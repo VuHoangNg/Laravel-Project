@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom'; // Import useNavigate for redirection
 import axios from 'axios';
-import { Form, Input, Button, message, Spin, Typography } from 'antd';
+import { Form, Input, Button, message, Typography } from 'antd';
 import { Link } from 'react-router-dom';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 
-const { Title, Text } = Typography;
+const { Title } = Typography;
 
 const api = axios.create({
     baseURL: '',
@@ -12,6 +13,7 @@ const api = axios.create({
 
 function Login() {
     const [loading, setLoading] = useState(false);
+    const navigate = useNavigate(); // Hook for navigation
 
     const onFinish = async (values) => {
         setLoading(true);
@@ -20,6 +22,10 @@ function Login() {
                 headers: { 'Accept': 'application/json' },
             });
             message.success(`Welcome, ${response.data.username}!`);
+            // Store the token (if needed) in localStorage or a state management solution
+            localStorage.setItem('auth_token', response.data.token);
+            // Redirect to the home page on success
+            navigate('/home');
         } catch (error) {
             if (error.response) {
                 message.error(error.response.data.message || 'Login failed');
@@ -71,7 +77,7 @@ function Login() {
                     layout="vertical"
                 >
                     <Form.Item
-                        label="Username"
+                        label="User Name"
                         name="username"
                         rules={[{ required: true, message: 'Please input your username!' }]}
                     >
@@ -100,7 +106,7 @@ function Login() {
                         <Link to="/forgot-password" style={{ color: '#3498db' }}>
                             Forgot Password?
                         </Link>
-                        <Link to="/auth/signup" style={{ color: '#3498db' }}>
+                        <Link to="/signup" style={{ color: '#3498db' }}>
                             Don't have an account? Sign Up
                         </Link>
                     </div>
@@ -127,7 +133,6 @@ function Login() {
                 </Form>
             </div>
 
-            {/* Add keyframes for fade-in animation */}
             <style>
                 {`
                     @keyframes fadeIn {

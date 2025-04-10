@@ -1,12 +1,12 @@
 <?php
 
-namespace Modules\Auth\Http\Controllers;
+namespace Modules\Auth\src\Controllers;
 
 use Illuminate\Contracts\Support\Renderable;
 use Illuminate\Routing\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Modules\Auth\Models\User;
+use Modules\Auth\src\Models\User;
 
 
 class AuthController extends Controller

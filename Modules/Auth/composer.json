@@ -9,9 +9,11 @@
     ],
     "extra": {
         "laravel": {
-            "providers": [],
+            "providers": [
+                "Modules\\Auth\\src\\Providers\\AuthServiceProvider",
+                "Modules\\Auth\\src\\Providers\\RouteServiceProvider"
+            ],
             "aliases": {
-
             }
         }
     },

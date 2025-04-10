@@ -1,6 +1,6 @@
 <?php
 
-use Modules\Auth\Http\Controllers\AuthController;
+use Modules\Auth\src\Controllers\AuthController;
 
 
 Route::middleware('auth:sanctum')->get('/auth', function (Request $request) {

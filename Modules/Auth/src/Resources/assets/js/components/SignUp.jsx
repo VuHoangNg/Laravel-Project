@@ -83,7 +83,7 @@ function SignUp() {
                     </Form.Item>
 
                     <Form.Item
-                        label="Username"
+                        label="User Name"
                         name="username"
                         rules={[{ required: true, message: 'Please input your username!' }]}
                     >
@@ -128,7 +128,7 @@ function SignUp() {
                     </Form.Item>
 
                     <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                        <Link to="/auth/login" style={{ color: '#3498db' }}>
+                        <Link to="/login" style={{ color: '#3498db' }}>
                             Already have an account? Log In
                         </Link>
                     </div>

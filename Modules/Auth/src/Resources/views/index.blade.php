@@ -6,6 +6,7 @@
 </head>
 <body>
     <div id="app"></div>
-    @vite('Modules/Auth/Resources/assets/js/app.jsx')
+    @viteReactRefresh
+    @vite('Modules/Auth/src/Resources/assets/js/app.jsx')
 </body>
 </html>
