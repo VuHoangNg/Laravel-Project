@@ -1,20 +1,25 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
-import Login from './components/LogIn';
-import SignUp from './components/SignUp';
-import Home from './components/Home';
-import RootLayout from './components/Layout';
+import React from "react";
+import ReactDOM from "react-dom/client";
+import {
+    BrowserRouter as Router,
+    Routes,
+    Route,
+    Link,
+    Navigate,
+} from "react-router-dom";
+import Login from "./components/LogIn";
+import SignUp from "./components/SignUp";
+import Home from "./components/Home";
+import RootLayout from "./components/Layout";
 
 // Import Ant Design components
-import { Button, Typography, Row, Col, Card } from 'antd';
-import 'antd/dist/reset.css';
+import { Button, Typography, Row, Col, Card } from "antd";
 
 const { Title, Paragraph } = Typography;
 
 // A simple protected route component
 function ProtectedRoute({ children }) {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem("auth_token");
     return token ? children : <Navigate to="/login" />;
 }
 
@@ -30,35 +35,60 @@ function App() {
                                 <Route
                                     path="/"
                                     element={
-                                        <Row justify="center" align="middle" style={{ minHeight: '100%' }}>
+                                        <Row
+                                            justify="center"
+                                            align="middle"
+                                            style={{ minHeight: "100%" }}
+                                        >
                                             <Col xs={22} sm={16} md={12} lg={8}>
                                                 <Card
                                                     style={{
-                                                        borderRadius: '10px',
-                                                        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
-                                                        animation: 'fadeIn 0.5s ease-in-out',
+                                                        borderRadius: "10px",
+                                                        boxShadow:
+                                                            "0 4px 20px rgba(0, 0, 0, 0.1)",
+                                                        animation:
+                                                            "fadeIn 0.5s ease-in-out",
                                                     }}
                                                 >
-                                                    <Title level={2} style={{ textAlign: 'center', color: '#2c3e50' }}>
+                                                    <Title
+                                                        level={2}
+                                                        style={{
+                                                            textAlign: "center",
+                                                            color: "#2c3e50",
+                                                        }}
+                                                    >
                                                         Welcome to the V APP
                                                     </Title>
                                                     <Paragraph
                                                         style={{
-                                                            textAlign: 'center',
-                                                            color: '#7f8c8d',
-                                                            fontSize: '1.1rem',
-                                                            marginBottom: '30px',
+                                                            textAlign: "center",
+                                                            color: "#7f8c8d",
+                                                            fontSize: "1.1rem",
+                                                            marginBottom:
+                                                                "30px",
                                                         }}
                                                     >
-                                                        Securely manage your account with ease. Log in to access your dashboard or sign up to get started.
+                                                        Securely manage your
+                                                        account with ease. Log
+                                                        in to access your
+                                                        dashboard or sign up to
+                                                        get started.
                                                     </Paragraph>
-                                                    <Row justify="center" gutter={16}>
+                                                    <Row
+                                                        justify="center"
+                                                        gutter={16}
+                                                    >
                                                         <Col>
                                                             <Link to="/login">
                                                                 <Button
                                                                     type="primary"
                                                                     size="large"
-                                                                    style={{ borderRadius: '5px', padding: '0 30px' }}
+                                                                    style={{
+                                                                        borderRadius:
+                                                                            "5px",
+                                                                        padding:
+                                                                            "0 30px",
+                                                                    }}
                                                                 >
                                                                     Log In
                                                                 </Button>
@@ -68,7 +98,12 @@ function App() {
                                                             <Link to="/signup">
                                                                 <Button
                                                                     size="large"
-                                                                    style={{ borderRadius: '5px', padding: '0 30px' }}
+                                                                    style={{
+                                                                        borderRadius:
+                                                                            "5px",
+                                                                        padding:
+                                                                            "0 30px",
+                                                                    }}
                                                                 >
                                                                     Sign Up
                                                                 </Button>
@@ -99,7 +134,7 @@ function App() {
     );
 }
 
-const appElement = document.getElementById('app');
+const appElement = document.getElementById("app");
 if (appElement) {
     const root = ReactDOM.createRoot(appElement);
     root.render(<App />);

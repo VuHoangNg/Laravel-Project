@@ -1,9 +1,8 @@
 {
-  "private": true,
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build"
-  },
-  "devDependencies": {
-  }
+    "private": true,
+    "scripts": {
+        "auth": "webpack --config webpack.auth.config.js --mode development",
+        "auth:build": "webpack --config webpack.auth.config.js --mode production"
+    },
+    "devDependencies": {}
 }
