@@ -1,17 +1,15 @@
 const path = require("path");
 
 module.exports = {
-    mode: "development", // Change to 'production' for production builds
+    mode: "development", // Change to "production" for production builds
     entry: {
-        auth: "./Modules/Auth/src/Resources/assets/js/app.jsx",
-        blog: "./Modules/Blog/src/Resources/assets/js/app.jsx", // Entry point for Blog module
+        auth: "./Modules/Auth/src/Resources/assets/js/app.jsx", // Auth entry
+        blog: "./Modules/Blog/src/Resources/assets/js/app.jsx", // Blog entry
     },
     output: {
-        path: (pathData) => {
-            const name = pathData.chunk.name;
-            return path.resolve(__dirname, `public/modules/${name}/`);
-        },
-        filename: "[name].js",
+        // Correct the output directory to an absolute path
+        path: path.resolve(__dirname, "public/modules"),
+        filename: "[name]/[name].js", // Dynamic output: auth.js -> Auth folder, blog.js -> Blog folder
     },
     module: {
         rules: [
@@ -32,6 +30,6 @@ module.exports = {
         ],
     },
     resolve: {
-        extensions: [".js", ".jsx"],
+        extensions: [".js", ".jsx"], // Resolves .js and .jsx extensions
     },
 };

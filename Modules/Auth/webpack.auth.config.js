@@ -6,8 +6,9 @@ module.exports = {
         auth: "./Modules/Auth/src/Resources/assets/js/app.jsx", // Entry point for Auth module
     },
     output: {
-        path: path.resolve("public/modules/auth"),
-        filename: "[name].js", // Output file name will be "auth.js"
+        // Correct the output directory to an absolute path
+        path: path.resolve(__dirname, "public/modules"),
+        filename: "[name]/[name].js", // Dynamic output: auth.js -> Auth folder, blog.js -> Blog folder
     },
     module: {
         rules: [
