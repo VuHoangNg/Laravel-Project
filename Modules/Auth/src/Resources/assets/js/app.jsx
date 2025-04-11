@@ -7,17 +7,14 @@ import {
     Link,
     Navigate,
 } from "react-router-dom";
-import Login from "./components/LogIn";
+import Login from "./components/Login";
 import SignUp from "./components/SignUp";
 import Home from "./components/Home";
 import RootLayout from "./components/Layout";
-
-// Import Ant Design components
 import { Button, Typography, Row, Col, Card } from "antd";
 
 const { Title, Paragraph } = Typography;
 
-// A simple protected route component
 function ProtectedRoute({ children }) {
     const token = localStorage.getItem("auth_token");
     return token ? children : <Navigate to="/login" />;
@@ -118,7 +115,7 @@ function App() {
                                 <Route path="/login" element={<Login />} />
                                 <Route path="/signup" element={<SignUp />} />
                                 <Route
-                                    path="/home"
+                                    path="/home/*" // Updated here
                                     element={
                                         <ProtectedRoute>
                                             <Home />

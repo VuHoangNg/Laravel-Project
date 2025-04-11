@@ -4,9 +4,13 @@ module.exports = {
     mode: "development", // Change to 'production' for production builds
     entry: {
         auth: "./Modules/Auth/src/Resources/assets/js/app.jsx",
+        blog: "./Modules/Blog/src/Resources/assets/js/app.jsx", // Entry point for Blog module
     },
     output: {
-        path: path.resolve(__dirname, "Modules/Auth/public/build"),
+        path: (pathData) => {
+            const name = pathData.chunk.name;
+            return path.resolve(__dirname, `public/modules/${name}/`);
+        },
         filename: "[name].js",
     },
     module: {

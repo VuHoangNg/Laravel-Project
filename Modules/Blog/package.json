@@ -1,0 +1,8 @@
+{
+    "private": true,
+    "scripts": {
+        "blog": "webpack --config webpack.blog.config.js --mode development",
+        "blog:build": "webpack --config webpack.blog.config.js --mode production"
+    },
+    "devDependencies": {}
+}

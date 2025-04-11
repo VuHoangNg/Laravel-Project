@@ -2,13 +2,6 @@ import React from 'react';
 import { Layout, Menu, Typography } from 'antd';
 import { Link, useNavigate, Routes, Route, useLocation } from 'react-router-dom';
 import { DashboardOutlined, UserOutlined, LogoutOutlined, ShoppingCartOutlined, AppstoreOutlined, TeamOutlined } from '@ant-design/icons';
-
-// Import the new components
-
-// import Orders from './Orders';
-// import Products from './Products';
-// import Customers from './Customers';
-// import Profile from './Profile';
 import Dashboard from './Dashboard';
 
 const { Sider, Content } = Layout;
@@ -57,12 +50,10 @@ function Home() {
         },
     ];
 
-    // Determine the selected key based on the current route
     const selectedKey = location.pathname.split('/').pop() || 'dashboard';
 
     return (
         <Layout style={{ minHeight: '100vh' }}>
-            {/* Sidebar */}
             <Sider width={200} style={{ backgroundColor: '#fff', boxShadow: '2px 0 8px rgba(0, 0, 0, 0.1)' }}>
                 <div style={{ padding: '20px', textAlign: 'center' }}>
                     <Title level={4} style={{ color: '#2c3e50', margin: 0 }}>
@@ -76,8 +67,6 @@ function Home() {
                     style={{ minHeight: 280, borderRight: 0 }}
                 />
             </Sider>
-
-            {/* Main Content */}
             <Layout style={{ padding: '0 24px 24px' }}>
                 <Content
                     style={{
@@ -90,10 +79,10 @@ function Home() {
                 >
                     <Routes>
                         <Route path="/" element={<Dashboard />} />
-                        {/* <Route path="/orders" element={<Orders />} />
-                        <Route path="/products" element={<Products />} />
-                        <Route path="/customers" element={<Customers />} />
-                        <Route path="/profile" element={<Profile />} /> */}
+                        <Route path="/orders" element={<div>Orders Page</div>} />
+                        <Route path="/products" element={<div>Products Page</div>} />
+                        <Route path="/customers" element={<div>Customers Page</div>} />
+                        <Route path="/profile" element={<div>Profile Page</div>} />
                     </Routes>
                 </Content>
             </Layout>
