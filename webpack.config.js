@@ -3,8 +3,8 @@ const path = require("path");
 module.exports = {
     mode: "development", // Change to "production" for production builds
     entry: {
-        auth: "./Modules/Auth/src/Resources/assets/js/app.jsx", // Auth entry
         blog: "./Modules/Blog/src/Resources/assets/js/app.jsx", // Blog entry
+        core: "./Modules/Core/src/Resources/assets/js/app.jsx", // Core entry
     },
     output: {
         // Correct the output directory to an absolute path

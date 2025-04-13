@@ -1,8 +1,0 @@
-{
-    "private": true,
-    "scripts": {
-        "auth": "webpack --config webpack.auth.config.js --mode development",
-        "auth:build": "webpack --config webpack.auth.config.js --mode production"
-    },
-    "devDependencies": {}
-}

@@ -7,7 +7,7 @@ module.exports = {
     },
     output: {
         // Correct the output directory to an absolute path
-        path: path.resolve(__dirname, "public/modules"),
+        path: path.resolve("public/modules"),
         filename: "[name]/[name].js", // Dynamic output: auth.js -> Auth folder, blog.js -> Blog folder
     },
     module: {

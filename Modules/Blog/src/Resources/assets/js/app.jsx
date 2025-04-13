@@ -1,16 +1,25 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { Typography } from "antd";
-import Grid from "antd/es/card/Grid";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import RootLayout from "../../../../../Auth/src/Resources/assets/js/components/Layout";
+import HomeBlog from "./components/Home";
 
 function Blog() {
     return (
-        <Grid>
-            <Typography.Title level={2}>Blog</Typography.Title>
-            <Typography.Paragraph>
-                This is the Blog module.
-            </Typography.Paragraph>
-        </Grid>
+        <Router basename="/blog">
+            <Routes>
+                <Route
+                    path="/*"
+                    element={
+                        <RootLayout>
+                            <Routes>
+                                <Route path="/" element={<HomeBlog />} />
+                            </Routes>
+                        </RootLayout>
+                    }
+                />
+            </Routes>
+        </Router>
     );
 }
 
