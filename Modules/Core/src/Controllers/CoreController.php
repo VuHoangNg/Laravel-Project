@@ -80,52 +80,6 @@ class CoreController extends Controller
         //
     }
 
-    public function login(Request $request)
-    {
-        $request->validate([
-            'username' => 'required',
-            'password' => 'required',
-        ]);
-
-        $user = User::where('username', $request->username)->first();
-
-        if ($user && Hash::check($request->password, $user->password)) {
-            // Issue token
-            $token = $user->createToken('core_token')->plainTextToken;
-
-            return response()->json([
-                'username' => $user->username,
-                'token' => $token,
-                'message' => 'Login successful',
-            ]);
-        }
-
-        return response()->json([
-            'message' => 'Invalid credentials',
-        ], 401);
-    }
-
-        public function register(Request $request)
-    {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'username' => 'required|string|max:255|unique:users',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:8',
-        ]);
-
-        $user = User::create([
-            'name' => $request->name,
-            'username' => $request->username,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-        ]);
-
-        return response()->json([
-            'name' => $user->name,
-            'message' => 'Account created successfully',
-        ], 201);
-    }
 }
 
 

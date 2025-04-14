@@ -3,6 +3,7 @@
     "scripts": {
         "build": "webpack --mode production",
         "dev": "webpack --mode development --watch",
+        "auth": "webpack --config Modules/Auth/webpack.auth.config.js --watch",
         "core": "webpack --config Modules/Core/webpack.core.config.js --watch",
         "blog": "webpack --config Modules/Blog/webpack.blog.config.js --watch"
     },
@@ -26,11 +27,14 @@
     "dependencies": {
         "@reduxjs/toolkit": "^2.6.1",
         "antd": "^5.22.0",
+        "history": "^5.3.0",
         "laravel-mix": "^6.0.49",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
         "react-redux": "^9.2.0",
-        "react-router-dom": "^6.26.1",
-        "redux": "^5.0.1"
+        "react-router-dom": "^6.30.0",
+        "redux": "^5.0.1",
+        "redux-logger": "^3.0.6",
+        "redux-thunk": "^3.1.0"
     }
 }
