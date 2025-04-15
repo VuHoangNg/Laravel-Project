@@ -32,15 +32,19 @@ api.interceptors.request.use(
 
 // Add Axios response interceptor
 api.interceptors.response.use(
-    (response) => response,
+    (response) => {
+        // Successful response
+        console.log("API call successful:", response);
+        return response.data; // Return only the data from the response
+    },
     (error) => {
+        // Handle error responses
         if (error.response?.status === 401) {
             console.error("Unauthorized! Redirecting to login...");
             localStorage.removeItem("auth_token"); // Clear invalid token
             window.location.href = "/auth/login";
         } else if (error.response?.status === 422) {
             console.error("Validation error:", error.response.data.errors);
-            // Optionally handle validation errors in UI
         } else if (error.response?.status === 500) {
             console.error("Server error:", error.response.data.message);
         }
