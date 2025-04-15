@@ -81,29 +81,51 @@ class AuthController extends Controller
     }
 
     public function login(Request $request)
-    {
-        $request->validate([
-            'username' => 'required',
-            'password' => 'required',
-        ]);
+{
+    $request->validate([
+        'username' => 'required',
+        'password' => 'required',
+    ]);
 
-        $user = User::where('username', $request->username)->first();
+    $user = User::where('username', $request->username)->first();
 
-        if ($user && Hash::check($request->password, $user->password)) {
-            // Issue token
-            $token = $user->createToken('auth_token')->plainTextToken;
+    if ($user && Hash::check($request->password, $user->password)) {
+        // Issue token
+        $token = $user->createToken('auth_token')->plainTextToken;
 
-            return response()->json([
-                'username' => $user->username,
-                'token' => $token,
-                'message' => 'Login successful',
-            ]);
-        }
+        // Set cookies for username and email
+        setcookie('username', $user->username, time() + (86400 * 7), "/", "127.0.0.1", false, true);
+        setcookie('email', $user->email, time() + (86400 * 7), "/", "127.0.0.1", false, true);
+        setcookie('token', $token, time() + (86400 * 7), "/", "127.0.0.1", false, true);
 
         return response()->json([
-            'message' => 'Invalid credentials',
-        ], 401);
+            'username' => $user->username,
+            'email' => $user->email,
+            'token' => $token,
+            'message' => 'Login successful',
+        ]);
     }
+
+    return response()->json([
+        'message' => 'Invalid credentials',
+    ], 401);
+}
+
+    public function logout(Request $request)
+{
+    // Revoke the user's current token
+    $request->user()->currentAccessToken()->delete();
+
+    // Clear the cookies
+    setcookie('username', '', time() - 3600, "/", "127.0.0.1", false, true);
+    setcookie('email', '', time() - 3600, "/", "127.0.0.1", false, true);
+    setcookie('token', '', time() - 3600, "/", "127.0.0.1", false, true);
+
+    return response()->json([
+        'message' => 'Logout successful'
+    ]);
+}
+
 
         public function register(Request $request)
     {

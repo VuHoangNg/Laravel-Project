@@ -1,14 +1,10 @@
 import React, { useState } from "react";
-import axios from "axios";
 import { Form, Input, Button, message, Typography } from "antd";
 import { Link, useNavigate } from "react-router-dom";
 import { UserOutlined, MailOutlined, LockOutlined } from "@ant-design/icons";
+import api from "../../../../../../Core/src/Resources/assets/js/api/api";
 
 const { Title } = Typography;
-
-const api = axios.create({
-    baseURL: "", // Replace with backend URL
-});
 
 function SignUp() {
     const [loading, setLoading] = useState(false);
@@ -18,7 +14,7 @@ function SignUp() {
         setLoading(true);
         try {
             const response = await api.post("/api/register", values, {
-                headers: { Accept: "application/json" },
+                skipAuth: true,
             });
             message.success(`Account created successfully, ${response.data.name}!`);
             navigate("/auth/login");

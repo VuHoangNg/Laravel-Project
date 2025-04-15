@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
     MenuFoldOutlined,
     MenuUnfoldOutlined,
@@ -8,50 +8,18 @@ import {
     LogoutOutlined,
 } from "@ant-design/icons";
 import { Button, Layout, Menu, theme, Modal } from "antd";
-import {
-    Routes,
-    Route,
-    Link,
-    Navigate,
-    useNavigate,
-} from "react-router-dom";
+import { Routes, Route, Link } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { clearToken } from "./redux/actions";
 import Blog from "../../../../../Blog/src/Resources/assets/js/app";
-import axios from "axios";
+import api from "./api/api";
 
 const { Header, Sider, Content } = Layout;
-
-// Axios instance with token interceptor
-const api = axios.create({
-    baseURL: "", // Replace with backend URL, e.g., "http://localhost:8000"
-});
-
-api.interceptors.request.use((config) => {
-    const token = localStorage.getItem("auth_token");
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-});
-
-api.interceptors.response.use(
-    (response) => response,
-    (error) => {
-        if (error.response?.status === 401) {
-            localStorage.removeItem("auth_token");
-            store.dispatch({ type: "auth/clearToken" });
-            window.location.href = "/auth/login";
-        }
-        return Promise.reject(error);
-    }
-);
 
 function Core() {
     const [collapsed, setCollapsed] = useState(false);
     const { token } = useSelector((state) => state);
     const dispatch = useDispatch();
-    const navigate = useNavigate();
     const {
         token: { colorBgContainer, borderRadiusLG },
     } = theme.useToken();
@@ -64,13 +32,18 @@ function Core() {
     const handleLogout = () => {
         Modal.confirm({
             title: "Are you sure you want to log out?",
-            onOk: () => {
-                dispatch(clearToken());
-                window.location.href = "/auth/login";
+            onOk: async () => {
+                try {
+                    await api.post("/api/logout");
+                    dispatch(clearToken());
+                    window.location.href = "/auth/login";
+                } catch (error) {
+                    message.error("Logout failed. Please try again.");
+                    console.error(error);
+                }
             },
         });
     };
-
     const menuItems = [
         {
             key: "1",
@@ -134,7 +107,10 @@ function Core() {
                         <Route path="/" element={<h2>Welcome to Core</h2>} />
                         <Route path="/blog" element={<Blog />} />
                         <Route path="/media" element={<div>Media Page</div>} />
-                        <Route path="/nav3" element={<div>Navigation 3 Page</div>} />
+                        <Route
+                            path="/nav3"
+                            element={<div>Navigation 3 Page</div>}
+                        />
                     </Routes>
                 </Content>
             </Layout>

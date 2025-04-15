@@ -1,29 +1,23 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import axios from "axios";
 import { Form, Input, Button, message, Typography } from "antd";
 import { Link } from "react-router-dom";
 import { UserOutlined, LockOutlined } from "@ant-design/icons";
+import api from "../../../../../../Core/src/Resources/assets/js/api/api";
 
 const { Title } = Typography;
 
-const api = axios.create({
-    baseURL: "", // Replace with backend URL
-});
-
 function Login() {
     const [loading, setLoading] = useState(false);
-    const navigate = useNavigate();
 
     const onFinish = async (values) => {
         setLoading(true);
         try {
             const response = await api.post("/api/login", values, {
-                headers: { Accept: "application/json" },
+                skipAuth: true,
             });
             localStorage.setItem("auth_token", response.data.token);
             message.success(`Welcome, ${response.data.username}!`);
-            navigate("/core");
+            window.location.href = "/core";
         } catch (error) {
             message.error(error.response?.data?.message || "Login failed");
         } finally {
@@ -59,7 +53,11 @@ function Login() {
             >
                 <Title
                     level={2}
-                    style={{ textAlign: "center", color: "#2c3e50", marginBottom: "20px" }}
+                    style={{
+                        textAlign: "center",
+                        color: "#2c3e50",
+                        marginBottom: "20px",
+                    }}
                 >
                     Login
                 </Title>
@@ -74,7 +72,12 @@ function Login() {
                     <Form.Item
                         label="User Name"
                         name="username"
-                        rules={[{ required: true, message: "Please input your username!" }]}
+                        rules={[
+                            {
+                                required: true,
+                                message: "Please input your username!",
+                            },
+                        ]}
                     >
                         <Input
                             prefix={<UserOutlined />}
@@ -86,7 +89,12 @@ function Login() {
                     <Form.Item
                         label="Password"
                         name="password"
-                        rules={[{ required: true, message: "Please input your password!" }]}
+                        rules={[
+                            {
+                                required: true,
+                                message: "Please input your password!",
+                            },
+                        ]}
                     >
                         <Input.Password
                             prefix={<LockOutlined />}
@@ -102,7 +110,10 @@ function Login() {
                             marginBottom: "20px",
                         }}
                     >
-                        <Link to="/auth/forgot-password" style={{ color: "#3498db" }}>
+                        <Link
+                            to="/auth/forgot-password"
+                            style={{ color: "#3498db" }}
+                        >
                             Forgot Password?
                         </Link>
                         <Link to="/auth/signup" style={{ color: "#3498db" }}>
