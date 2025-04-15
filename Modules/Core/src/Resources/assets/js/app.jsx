@@ -75,7 +75,7 @@ function Core() {
                 <Menu
                     theme="dark"
                     mode="inline"
-                    defaultSelectedKeys={["1"]}
+                    // defaultSelectedKeys={["1"]}
                     items={menuItems}
                 />
             </Sider>

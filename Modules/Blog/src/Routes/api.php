@@ -1,18 +1,12 @@
 <?php
 
-use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+use Modules\Blog\src\Controllers\BlogController;
 
-/*
-|--------------------------------------------------------------------------
-| API Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider within a group which
-| is assigned the "api" middleware group. Enjoy building your API!
-|
-*/
-
-Route::middleware('auth:api')->get('/blog', function (Request $request) {
-    return $request->user();
+Route::prefix('blogs')->group(function () {
+    Route::get('/', [BlogController::class, 'index'])->name('blogs.index');
+    Route::post('/', [BlogController::class, 'store'])->middleware('auth:sanctum')->name('blogs.store');
+    Route::get('/{id}', [BlogController::class, 'show'])->name('blogs.show');
+    Route::put('/{id}', [BlogController::class, 'update'])->middleware('auth:sanctum')->name('blogs.update');
+    Route::delete('/{id}', [BlogController::class, 'destroy'])->middleware('auth:sanctum')->name('blogs.destroy');
 });

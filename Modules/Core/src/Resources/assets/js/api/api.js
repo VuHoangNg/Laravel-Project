@@ -5,6 +5,7 @@ const api = axios.create({
     baseURL: "http://127.0.0.1:8000", // Your backend base URL
     headers: {
         Accept: "application/json",
+        "Content-Type": "application/json", // Explicitly set for POST/PUT
     },
 });
 
@@ -19,10 +20,7 @@ api.interceptors.request.use(
         // Retrieve the token from localStorage
         const token = localStorage.getItem("auth_token");
         if (token) {
-            // Add Authorization header with Bearer token
             config.headers.Authorization = `Bearer ${token}`;
-        } else {
-            console.warn("Authorization token not found!"); // Debugging message
         }
         return config;
     },
@@ -32,14 +30,19 @@ api.interceptors.request.use(
     }
 );
 
-// Add Axios response interceptor (optional, for handling errors globally)
+// Add Axios response interceptor
 api.interceptors.response.use(
-    (response) => response, // Pass through successful responses
+    (response) => response,
     (error) => {
         if (error.response?.status === 401) {
             console.error("Unauthorized! Redirecting to login...");
-            // Example: Redirect user to login page if token is invalid or expired
+            localStorage.removeItem("auth_token"); // Clear invalid token
             window.location.href = "/auth/login";
+        } else if (error.response?.status === 422) {
+            console.error("Validation error:", error.response.data.errors);
+            // Optionally handle validation errors in UI
+        } else if (error.response?.status === 500) {
+            console.error("Server error:", error.response.data.message);
         }
         return Promise.reject(error);
     }
