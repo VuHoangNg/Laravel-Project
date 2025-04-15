@@ -5,7 +5,7 @@ import {
     createBlog,
     updateBlog,
     deleteBlog,
-} from "../../../../../Core/src/Resources/assets/js/redux/actions";
+} from "./redux/actions";
 import { BlogProvider, useBlogContext } from "./context/BlogContext";
 import {
     Layout,
@@ -24,13 +24,12 @@ const { Content } = Layout;
 
 function BlogContent() {
     const dispatch = useDispatch();
-    const blogs = useSelector((state) => state.blogs);
+    const blogs = useSelector((state) => state.blogs.blogs); // Updated state path
     const { isModalOpen, editingBlog, openModal, closeModal } =
         useBlogContext();
     const [form] = Form.useForm();
     const [searchParams, setSearchParams] = useSearchParams();
 
-    // Handle URL query params on mount
     useEffect(() => {
         const action = searchParams.get("action");
         const id = searchParams.get("id");
@@ -51,29 +50,44 @@ function BlogContent() {
         }
     }, [searchParams, blogs, openModal, isModalOpen]);
 
-    // Fetch blogs on mount
     useEffect(() => {
         dispatch(fetchBlogs());
     }, [dispatch]);
 
-    const handleSubmit = (values) => {
-        if (editingBlog) {
-            dispatch(updateBlog(editingBlog.id, values));
-        } else {
-            dispatch(createBlog(values));
+    const handleSubmit = async (values) => {
+        try {
+            if (editingBlog) {
+                await dispatch(updateBlog(editingBlog.id, values));
+            } else {
+                await dispatch(createBlog(values));
+            }
+            closeModal();
+            setSearchParams({});
+            form.resetFields();
+        } catch (error) {
+            if (error.response?.status === 422) {
+                const errors = error.response.data.errors;
+                Object.keys(errors).forEach((key) => {
+                    form.setFields([
+                        {
+                            name: key,
+                            errors: errors[key],
+                        },
+                    ]);
+                });
+            }
         }
-        closeModal();
-        setSearchParams({}); // Clear query params after submission
-        form.resetFields();
     };
 
     const handleDelete = (id) => {
+        setSearchParams({ action: "delete", id });
         Modal.confirm({
             title: "Are you sure you want to delete this blog?",
             onOk: () => {
                 dispatch(deleteBlog(id));
-                setSearchParams({}); // Clear query params after deletion
+                setSearchParams({});
             },
+            onCancel: () => setSearchParams({}),
         });
     };
 

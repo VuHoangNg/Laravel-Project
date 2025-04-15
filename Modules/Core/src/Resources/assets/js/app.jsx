@@ -10,15 +10,15 @@ import {
 import { Button, Layout, Menu, theme, Modal } from "antd";
 import { Routes, Route, Link } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
-import { clearToken } from "./redux/actions";
-import Blog from "../../../../../Blog/src/Resources/assets/js/app";
+import { clearToken } from "./redux/actions"; // Core auth actions
 import api from "./api/api";
+import Blog from "../../../../../Blog/src/Resources/assets/js/app";
 
 const { Header, Sider, Content } = Layout;
 
 function Core() {
     const [collapsed, setCollapsed] = useState(false);
-    const { token } = useSelector((state) => state);
+    const { token } = useSelector((state) => state.auth); // Updated state path
     const dispatch = useDispatch();
     const {
         token: { colorBgContainer, borderRadiusLG },
@@ -44,6 +44,7 @@ function Core() {
             },
         });
     };
+
     const menuItems = [
         {
             key: "1",
@@ -75,7 +76,6 @@ function Core() {
                 <Menu
                     theme="dark"
                     mode="inline"
-                    // defaultSelectedKeys={["1"]}
                     items={menuItems}
                 />
             </Sider>
