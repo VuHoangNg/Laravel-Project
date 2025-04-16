@@ -7,7 +7,7 @@ use Illuminate\Routing\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Modules\Auth\src\Models\User;
-
+use Illuminate\Support\Facades\Cookie;
 
 class AuthController extends Controller
 {
@@ -93,17 +93,14 @@ class AuthController extends Controller
         // Issue token
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        // Set cookies for username and email
-        setcookie('username', $user->username, time() + (86400 * 7), "/", "127.0.0.1", false, true);
-        setcookie('email', $user->email, time() + (86400 * 7), "/", "127.0.0.1", false, true);
-        setcookie('token', $token, time() + (86400 * 7), "/", "127.0.0.1", false, true);
-
         return response()->json([
             'username' => $user->username,
             'email' => $user->email,
             'token' => $token,
             'message' => 'Login successful',
-        ]);
+        ])->withCookie(Cookie::forever('username', $user->username))
+          ->withCookie(Cookie::forever('email', $user->email))
+          ->withCookie(Cookie::forever('token', $token));
     }
 
     return response()->json([
@@ -111,20 +108,18 @@ class AuthController extends Controller
     ], 401);
 }
 
-    public function logout(Request $request)
-{
-    // Revoke the user's current token
-    $request->user()->currentAccessToken()->delete();
+        public function logout(Request $request)
+        {
+            // Revoke the user's current token
+            $request->user()->currentAccessToken()->delete();
 
-    // Clear the cookies
-    setcookie('username', '', time() - 3600, "/", "127.0.0.1", false, true);
-    setcookie('email', '', time() - 3600, "/", "127.0.0.1", false, true);
-    setcookie('token', '', time() - 3600, "/", "127.0.0.1", false, true);
-
-    return response()->json([
-        'message' => 'Logout successful'
-    ]);
-}
+            // Clear the cookies using Cookie facade
+            return response()->json([
+                'message' => 'Logout successful'
+            ])->withCookie(Cookie::forget('username'))
+            ->withCookie(Cookie::forget('email'))
+            ->withCookie(Cookie::forget('token'));
+        }
 
 
         public function register(Request $request)

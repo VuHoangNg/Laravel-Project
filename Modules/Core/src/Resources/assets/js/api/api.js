@@ -35,7 +35,7 @@ api.interceptors.response.use(
     (response) => {
         // Successful response
         console.log("API call successful:", response);
-        return response.data; // Return only the data from the response
+        return response; // Return only the data from the response
     },
     (error) => {
         // Handle error responses

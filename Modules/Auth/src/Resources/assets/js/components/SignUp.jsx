@@ -2,22 +2,20 @@ import React, { useState } from "react";
 import { Form, Input, Button, message, Typography } from "antd";
 import { Link, useNavigate } from "react-router-dom";
 import { UserOutlined, MailOutlined, LockOutlined } from "@ant-design/icons";
-import api from "../../../../../../Core/src/Resources/assets/js/api/api";
+import { register } from "../redux/actions";
+import { useDispatch } from "react-redux";
 
 const { Title } = Typography;
 
 function SignUp() {
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
-
+    const dispatch = useDispatch();
     const onFinish = async (values) => {
         setLoading(true);
         try {
-            const response = await api.post("/api/register", values, {
-                skipAuth: true,
-            });
-            message.success(`Account created successfully, ${response.data.name}!`);
-            navigate("/auth/login");
+            await dispatch(register(values));
+            navigate("/login");
         } catch (error) {
             message.error(error.response?.data?.message || "Sign up failed");
         } finally {
@@ -53,7 +51,11 @@ function SignUp() {
             >
                 <Title
                     level={2}
-                    style={{ textAlign: "center", color: "#2c3e50", marginBottom: "20px" }}
+                    style={{
+                        textAlign: "center",
+                        color: "#2c3e50",
+                        marginBottom: "20px",
+                    }}
                 >
                     Sign Up
                 </Title>
@@ -67,7 +69,12 @@ function SignUp() {
                     <Form.Item
                         label="Name"
                         name="name"
-                        rules={[{ required: true, message: "Please input your name!" }]}
+                        rules={[
+                            {
+                                required: true,
+                                message: "Please input your name!",
+                            },
+                        ]}
                     >
                         <Input
                             prefix={<UserOutlined />}
@@ -79,7 +86,12 @@ function SignUp() {
                     <Form.Item
                         label="User Name"
                         name="username"
-                        rules={[{ required: true, message: "Please input your username!" }]}
+                        rules={[
+                            {
+                                required: true,
+                                message: "Please input your username!",
+                            },
+                        ]}
                     >
                         <Input
                             prefix={<UserOutlined />}
@@ -92,8 +104,14 @@ function SignUp() {
                         label="Email"
                         name="email"
                         rules={[
-                            { required: true, message: "Please input your email!" },
-                            { type: "email", message: "Please enter a valid email!" },
+                            {
+                                required: true,
+                                message: "Please input your email!",
+                            },
+                            {
+                                type: "email",
+                                message: "Please enter a valid email!",
+                            },
                         ]}
                     >
                         <Input
@@ -107,8 +125,15 @@ function SignUp() {
                         label="Password"
                         name="password"
                         rules={[
-                            { required: true, message: "Please input your password!" },
-                            { min: 8, message: "Password must be at least 8 characters!" },
+                            {
+                                required: true,
+                                message: "Please input your password!",
+                            },
+                            {
+                                min: 8,
+                                message:
+                                    "Password must be at least 8 characters!",
+                            },
                         ]}
                     >
                         <Input.Password
@@ -119,7 +144,7 @@ function SignUp() {
                         />
                     </Form.Item>
                     <div style={{ textAlign: "center", marginBottom: "20px" }}>
-                        <Link to="/auth/login" style={{ color: "#3498db" }}>
+                        <Link to="/login" style={{ color: "#3498db" }}>
                             Already have an account? Log In
                         </Link>
                     </div>

@@ -2,21 +2,18 @@ import React, { useState } from "react";
 import { Form, Input, Button, message, Typography } from "antd";
 import { Link } from "react-router-dom";
 import { UserOutlined, LockOutlined } from "@ant-design/icons";
-import api from "../../../../../../Core/src/Resources/assets/js/api/api";
+import { login } from "../redux/actions";
+import { useDispatch } from "react-redux";
 
 const { Title } = Typography;
 
 function Login() {
     const [loading, setLoading] = useState(false);
-
+    const dispatch = useDispatch();
     const onFinish = async (values) => {
         setLoading(true);
         try {
-            const response = await api.post("/api/login", values, {
-                skipAuth: true,
-            });
-            localStorage.setItem("auth_token", response.data.token);
-            message.success(`Welcome, ${response.data.username}!`);
+            await dispatch(login(values));
             window.location.href = "/core";
         } catch (error) {
             message.error(error.response?.data?.message || "Login failed");
@@ -111,12 +108,12 @@ function Login() {
                         }}
                     >
                         <Link
-                            to="/auth/forgot-password"
+                            to="/forgot-password"
                             style={{ color: "#3498db" }}
                         >
                             Forgot Password?
                         </Link>
-                        <Link to="/auth/signup" style={{ color: "#3498db" }}>
+                        <Link to="/signup" style={{ color: "#3498db" }}>
                             Don't have an account? Sign Up
                         </Link>
                     </div>

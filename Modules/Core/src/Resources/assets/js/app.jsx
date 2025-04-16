@@ -10,9 +10,9 @@ import {
 import { Button, Layout, Menu, theme, Modal } from "antd";
 import { Routes, Route, Link } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
-import { clearToken } from "./redux/actions"; // Core auth actions
-import api from "./api/api";
+import { clearToken } from "./redux/actions";
 import Blog from "../../../../../Blog/src/Resources/assets/js/app";
+import { logout } from "../../../../../Auth/src/Resources/assets/js/redux/actions";
 
 const { Header, Sider, Content } = Layout;
 
@@ -34,7 +34,7 @@ function Core() {
             title: "Are you sure you want to log out?",
             onOk: async () => {
                 try {
-                    await api.post("/api/logout");
+                    await dispatch(logout());
                     dispatch(clearToken());
                     window.location.href = "/auth/login";
                 } catch (error) {
@@ -73,11 +73,7 @@ function Core() {
         <Layout style={{ minHeight: "100vh" }}>
             <Sider trigger={null} collapsible collapsed={collapsed}>
                 <div className="demo-logo-vertical" />
-                <Menu
-                    theme="dark"
-                    mode="inline"
-                    items={menuItems}
-                />
+                <Menu theme="dark" mode="inline" items={menuItems} />
             </Sider>
             <Layout>
                 <Header style={{ padding: 0, background: colorBgContainer }}>
