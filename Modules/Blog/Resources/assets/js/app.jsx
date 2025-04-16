@@ -23,14 +23,12 @@ function BlogContent() {
         editingBlogContext,
         getBlogContext,
         deleteBlogContext,
-        apiBlogContext,
     } = useBlogContext();
-    const { resetForm } = createBlogContext;
-    const { editingBlog } = editingBlogContext;
-    const { isModalOpen, openModal, closeModal } = getBlogContext;
-    const { isDeleteModalOpen, blogToDelete, openDeleteModal, closeDeleteModal } =
+    const { resetForm, createBlog } = createBlogContext;
+    const { editingBlog, updateBlog } = editingBlogContext;
+    const { isModalOpen, openModal, closeModal, fetchBlogs } = getBlogContext;
+    const { isDeleteModalOpen, blogToDelete, openDeleteModal, closeDeleteModal, deleteBlog } =
         deleteBlogContext;
-    const { fetchBlogs, createBlog, updateBlog, deleteBlog } = apiBlogContext;
     const [form] = Form.useForm();
     const [searchParams, setSearchParams] = useSearchParams();
 
