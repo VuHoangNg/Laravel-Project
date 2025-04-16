@@ -1,10 +1,13 @@
 import React, { createContext, useContext, useState } from "react";
+import { useDispatch } from "react-redux";
 
 // Create a single BlogContext
 const BlogContext = createContext();
 
-// BlogProvider to manage all context logic and pass as props
-export function BlogProvider({ children }) {
+// BlogProvider to manage all context logic and API calls
+export function BlogProvider({ children, api }) {
+    const dispatch = useDispatch();
+
     // State for creating blogs
     const [formData, setFormData] = useState({ title: "", content: "" });
 
@@ -54,6 +57,46 @@ export function BlogProvider({ children }) {
         },
     };
 
+    // API actions for blogs
+    const apiBlogContext = {
+        fetchBlogs: async () => {
+            try {
+                const response = await api.get("/api/blogs"); // Adjust endpoint as needed
+                dispatch({ type: "blogs/setBlogs", payload: response.data });
+            } catch (error) {
+                console.error("Failed to fetch blogs:", error);
+                throw error;
+            }
+        },
+        createBlog: async (data) => {
+            try {
+                const response = await api.post("/api/blogs", data); // Adjust endpoint
+                dispatch({ type: "blogs/addBlog", payload: response.data });
+            } catch (error) {
+                console.error("Failed to create blog:", error);
+                throw error;
+            }
+        },
+        updateBlog: async (id, data) => {
+            try {
+                const response = await api.put(`/api/blogs/${id}`, data); // Adjust endpoint
+                dispatch({ type: "blogs/updateBlog", payload: response.data });
+            } catch (error) {
+                console.error("Failed to update blog:", error);
+                throw error;
+            }
+        },
+        deleteBlog: async (id) => {
+            try {
+                await api.delete(`/api/blogs/${id}`); // Adjust endpoint
+                dispatch({ type: "blogs/deleteBlog", payload: id });
+            } catch (error) {
+                console.error("Failed to delete blog:", error);
+                throw error;
+            }
+        },
+    };
+
     return (
         <BlogContext.Provider
             value={{
@@ -61,6 +104,7 @@ export function BlogProvider({ children }) {
                 editingBlogContext,
                 getBlogContext,
                 deleteBlogContext,
+                apiBlogContext,
             }}
         >
             {children}
