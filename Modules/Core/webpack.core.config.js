@@ -3,7 +3,7 @@ const path = require("path");
 module.exports = {
     mode: "development",
     entry: {
-        core: "./Modules/Core/src/Resources/assets/js/index.jsx",
+        core: "./Modules/Core/Resources/assets/js/index.jsx",
     },
     output: {
         // Correct the output directory to an absolute path

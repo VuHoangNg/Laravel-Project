@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
     fetchBlogs,
@@ -24,33 +24,13 @@ const { Content } = Layout;
 
 function BlogContent() {
     const dispatch = useDispatch();
-    const blogs = useSelector((state) => state.blogs.blogs); // Updated state path
+    const blogs = useSelector((state) => state.blogs.blogs);
     const { isModalOpen, editingBlog, openModal, closeModal } =
         useBlogContext();
     const [form] = Form.useForm();
     const [searchParams, setSearchParams] = useSearchParams();
 
-    useEffect(() => {
-        const action = searchParams.get("action");
-        const id = searchParams.get("id");
-
-        if (action === "create" && !isModalOpen) {
-            openModal();
-        } else if (action === "edit" && id) {
-            const blog = blogs.find((b) => b.id === parseInt(id));
-            if (blog) {
-                openModal(blog);
-            } else {
-                Modal.error({
-                    title: "Blog Not Found",
-                    content: "The requested blog does not exist.",
-                    onOk: () => setSearchParams({}),
-                });
-            }
-        }
-    }, [searchParams, blogs, openModal, isModalOpen]);
-
-    useEffect(() => {
+    React.useEffect(() => {
         dispatch(fetchBlogs());
     }, [dispatch]);
 
@@ -93,11 +73,15 @@ function BlogContent() {
 
     const handleOpenCreate = () => {
         openModal();
+        form.resetFields();
+        form.setFieldsValue({ title: "", content: "" });
         setSearchParams({ action: "create" });
     };
 
     const handleOpenEdit = (blog) => {
         openModal(blog);
+        form.resetFields();
+        form.setFieldsValue(blog);
         setSearchParams({ action: "edit", id: blog.id });
     };
 
@@ -150,12 +134,7 @@ function BlogContent() {
                 onCancel={handleCancel}
                 footer={null}
             >
-                <Form
-                    form={form}
-                    layout="vertical"
-                    onFinish={handleSubmit}
-                    initialValues={editingBlog || {}}
-                >
+                <Form form={form} layout="vertical" onFinish={handleSubmit}>
                     <Form.Item
                         name="title"
                         label="Title"

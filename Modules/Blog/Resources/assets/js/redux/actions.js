@@ -1,5 +1,5 @@
 import { message } from "antd";
-import api from "../../../../../../Core/src/Resources/assets/js/api/api";
+import api from "../../../../../Core/Resources/assets/js/api/api";
 
 export const fetchBlogs = () => async (dispatch) => {
     try {

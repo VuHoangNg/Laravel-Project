@@ -1,8 +1,8 @@
-import React, { createContext, useState, useContext } from "react";
+import React, { createContext, useContext, useState } from "react";
 
 const BlogContext = createContext();
 
-export const BlogProvider = ({ children }) => {
+export function BlogProvider({ children }) {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingBlog, setEditingBlog] = useState(null);
 
@@ -23,6 +23,8 @@ export const BlogProvider = ({ children }) => {
             {children}
         </BlogContext.Provider>
     );
-};
+}
 
-export const useBlogContext = () => useContext(BlogContext);
+export function useBlogContext() {
+    return useContext(BlogContext);
+}

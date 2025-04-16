@@ -11,8 +11,8 @@ import { Button, Layout, Menu, theme, Modal } from "antd";
 import { Routes, Route, Link } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { clearToken } from "./redux/actions";
-import Blog from "../../../../../Blog/src/Resources/assets/js/app";
-import { logout } from "../../../../../Auth/src/Resources/assets/js/redux/actions";
+import Blog from "../../../../Blog/Resources/assets/js/app";
+import { logout } from "../../../../Auth/Resources/assets/js/redux/actions";
 
 const { Header, Sider, Content } = Layout;
 

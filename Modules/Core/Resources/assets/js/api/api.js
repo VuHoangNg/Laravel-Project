@@ -34,7 +34,7 @@ api.interceptors.request.use(
 api.interceptors.response.use(
     (response) => {
         // Successful response
-        console.log("API call successful:", response);
+
         return response; // Return only the data from the response
     },
     (error) => {

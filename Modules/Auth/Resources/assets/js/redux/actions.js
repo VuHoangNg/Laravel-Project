@@ -1,4 +1,4 @@
-import api from "../../../../../../Core/src/Resources/assets/js/api/api";
+import api from "../../../../../Core/Resources/assets/js/api/api";
 import { message } from "antd";
 
 export const login = (userData) => async (dispatch) => {
