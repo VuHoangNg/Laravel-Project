@@ -1,11 +1,5 @@
 import React from "react";
-import { useDispatch, useSelector } from "react-redux";
-import {
-    fetchBlogs,
-    createBlog,
-    updateBlog,
-    deleteBlog,
-} from "./redux/actions";
+import { useSelector } from "react-redux";
 import { BlogProvider, useBlogContext } from "./context/BlogContext";
 import {
     Layout,
@@ -22,33 +16,34 @@ import { useSearchParams } from "react-router-dom";
 const { Title } = Typography;
 const { Content } = Layout;
 
-function BlogContent({ api }) {
-    const dispatch = useDispatch();
+function BlogContent() {
     const blogs = useSelector((state) => state.blogs.blogs);
     const {
         createBlogContext,
         editingBlogContext,
         getBlogContext,
         deleteBlogContext,
+        apiBlogContext,
     } = useBlogContext();
     const { resetForm } = createBlogContext;
     const { editingBlog } = editingBlogContext;
     const { isModalOpen, openModal, closeModal } = getBlogContext;
     const { isDeleteModalOpen, blogToDelete, openDeleteModal, closeDeleteModal } =
         deleteBlogContext;
+    const { fetchBlogs, createBlog, updateBlog, deleteBlog } = apiBlogContext;
     const [form] = Form.useForm();
     const [searchParams, setSearchParams] = useSearchParams();
 
     React.useEffect(() => {
-        dispatch(fetchBlogs(api)); // Pass API to fetchBlogs
-    }, [dispatch, api]);
+        fetchBlogs(); // Use context-provided action
+    }, [fetchBlogs]);
 
     const handleSubmit = async (values) => {
         try {
             if (editingBlog) {
-                await dispatch(updateBlog(editingBlog.id, values, api)); // Pass API
+                await updateBlog(editingBlog.id, values); // Use context-provided action
             } else {
-                await dispatch(createBlog(values, api)); // Pass API
+                await createBlog(values); // Use context-provided action
             }
             closeModal();
             setSearchParams({});
@@ -75,7 +70,7 @@ function BlogContent({ api }) {
     };
 
     const handleConfirmDelete = () => {
-        dispatch(deleteBlog(blogToDelete, api)); // Pass API
+        deleteBlog(blogToDelete); // Use context-provided action
         closeDeleteModal();
         setSearchParams({});
     };
@@ -195,9 +190,9 @@ function BlogContent({ api }) {
 
 function Blog({ api }) {
     return (
-        <BlogProvider>
+        <BlogProvider api={api}>
             <Layout>
-                <BlogContent api={api} />
+                <BlogContent />
             </Layout>
         </BlogProvider>
     );
