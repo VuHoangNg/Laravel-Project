@@ -6,7 +6,6 @@ import {
     updateBlog,
     deleteBlog,
 } from "./redux/actions";
-import { BlogProvider, useBlogContext } from "./context/BlogContext";
 import {
     Layout,
     Typography,
@@ -22,11 +21,19 @@ import { useSearchParams } from "react-router-dom";
 const { Title } = Typography;
 const { Content } = Layout;
 
-function BlogContent() {
+function BlogContent({
+    createBlogContext,
+    editingBlogContext,
+    getBlogContext,
+    deleteBlogContext,
+}) {
     const dispatch = useDispatch();
     const blogs = useSelector((state) => state.blogs.blogs);
-    const { isModalOpen, editingBlog, openModal, closeModal } =
-        useBlogContext();
+    const { resetForm } = createBlogContext;
+    const { editingBlog } = editingBlogContext;
+    const { isModalOpen, openModal, closeModal } = getBlogContext;
+    const { isDeleteModalOpen, blogToDelete, openDeleteModal, closeDeleteModal } =
+        deleteBlogContext;
     const [form] = Form.useForm();
     const [searchParams, setSearchParams] = useSearchParams();
 
@@ -44,6 +51,7 @@ function BlogContent() {
             closeModal();
             setSearchParams({});
             form.resetFields();
+            resetForm();
         } catch (error) {
             if (error.response?.status === 422) {
                 const errors = error.response.data.errors;
@@ -61,20 +69,25 @@ function BlogContent() {
 
     const handleDelete = (id) => {
         setSearchParams({ action: "delete", id });
-        Modal.confirm({
-            title: "Are you sure you want to delete this blog?",
-            onOk: () => {
-                dispatch(deleteBlog(id));
-                setSearchParams({});
-            },
-            onCancel: () => setSearchParams({}),
-        });
+        openDeleteModal(id);
+    };
+
+    const handleConfirmDelete = () => {
+        dispatch(deleteBlog(blogToDelete));
+        closeDeleteModal();
+        setSearchParams({});
+    };
+
+    const handleCancelDelete = () => {
+        closeDeleteModal();
+        setSearchParams({});
     };
 
     const handleOpenCreate = () => {
         openModal();
         form.resetFields();
         form.setFieldsValue({ title: "", content: "" });
+        resetForm();
         setSearchParams({ action: "create" });
     };
 
@@ -89,6 +102,7 @@ function BlogContent() {
         closeModal();
         setSearchParams({});
         form.resetFields();
+        resetForm();
     };
 
     const columns = [
@@ -163,17 +177,79 @@ function BlogContent() {
                     </Form.Item>
                 </Form>
             </Modal>
+            <Modal
+                title="Confirm Delete"
+                open={isDeleteModalOpen}
+                onOk={handleConfirmDelete}
+                onCancel={handleCancelDelete}
+                okText="Delete"
+                okType="danger"
+            >
+                <p>Are you sure you want to delete this blog?</p>
+            </Modal>
         </Content>
     );
 }
 
 function Blog() {
+    // State for creating blogs
+    const [formData, setFormData] = useState({ title: "", content: "" });
+
+    const createBlogContext = {
+        formData,
+        setFormData,
+        resetForm: () => setFormData({ title: "", content: "" }),
+    };
+
+    // State for editing blogs
+    const [editingBlog, setEditingBlog] = useState(null);
+
+    const editingBlogContext = {
+        editingBlog,
+        setEditingBlog,
+    };
+
+    // State for getting blogs (modal control)
+    const [isModalOpen, setIsModalOpen] = useState(false);
+
+    const getBlogContext = {
+        isModalOpen,
+        openModal: (blog = null) => {
+            setEditingBlog(blog);
+            setIsModalOpen(true);
+        },
+        closeModal: () => {
+            setEditingBlog(null);
+            setIsModalOpen(false);
+        },
+    };
+
+    // State for deleting blogs
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [blogToDelete, setBlogToDelete] = useState(null);
+
+    const deleteBlogContext = {
+        isDeleteModalOpen,
+        blogToDelete,
+        openDeleteModal: (blogId) => {
+            setBlogToDelete(blogId);
+            setIsDeleteModalOpen(true);
+        },
+        closeDeleteModal: () => {
+            setBlogToDelete(null);
+            setIsDeleteModalOpen(false);
+        },
+    };
+
     return (
-        <BlogProvider>
-            <Layout>
-                <BlogContent />
-            </Layout>
-        </BlogProvider>
+        <Layout>
+            <BlogContent
+                createBlogContext={createBlogContext}
+                editingBlogContext={editingBlogContext}
+                getBlogContext={getBlogContext}
+                deleteBlogContext={deleteBlogContext}
+            />
+        </Layout>
     );
 }
 
