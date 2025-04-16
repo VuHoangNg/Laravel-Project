@@ -13,12 +13,13 @@ import { useSelector, useDispatch } from "react-redux";
 import { clearToken } from "./redux/actions";
 import Blog from "../../../../Blog/Resources/assets/js/app";
 import { logout } from "../../../../Auth/Resources/assets/js/redux/actions";
+import api from "./api/api";
 
 const { Header, Sider, Content } = Layout;
 
 function Core() {
     const [collapsed, setCollapsed] = useState(false);
-    const { token } = useSelector((state) => state.auth); // Updated state path
+    const { token } = useSelector((state) => state.auth);
     const dispatch = useDispatch();
     const {
         token: { colorBgContainer, borderRadiusLG },
@@ -101,7 +102,8 @@ function Core() {
                 >
                     <Routes>
                         <Route path="/" element={<h2>Welcome to Core</h2>} />
-                        <Route path="/blog" element={<Blog />} />
+                        <Route path="/blog" element={<Blog api={api} />} />{" "}
+                        {/* Pass API as prop */}
                         <Route path="/media" element={<div>Media Page</div>} />
                         <Route
                             path="/nav3"

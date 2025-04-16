@@ -5,19 +5,16 @@ const api = axios.create({
     baseURL: "http://127.0.0.1:8000", // Your backend base URL
     headers: {
         Accept: "application/json",
-        "Content-Type": "application/json", // Explicitly set for POST/PUT
+        "Content-Type": "application/json",
     },
 });
 
 // Add Axios request interceptor
 api.interceptors.request.use(
     (config) => {
-        // Skip adding the Authorization header if "skipAuth" is true
         if (config.skipAuth) {
             return config;
         }
-
-        // Retrieve the token from localStorage
         const token = localStorage.getItem("auth_token");
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
@@ -33,15 +30,12 @@ api.interceptors.request.use(
 // Add Axios response interceptor
 api.interceptors.response.use(
     (response) => {
-        // Successful response
-
-        return response; // Return only the data from the response
+        return response;
     },
     (error) => {
-        // Handle error responses
         if (error.response?.status === 401) {
             console.error("Unauthorized! Redirecting to login...");
-            localStorage.removeItem("auth_token"); // Clear invalid token
+            localStorage.removeItem("auth_token");
             window.location.href = "/auth/login";
         } else if (error.response?.status === 422) {
             console.error("Validation error:", error.response.data.errors);

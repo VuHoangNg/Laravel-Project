@@ -1,45 +1,39 @@
-import { message } from "antd";
-import api from "../../../../../Core/Resources/assets/js/api/api";
-
-export const fetchBlogs = () => async (dispatch) => {
+export const fetchBlogs = (api) => async (dispatch) => {
     try {
-        const response = await api.get("/api/blogs", { skipAuth: true });
+        const response = await api.get("/api/blogs"); // Adjust endpoint as needed
         dispatch({ type: "blogs/setBlogs", payload: response.data });
     } catch (error) {
-        message.error("Failed to fetch blogs.");
-        console.error(error);
+        console.error("Failed to fetch blogs:", error);
+        throw error;
     }
 };
 
-export const createBlog = (blogData) => async (dispatch) => {
+export const createBlog = (data, api) => async (dispatch) => {
     try {
-        const response = await api.post("/api/blogs", blogData);
+        const response = await api.post("/api/blogs", data); // Adjust endpoint
         dispatch({ type: "blogs/addBlog", payload: response.data });
-        message.success("Blog created successfully!");
     } catch (error) {
-        message.error("Failed to create blog.");
-        console.error(error);
+        console.error("Failed to create blog:", error);
+        throw error;
     }
 };
 
-export const updateBlog = (id, blogData) => async (dispatch) => {
+export const updateBlog = (id, data, api) => async (dispatch) => {
     try {
-        const response = await api.put(`/api/blogs/${id}`, blogData);
+        const response = await api.put(`/api/blogs/${id}`, data); // Adjust endpoint
         dispatch({ type: "blogs/updateBlog", payload: response.data });
-        message.success("Blog updated successfully!");
     } catch (error) {
-        message.error("Failed to update blog.");
-        console.error(error);
+        console.error("Failed to update blog:", error);
+        throw error;
     }
 };
 
-export const deleteBlog = (id) => async (dispatch) => {
+export const deleteBlog = (id, api) => async (dispatch) => {
     try {
-        await api.delete(`/api/blogs/${id}`);
+        await api.delete(`/api/blogs/${id}`); // Adjust endpoint
         dispatch({ type: "blogs/deleteBlog", payload: id });
-        message.success("Blog deleted successfully!");
     } catch (error) {
-        message.error("Failed to delete blog.");
-        console.error(error);
+        console.error("Failed to delete blog:", error);
+        throw error;
     }
 };

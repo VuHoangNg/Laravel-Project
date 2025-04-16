@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
     fetchBlogs,
@@ -6,6 +6,7 @@ import {
     updateBlog,
     deleteBlog,
 } from "./redux/actions";
+import { BlogProvider, useBlogContext } from "./context/BlogContext";
 import {
     Layout,
     Typography,
@@ -21,14 +22,15 @@ import { useSearchParams } from "react-router-dom";
 const { Title } = Typography;
 const { Content } = Layout;
 
-function BlogContent({
-    createBlogContext,
-    editingBlogContext,
-    getBlogContext,
-    deleteBlogContext,
-}) {
+function BlogContent({ api }) {
     const dispatch = useDispatch();
     const blogs = useSelector((state) => state.blogs.blogs);
+    const {
+        createBlogContext,
+        editingBlogContext,
+        getBlogContext,
+        deleteBlogContext,
+    } = useBlogContext();
     const { resetForm } = createBlogContext;
     const { editingBlog } = editingBlogContext;
     const { isModalOpen, openModal, closeModal } = getBlogContext;
@@ -38,15 +40,15 @@ function BlogContent({
     const [searchParams, setSearchParams] = useSearchParams();
 
     React.useEffect(() => {
-        dispatch(fetchBlogs());
-    }, [dispatch]);
+        dispatch(fetchBlogs(api)); // Pass API to fetchBlogs
+    }, [dispatch, api]);
 
     const handleSubmit = async (values) => {
         try {
             if (editingBlog) {
-                await dispatch(updateBlog(editingBlog.id, values));
+                await dispatch(updateBlog(editingBlog.id, values, api)); // Pass API
             } else {
-                await dispatch(createBlog(values));
+                await dispatch(createBlog(values, api)); // Pass API
             }
             closeModal();
             setSearchParams({});
@@ -73,7 +75,7 @@ function BlogContent({
     };
 
     const handleConfirmDelete = () => {
-        dispatch(deleteBlog(blogToDelete));
+        dispatch(deleteBlog(blogToDelete, api)); // Pass API
         closeDeleteModal();
         setSearchParams({});
     };
@@ -191,65 +193,13 @@ function BlogContent({
     );
 }
 
-function Blog() {
-    // State for creating blogs
-    const [formData, setFormData] = useState({ title: "", content: "" });
-
-    const createBlogContext = {
-        formData,
-        setFormData,
-        resetForm: () => setFormData({ title: "", content: "" }),
-    };
-
-    // State for editing blogs
-    const [editingBlog, setEditingBlog] = useState(null);
-
-    const editingBlogContext = {
-        editingBlog,
-        setEditingBlog,
-    };
-
-    // State for getting blogs (modal control)
-    const [isModalOpen, setIsModalOpen] = useState(false);
-
-    const getBlogContext = {
-        isModalOpen,
-        openModal: (blog = null) => {
-            setEditingBlog(blog);
-            setIsModalOpen(true);
-        },
-        closeModal: () => {
-            setEditingBlog(null);
-            setIsModalOpen(false);
-        },
-    };
-
-    // State for deleting blogs
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [blogToDelete, setBlogToDelete] = useState(null);
-
-    const deleteBlogContext = {
-        isDeleteModalOpen,
-        blogToDelete,
-        openDeleteModal: (blogId) => {
-            setBlogToDelete(blogId);
-            setIsDeleteModalOpen(true);
-        },
-        closeDeleteModal: () => {
-            setBlogToDelete(null);
-            setIsDeleteModalOpen(false);
-        },
-    };
-
+function Blog({ api }) {
     return (
-        <Layout>
-            <BlogContent
-                createBlogContext={createBlogContext}
-                editingBlogContext={editingBlogContext}
-                getBlogContext={getBlogContext}
-                deleteBlogContext={deleteBlogContext}
-            />
-        </Layout>
+        <BlogProvider>
+            <Layout>
+                <BlogContent api={api} />
+            </Layout>
+        </BlogProvider>
     );
 }
 
