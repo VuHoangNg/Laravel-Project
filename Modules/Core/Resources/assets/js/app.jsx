@@ -14,6 +14,7 @@ import { clearToken } from "./redux/actions";
 import Blog from "../../../../Blog/Resources/assets/js/app";
 import { logout } from "../../../../Auth/Resources/assets/js/redux/actions";
 import api from "./api/api";
+import Media from "../../../../Media/Resources/assets/js/app";
 
 const { Header, Sider, Content } = Layout;
 
@@ -104,7 +105,7 @@ function Core() {
                         <Route path="/" element={<h2>Welcome to Core</h2>} />
                         <Route path="/blog" element={<Blog api={api} />} />{" "}
                         {/* Pass API as prop */}
-                        <Route path="/media" element={<div>Media Page</div>} />
+                        <Route path="/media" element={<Media api={api} />} />
                         <Route
                             path="/nav3"
                             element={<div>Navigation 3 Page</div>}

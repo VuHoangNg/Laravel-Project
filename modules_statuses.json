@@ -1,5 +1,6 @@
 {
     "Auth": true,
     "Blog": true,
-    "Core": true
+    "Core": true,
+    "Media": true
 }

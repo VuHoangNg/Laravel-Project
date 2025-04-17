@@ -1,0 +1,8 @@
+{
+    "private": true,
+    "scripts": {
+        "media": "webpack --config webpack.media.config.js --mode development",
+        "media:build": "webpack --config webpack.media.config.js --mode production"
+    },
+    "devDependencies": {}
+}
