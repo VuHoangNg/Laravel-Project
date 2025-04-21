@@ -1,5 +1,5 @@
-import React from "react";
-import { useSelector } from "react-redux";
+import React, { useState } from "react";
+import { useSelector, useDispatch } from "react-redux";
 import { BlogProvider, useBlogContext } from "./context/BlogContext";
 import {
     Layout,
@@ -10,14 +10,65 @@ import {
     Form,
     Input,
     Space,
+    Card,
+    Row,
+    Col,
 } from "antd";
 import { useSearchParams } from "react-router-dom";
+import Hls from "hls.js";
 
 const { Title } = Typography;
 const { Content } = Layout;
+const { Meta } = Card;
 
-function BlogContent() {
+// Custom VideoPlayer component to handle HLS playback
+const VideoPlayer = ({ src, style }) => {
+    const videoRef = React.useRef(null);
+
+    React.useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        if (Hls.isSupported()) {
+            const hls = new Hls();
+            hls.loadSource(src);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                video.play().catch((error) => {
+                    console.error("Video playback failed:", error);
+                });
+            });
+            hls.on(Hls.Events.ERROR, (event, data) => {
+                console.error("HLS error:", event, data);
+            });
+            return () => {
+                hls.destroy();
+            };
+        } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+            // For browsers with native HLS support (e.g., Safari)
+            video.src = src;
+            video.play().catch((error) => {
+                console.error("Video playback failed:", error);
+            });
+        } else {
+            console.error("HLS is not supported in this browser");
+        }
+    }, [src]);
+
+    return (
+        <video
+            ref={videoRef}
+            controls
+            style={style}
+            type="application/x-mpegURL"
+        />
+    );
+};
+
+function BlogContent({ api }) {
+    const dispatch = useDispatch();
     const blogs = useSelector((state) => state.blogs.blogs);
+    const media = useSelector((state) => state.media.media);
     const {
         createBlogContext,
         editingBlogContext,
@@ -27,21 +78,48 @@ function BlogContent() {
     const { resetForm, createBlog } = createBlogContext;
     const { editingBlog, updateBlog } = editingBlogContext;
     const { isModalOpen, openModal, closeModal, fetchBlogs } = getBlogContext;
-    const { isDeleteModalOpen, blogToDelete, openDeleteModal, closeDeleteModal, deleteBlog } =
-        deleteBlogContext;
+    const {
+        isDeleteModalOpen,
+        blogToDelete,
+        openDeleteModal,
+        closeDeleteModal,
+        deleteBlog,
+    } = deleteBlogContext;
     const [form] = Form.useForm();
     const [searchParams, setSearchParams] = useSearchParams();
+    const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
 
     React.useEffect(() => {
-        fetchBlogs(); // Use context-provided action
-    }, [fetchBlogs]);
+        fetchBlogs();
+        // Fetch media if not already loaded
+        if (!media.length) {
+            const fetchMedia = async () => {
+                try {
+                    const response = await api.get("/api/media");
+                    dispatch({
+                        type: "media/setMedia",
+                        payload: response.data,
+                    });
+                } catch (error) {
+                    console.error("Failed to fetch media:", error);
+                    throw error;
+                }
+            };
+            fetchMedia();
+        }
+    }, [fetchBlogs, dispatch, media.length, api]);
+
+    // Debug media data
+    React.useEffect(() => {
+        console.log("Media data:", media);
+    }, [media]);
 
     const handleSubmit = async (values) => {
         try {
             if (editingBlog) {
-                await updateBlog(editingBlog.id, values); // Use context-provided action
+                await updateBlog(editingBlog.id, values);
             } else {
-                await createBlog(values); // Use context-provided action
+                await createBlog(values);
             }
             closeModal();
             setSearchParams({});
@@ -68,7 +146,7 @@ function BlogContent() {
     };
 
     const handleConfirmDelete = () => {
-        deleteBlog(blogToDelete); // Use context-provided action
+        deleteBlog(blogToDelete);
         closeDeleteModal();
         setSearchParams({});
     };
@@ -81,7 +159,7 @@ function BlogContent() {
     const handleOpenCreate = () => {
         openModal();
         form.resetFields();
-        form.setFieldsValue({ title: "", content: "" });
+        form.setFieldsValue({ title: "", content: "", thumbnail_id: null });
         resetForm();
         setSearchParams({ action: "create" });
     };
@@ -89,7 +167,11 @@ function BlogContent() {
     const handleOpenEdit = (blog) => {
         openModal(blog);
         form.resetFields();
-        form.setFieldsValue(blog);
+        form.setFieldsValue({
+            title: blog.title,
+            content: blog.content,
+            thumbnail_id: blog.thumbnail_id || null,
+        });
         setSearchParams({ action: "edit", id: blog.id });
     };
 
@@ -98,6 +180,28 @@ function BlogContent() {
         setSearchParams({});
         form.resetFields();
         resetForm();
+    };
+
+    const handleOpenMediaModal = () => {
+        setIsMediaModalOpen(true);
+    };
+
+    const handleCloseMediaModal = () => {
+        setIsMediaModalOpen(false);
+    };
+
+    const handleSelectMedia = (mediaId) => {
+        form.setFieldsValue({ thumbnail_id: mediaId });
+        setIsMediaModalOpen(false);
+    };
+
+    const handleImageError = (e, item) => {
+        console.error(
+            `Failed to load image for ${item?.title || "unknown"}:`,
+            item?.url,
+            item?.thumbnail
+        );
+        e.target.src = "https://via.placeholder.com/150?text=Image+Not+Found";
     };
 
     const columns = [
@@ -111,6 +215,29 @@ function BlogContent() {
             dataIndex: "content",
             key: "content",
             render: (text) => text.substring(0, 50) + "...",
+        },
+        {
+            title: "Thumbnail",
+            dataIndex: "thumbnail",
+            key: "thumbnail",
+            render: (thumbnail) =>
+                thumbnail ? (
+                    thumbnail.type === "image" ? (
+                        <img
+                            src={thumbnail.url}
+                            alt={thumbnail.title}
+                            style={{ maxWidth: 400, maxHeight: 250 }}
+                            onError={(e) => handleImageError(e, thumbnail)}
+                        />
+                    ) : (
+                        <VideoPlayer
+                            src={thumbnail.url}
+                            style={{ maxWidth: 400, maxHeight: 250 }}
+                        />
+                    )
+                ) : (
+                    "No Thumbnail"
+                ),
         },
         {
             title: "Actions",
@@ -162,6 +289,20 @@ function BlogContent() {
                     >
                         <Input.TextArea rows={4} />
                     </Form.Item>
+                    <Form.Item
+                        name="thumbnail_id"
+                        label="Thumbnail"
+                        rules={[
+                            {
+                                required: true,
+                                message: "Please select a thumbnail",
+                            },
+                        ]}
+                    >
+                        <Button type="dashed" onClick={handleOpenMediaModal}>
+                            Select Thumbnail
+                        </Button>
+                    </Form.Item>
                     <Form.Item>
                         <Space>
                             <Button type="primary" htmlType="submit">
@@ -171,6 +312,53 @@ function BlogContent() {
                         </Space>
                     </Form.Item>
                 </Form>
+            </Modal>
+            <Modal
+                title="Select Media"
+                open={isMediaModalOpen}
+                onCancel={handleCloseMediaModal}
+                footer={null}
+                width={"100%"}
+                height={"flex"}
+            >
+                <Row gutter={[16, 16]}>
+                    {media.map((item) => (
+                        <Col span={8} key={item.id}>
+                            <Card
+                                hoverable
+                                cover={
+                                    item.type === "image" ? (
+                                        <img
+                                            alt={item.title}
+                                            src={item.url}
+                                            style={{
+                                                height: 250,
+                                                objectFit: "cover",
+                                            }}
+                                            onError={(e) =>
+                                                handleImageError(e, item)
+                                            }
+                                        />
+                                    ) : (
+                                        <VideoPlayer
+                                            src={item.url}
+                                            style={{
+                                                height: 250,
+                                                objectFit: "cover",
+                                            }}
+                                        />
+                                    )
+                                }
+                                onClick={() => handleSelectMedia(item.id)}
+                            >
+                                <Meta
+                                    title={item.title}
+                                    description={item.type}
+                                />
+                            </Card>
+                        </Col>
+                    ))}
+                </Row>
             </Modal>
             <Modal
                 title="Confirm Delete"
@@ -190,7 +378,7 @@ function Blog({ api }) {
     return (
         <BlogProvider api={api}>
             <Layout>
-                <BlogContent />
+                <BlogContent api={api} />
             </Layout>
         </BlogProvider>
     );

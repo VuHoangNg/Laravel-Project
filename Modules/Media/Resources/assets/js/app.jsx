@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import { MediaProvider, useMediaContext } from "./context/mediaContext";
 import {
@@ -85,12 +85,14 @@ function MediaContent() {
     } = deleteMediaContext;
     const [form] = Form.useForm();
     const [searchParams, setSearchParams] = useSearchParams();
+    const [loading, setLoading] = useState(false);
 
     React.useEffect(() => {
         fetchMedia();
     }, [fetchMedia]);
 
     const handleSubmit = async (values) => {
+        setLoading(true);
         try {
             if (editingMedia) {
                 await updateMedia(editingMedia.id, values);
@@ -113,6 +115,8 @@ function MediaContent() {
                     ]);
                 });
             }
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -171,11 +175,15 @@ function MediaContent() {
             key: "url",
             render: (url, record) =>
                 record.type === "image" ? (
-                    <img src={url} alt={record.title} style={{ width: 50 }} />
+                    <img
+                        src={url}
+                        alt={record.title}
+                        style={{ maxWidth: 400, maxHeight: 250 }}
+                    />
                 ) : (
                     <VideoPlayer
                         src={url}
-                        style={{ width: 500, height: 300 }}
+                        style={{ maxWidth: 400, maxHeight: 250 }}
                     />
                 ),
         },
@@ -273,7 +281,11 @@ function MediaContent() {
                     </Form.Item>
                     <Form.Item>
                         <Space>
-                            <Button type="primary" htmlType="submit">
+                            <Button
+                                type="primary"
+                                htmlType="submit"
+                                loading={loading}
+                            >
                                 {editingMedia ? "Update" : "Create"}
                             </Button>
                             <Button onClick={handleCancel}>Cancel</Button>

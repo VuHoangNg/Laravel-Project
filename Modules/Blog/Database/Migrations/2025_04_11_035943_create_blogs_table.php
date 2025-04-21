@@ -12,6 +12,7 @@ class CreateBlogsTable extends Migration
             $table->id();
             $table->string('title');
             $table->text('content');
+            $table->foreignId('thumbnail_id')->nullable()->constrained('media')->onDelete('set null');
             $table->timestamps();
         });
     }

@@ -116,66 +116,66 @@ class MediaController extends Controller
      * @return JsonResponse
      */
     public function update(Request $request, $id)
-    {
-        $media = Media::findOrFail($id);
+{
+    $media = Media::findOrFail($id);
 
-        $validator = Validator::make($request->all(), [
-            'title' => 'required|string|max:255',
-            'type' => 'required|in:image,video',
-            'file' => 'required|file|mimes:jpg,jpeg,png,mp4,mov,mkv,flv,avi,wmv|max:20480', // Add supported video formats
-        ]);
+    $validator = Validator::make($request->all(), [
+        'title' => 'required|string|max:255',
+        'type' => 'required|in:image,video',
+        'file' => 'required|file|mimes:jpg,jpeg,png,mp4,mov,mkv,flv,avi,wmv|max:20480',
+    ]);
 
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
-        }
-
-        $data = [
-            'title' => $request->input('type'),
-            'type' => $request->input('type'),
-        ];
-
-        if ($request->hasFile('file')) {
-            // Delete old file
-            Storage::disk('public')->delete($media->path);
-            if ($media->type === 'video') {
-                // Delete HLS directory
-                Storage::disk('public')->deleteDirectory(dirname($media->path));
-            }
-
-            $file = $request->file('file');
-            $filename = Str::random(40) . '.' . $file->getClientOriginalExtension();
-            $path = 'media/' . $data['type'] . 's/' . $filename;
-
-            if ($data['type'] === 'video') {
-                // Store original video temporarily
-                $tempPath = $file->storeAs('temp', $filename, 'local');
-
-                // Process video with FFmpeg to HLS
-                $hlsPath = 'media/videos/' . Str::random(40) . '/playlist.m3u8';
-                $this->convertToHls(storage_path('app/' . $tempPath), storage_path('app/public/' . dirname($hlsPath)));
-
-                // Delete temp file
-                Storage::disk('local')->delete($tempPath);
-
-                // Save HLS playlist path
-                $path = $hlsPath;
-            } else {
-                // Store image
-                $file->storeAs('public', $path);
-            }
-
-            $data['path'] = $path;
-        }
-
-        $media->update($data);
-
-        return response()->json([
-            'id' => $media->id,
-            'title' => $media->title,
-            'type' => $media->type,
-            'url' => Storage::url($media->path),
-        ]);
+    if ($validator->fails()) {
+        return response()->json(['errors' => $validator->errors()], 422);
     }
+
+    $data = [
+        'title' => $request->input('title'),
+        'type' => $request->input('type'),
+    ];
+
+    if ($request->hasFile('file')) {
+        // Delete old file
+        Storage::disk('public')->delete($media->path);
+        if ($media->type === 'video') {
+            // Delete HLS directory
+            Storage::disk('public')->deleteDirectory(dirname($media->path));
+        }
+
+        $file = $request->file('file');
+        $filename = Str::random(40) . '.' . $file->getClientOriginalExtension();
+        $path = 'media/' . $data['type'] . 's/' . $filename;
+
+        if ($data['type'] === 'video') {
+            // Store original video temporarily
+            $tempPath = $file->storeAs('temp', $filename, 'local');
+
+            // Process video with FFmpeg to HLS
+            $hlsPath = 'media/videos/' . Str::random(40) . '/playlist.m3u8';
+            $this->convertToHls(storage_path('app/' . $tempPath), storage_path('app/public/' . dirname($hlsPath)));
+
+            // Delete temp file
+            Storage::disk('local')->delete($tempPath);
+
+            // Save HLS playlist path
+            $path = $hlsPath;
+        } else {
+            // Store image
+            $file->storeAs('public', $path);
+        }
+
+        $data['path'] = $path;
+    }
+
+    $media->update($data);
+
+    return response()->json([
+        'id' => $media->id,
+        'title' => $media->title,
+        'type' => $media->type,
+        'url' => Storage::url($media->path),
+    ]);
+}
 
     /**
      * Remove the specified resource from storage.

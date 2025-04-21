@@ -9,15 +9,15 @@ export function BlogProvider({ children, api }) {
     const dispatch = useDispatch();
 
     // State for creating blogs
-    const [formData, setFormData] = useState({ title: "", content: "" });
+    const [formData, setFormData] = useState({ title: "", content: "", thumbnail_id: null });
 
     const createBlogContext = {
         formData,
         setFormData,
-        resetForm: () => setFormData({ title: "", content: "" }),
+        resetForm: () => setFormData({ title: "", content: "", thumbnail_id: null }),
         createBlog: async (data) => {
             try {
-                const response = await api.post("/api/blogs", data); // Adjust endpoint
+                const response = await api.post("/api/blogs", data);
                 dispatch({ type: "blogs/addBlog", payload: response.data });
             } catch (error) {
                 console.error("Failed to create blog:", error);
@@ -34,7 +34,7 @@ export function BlogProvider({ children, api }) {
         setEditingBlog,
         updateBlog: async (id, data) => {
             try {
-                const response = await api.put(`/api/blogs/${id}`, data); // Adjust endpoint
+                const response = await api.put(`/api/blogs/${id}`, data);
                 dispatch({ type: "blogs/updateBlog", payload: response.data });
             } catch (error) {
                 console.error("Failed to update blog:", error);
@@ -58,7 +58,7 @@ export function BlogProvider({ children, api }) {
         },
         fetchBlogs: async () => {
             try {
-                const response = await api.get("/api/blogs"); // Adjust endpoint
+                const response = await api.get("/api/blogs");
                 dispatch({ type: "blogs/setBlogs", payload: response.data });
             } catch (error) {
                 console.error("Failed to fetch blogs:", error);
@@ -84,7 +84,7 @@ export function BlogProvider({ children, api }) {
         },
         deleteBlog: async (id) => {
             try {
-                await api.delete(`/api/blogs/${id}`); // Adjust endpoint
+                await api.delete(`/api/blogs/${id}`);
                 dispatch({ type: "blogs/deleteBlog", payload: id });
             } catch (error) {
                 console.error("Failed to delete blog:", error);

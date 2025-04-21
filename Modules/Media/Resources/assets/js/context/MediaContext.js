@@ -46,13 +46,14 @@ export function MediaProvider({ children, api }) {
             try {
                 const formData = new FormData();
                 formData.append("title", data.title);
-                if (data.file) {
-                    formData.append("file", data.file);
+                if (!data.file) {
+                    throw new Error("No file selected for update");
                 }
+                formData.append("file", data.file);
                 formData.append("type", data.type);
-                const response = await api.put(`/api/media/${id}`, formData, {
-                    headers: { "Content-Type": "multipart/form-data" },
-                });
+                formData.append("_method", "PUT"); // Spoof the PUT method
+        
+                const response = await api.post(`/api/media/${id}`, formData); // Use POST instead of PUT
                 dispatch({ type: "media/updateMedia", payload: response.data });
             } catch (error) {
                 console.error("Failed to update media:", error);
