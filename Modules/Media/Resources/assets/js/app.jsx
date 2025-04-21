@@ -12,6 +12,8 @@ import {
     Space,
     Select,
     Upload,
+    Alert,
+    Spin,
 } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
 import { useSearchParams } from "react-router-dom";
@@ -45,7 +47,6 @@ const VideoPlayer = ({ src, style }) => {
                 hls.destroy();
             };
         } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-            // For browsers with native HLS support (e.g., Safari)
             video.src = src;
             video.play().catch((error) => {
                 console.error("Video playback failed:", error);
@@ -66,7 +67,16 @@ const VideoPlayer = ({ src, style }) => {
 };
 
 function MediaContent() {
-    const media = useSelector((state) => state.media.media);
+    const media = useSelector(
+        (state) =>
+            state.media.media || {
+                data: [],
+                current_page: 1,
+                per_page: 10,
+                total: 0,
+                last_page: 1,
+            }
+    );
     const {
         createMediaContext,
         editingMediaContext,
@@ -86,13 +96,37 @@ function MediaContent() {
     const [form] = Form.useForm();
     const [searchParams, setSearchParams] = useSearchParams();
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
 
     React.useEffect(() => {
-        fetchMedia();
+        const loadMedia = async () => {
+            setLoading(true);
+            setError(null);
+            try {
+                await fetchMedia(1, 10);
+            } catch (err) {
+                setError(
+                    err.response?.data?.error ||
+                        err.message ||
+                        "Failed to load media. Please try again."
+                );
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadMedia();
     }, [fetchMedia]);
+
+    const handleTableChange = (pagination) => {
+        setLoading(true);
+        fetchMedia(pagination.current, pagination.pageSize).finally(() => {
+            setLoading(false);
+        });
+    };
 
     const handleSubmit = async (values) => {
         setLoading(true);
+        setError(null);
         try {
             if (editingMedia) {
                 await updateMedia(editingMedia.id, values);
@@ -103,6 +137,8 @@ function MediaContent() {
             setSearchParams({});
             form.resetFields();
             resetForm();
+            // Reload media with current pagination
+            await fetchMedia(media.current_page, media.per_page);
         } catch (error) {
             if (error.response?.status === 422) {
                 const errors = error.response.data.errors;
@@ -114,6 +150,12 @@ function MediaContent() {
                         },
                     ]);
                 });
+            } else {
+                setError(
+                    error.response?.data?.error ||
+                        error.message ||
+                        "Failed to save media. Please try again."
+                );
             }
         } finally {
             setLoading(false);
@@ -125,10 +167,24 @@ function MediaContent() {
         openDeleteModal(id);
     };
 
-    const handleConfirmDelete = () => {
-        deleteMedia(mediaToDelete);
-        closeDeleteModal();
-        setSearchParams({});
+    const handleConfirmDelete = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            await deleteMedia(mediaToDelete);
+            closeDeleteModal();
+            setSearchParams({});
+            // Reload media with current pagination
+            await fetchMedia(media.current_page, media.per_page);
+        } catch (error) {
+            setError(
+                error.response?.data?.error ||
+                    error.message ||
+                    "Failed to delete media. Please try again."
+            );
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleCancelDelete = () => {
@@ -179,6 +235,11 @@ function MediaContent() {
                         src={url}
                         alt={record.title}
                         style={{ maxWidth: 400, maxHeight: 250 }}
+                        onError={(e) => {
+                            console.error(`Failed to load image: ${url}`);
+                            e.target.src =
+                                "https://via.placeholder.com/150?text=Image+Not+Found";
+                        }}
                     />
                 ) : (
                     <VideoPlayer
@@ -216,14 +277,51 @@ function MediaContent() {
     return (
         <Content style={{ padding: "24px" }}>
             <Title level={2}>Media Management</Title>
-            <Button
-                type="primary"
-                onClick={handleOpenCreate}
-                style={{ marginBottom: 16 }}
-            >
-                Add Media
-            </Button>
-            <Table columns={columns} dataSource={media} rowKey="id" />
+            {error && (
+                <Alert
+                    message="Error"
+                    description={error}
+                    type="error"
+                    showIcon
+                    closable
+                    onClose={() => setError(null)}
+                    style={{ marginBottom: 16 }}
+                />
+            )}
+            {loading && (
+                <div style={{ textAlign: "center", margin: "20px 0" }}>
+                    <Spin size="large" />
+                </div>
+            )}
+            {!loading && (
+                <>
+                    <Button
+                        type="primary"
+                        onClick={handleOpenCreate}
+                        style={{ marginBottom: 16 }}
+                    >
+                        Add Media
+                    </Button>
+                    <Table
+                        columns={columns}
+                        dataSource={media.data || []}
+                        rowKey="id"
+                        scroll={{ x: "max-content" }}
+                        pagination={{
+                            current: media.current_page,
+                            pageSize: media.per_page,
+                            total: media.total,
+                            showSizeChanger: true,
+                            pageSizeOptions: ["10", "20", "50"],
+                        }}
+                        onChange={handleTableChange}
+                        locale={{
+                            emptyText:
+                                "No media available. Upload some media to get started!",
+                        }}
+                    />
+                </>
+            )}
             <Modal
                 title={editingMedia ? "Edit Media" : "Add Media"}
                 open={isModalOpen}

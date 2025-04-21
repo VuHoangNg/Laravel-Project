@@ -14,9 +14,26 @@ class BlogController extends Controller
         $this->middleware('auth:sanctum')->except(['index', 'show']);
     }
 
-    public function index()
+    /**
+     * Display a listing of the resource.
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function index(Request $request)
     {
-        $blogs = Blog::with('thumbnail')->get()->map(function ($item) {
+        // Get query parameters for pagination
+        $perPage = $request->query('perPage', 10); // Default to 10 items per page
+        $page = $request->query('page', 1); // Default to page 1
+
+        // Validate perPage to ensure it's a reasonable number
+        $perPage = min(max((int)$perPage, 1), 100); // Restrict between 1 and 100
+
+        // Fetch paginated blogs with thumbnail relationship
+        $blogs = Blog::with('thumbnail')->paginate($perPage);
+
+        // Transform the data
+        $transformedBlogs = $blogs->map(function ($item) {
             return [
                 'id' => $item->id,
                 'title' => $item->title,
@@ -34,7 +51,14 @@ class BlogController extends Controller
             ];
         });
 
-        return response()->json($blogs, 200);
+        // Return paginated response
+        return response()->json([
+            'data' => $transformedBlogs,
+            'current_page' => $blogs->currentPage(),
+            'per_page' => $blogs->perPage(),
+            'total' => $blogs->total(),
+            'last_page' => $blogs->lastPage(),
+        ], 200);
     }
 
     public function store(Request $request)

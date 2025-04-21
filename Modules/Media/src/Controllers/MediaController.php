@@ -14,24 +14,37 @@ use Illuminate\Http\JsonResponse;
 
 class MediaController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     *
-     * @return JsonResponse
-     */
-    public function index()
-    {
-        $media = Media::all()->map(function ($item) {
-            return [
-                'id' => $item->id,
-                'title' => $item->title,
-                'type' => $item->type,
-                'url' => Storage::url($item->path),
-            ];
-        });
+    public function index(Request $request)
+{
+    $perPage = $request->query('perPage', 10);
+    $page = $request->query('page', 1);
 
-        return response()->json($media);
-    }
+    \Log::info('Requested page: ' . $page);
+    \Log::info('Requested perPage: ' . $perPage);
+
+    $perPage = min(max((int)$perPage, 1), 100);
+
+    $media = Media::paginate($perPage, ['*'], 'page', $page);
+
+    $transformedMedia = $media->map(function ($item) {
+        return [
+            'id' => $item->id,
+            'title' => $item->title,
+            'type' => $item->type,
+            'url' => Storage::url($item->path),
+        ];
+    });
+
+    return response()->json([
+        'data' => $transformedMedia,
+        'current_page' => $media->currentPage(),
+        'per_page' => $media->perPage(),
+        'total' => $media->total(),
+        'last_page' => $media->lastPage(),
+    ]);
+}
+
+
 
     /**
      * Store a newly created resource in storage.
