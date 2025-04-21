@@ -1,20 +1,20 @@
 <?php
 
-namespace Modules\Media\src\Controllers;
+namespace Modules\Media\src\Repositories;
 
-use App\Jobs\ProcessMedia;
 use Illuminate\Http\Request;
-use Illuminate\Routing\Controller;
-use Modules\Media\src\Models\Media;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Modules\Media\src\Models\Media;
 use Illuminate\Http\JsonResponse;
+use FFMpeg\FFMpeg;
+use FFMpeg\Format\Video\X264;
 
-class MediaController extends Controller
+class MediaRepository implements MediaRepositoryInterface
 {
     /**
-     * Display a listing of the media.
+     * Get paginated media.
      *
      * @param Request $request
      * @return JsonResponse
@@ -23,9 +23,6 @@ class MediaController extends Controller
     {
         $perPage = $request->query('perPage', 10);
         $page = $request->query('page', 1);
-
-        \Log::info('Requested page: ' . $page);
-        \Log::info('Requested perPage: ' . $perPage);
 
         $perPage = min(max((int)$perPage, 1), 100);
 
@@ -50,38 +47,44 @@ class MediaController extends Controller
     }
 
     /**
-     * Store a newly created media in storage.
+     * Store a newly created media file.
      *
      * @param Request $request
      * @return JsonResponse
      */
     public function store(Request $request): JsonResponse
     {
-        // Validate the incoming request
         $validator = Validator::make($request->all(), [
             'title' => 'required|string|max:255',
             'type' => 'required|in:image,video',
-            'file' => 'required|file|mimes:jpg,jpeg,png,mp4,mov,mkv,flv,avi,wmv|max:20480', // Add supported video formats
+            'file' => 'required|file|mimes:jpg,jpeg,png,mp4,mov,mkv,flv,avi,wmv|max:20480',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        // Get the validated data
         $file = $request->file('file');
         $type = $request->input('type');
         $title = $request->input('title');
+        $filename = Str::random(40) . '.' . $file->getClientOriginalExtension();
+        $path = 'media/' . $type . 's/' . $filename;
 
-        // Create a new media entry in the database
+        if ($type === 'video') {
+            $tempPath = $file->storeAs('temp', $filename, 'local');
+            $hlsPath = 'media/videos/' . Str::random(40) . '/playlist.m3u8';
+            $this->convertToHls(storage_path('app/' . $tempPath), storage_path('app/public/' . dirname($hlsPath)));
+            Storage::disk('local')->delete($tempPath);
+            $path = $hlsPath;
+        } else {
+            $file->storeAs('public', $path);
+        }
+
         $media = Media::create([
             'title' => $title,
             'type' => $type,
-            'path' => '', // This will be updated after the processing is done
+            'path' => $path,
         ]);
-
-        // Dispatch the job to process the media
-        ProcessMedia::dispatch($media, $file, $type, $title);
 
         return response()->json([
             'id' => $media->id,
@@ -92,12 +95,12 @@ class MediaController extends Controller
     }
 
     /**
-     * Display the specified media.
+     * Show a specific media item.
      *
      * @param int $id
      * @return JsonResponse
      */
-    public function show($id): JsonResponse
+    public function show(int $id): JsonResponse
     {
         $media = Media::findOrFail($id);
 
@@ -110,21 +113,20 @@ class MediaController extends Controller
     }
 
     /**
-     * Update the specified media in storage.
+     * Update an existing media item.
      *
      * @param Request $request
      * @param int $id
      * @return JsonResponse
      */
-    public function update(Request $request, $id): JsonResponse
+    public function update(Request $request, int $id): JsonResponse
     {
         $media = Media::findOrFail($id);
 
-        // Validate the incoming request
         $validator = Validator::make($request->all(), [
             'title' => 'required|string|max:255',
             'type' => 'required|in:image,video',
-            'file' => 'nullable|file|mimes:jpg,jpeg,png,mp4,mov,mkv,flv,avi,wmv|max:20480',
+            'file' => 'required|file|mimes:jpg,jpeg,png,mp4,mov,mkv,flv,avi,wmv|max:20480',
         ]);
 
         if ($validator->fails()) {
@@ -137,10 +139,8 @@ class MediaController extends Controller
         ];
 
         if ($request->hasFile('file')) {
-            // Delete old file
             Storage::disk('public')->delete($media->path);
             if ($media->type === 'video') {
-                // Delete the HLS directory
                 Storage::disk('public')->deleteDirectory(dirname($media->path));
             }
 
@@ -149,20 +149,12 @@ class MediaController extends Controller
             $path = 'media/' . $data['type'] . 's/' . $filename;
 
             if ($data['type'] === 'video') {
-                // Store the video temporarily
                 $tempPath = $file->storeAs('temp', $filename, 'local');
-
-                // Process the video using FFmpeg
                 $hlsPath = 'media/videos/' . Str::random(40) . '/playlist.m3u8';
                 $this->convertToHls(storage_path('app/' . $tempPath), storage_path('app/public/' . dirname($hlsPath)));
-
-                // Delete the temporary file
                 Storage::disk('local')->delete($tempPath);
-
-                // Set the path to the generated HLS playlist
                 $path = $hlsPath;
             } else {
-                // Store image as is
                 $file->storeAs('public', $path);
             }
 
@@ -180,19 +172,17 @@ class MediaController extends Controller
     }
 
     /**
-     * Remove the specified media from storage.
+     * Delete a media item.
      *
      * @param int $id
      * @return JsonResponse
      */
-    public function destroy($id): JsonResponse
+    public function destroy(int $id): JsonResponse
     {
         $media = Media::findOrFail($id);
 
-        // Delete the file
         Storage::disk('public')->delete($media->path);
         if ($media->type === 'video') {
-            // Delete the HLS directory
             Storage::disk('public')->deleteDirectory(dirname($media->path));
         }
 
@@ -208,16 +198,16 @@ class MediaController extends Controller
      * @param string $outputDir
      * @return void
      */
-    protected function convertToHls($inputPath, $outputDir)
+    protected function convertToHls(string $inputPath, string $outputDir): void
     {
         try {
-            $ffmpeg = FFMpeg\FFMpeg::create([
+            $ffmpeg = FFMpeg::create([
                 'ffmpeg.binaries' => config('media.ffmpeg_path', 'C:\FFMPEG\bin\ffmpeg'),
                 'ffprobe.binaries' => config('media.ffprobe_path', 'C:\FFMPEG\bin\ffprobe'),
             ]);
 
             $video = $ffmpeg->open($inputPath);
-            $format = new FFMpeg\Format\Video\X264();
+            $format = new X264();
             $format->setAdditionalParameters([
                 '-hls_time', '10',
                 '-hls_list_size', '0',

@@ -4,7 +4,8 @@ namespace Modules\Media\src\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Database\Eloquent\Factory;
-
+use Modules\Media\src\Repositories\MediaRepository;
+use Modules\Media\src\Repositories\MediaRepositoryInterface;
 class MediaServiceProvider extends ServiceProvider
 {
     /**
@@ -39,6 +40,7 @@ class MediaServiceProvider extends ServiceProvider
     public function register()
     {
         $this->app->register(RouteServiceProvider::class);
+        $this->app->bind(MediaRepositoryInterface::class, MediaRepository::class);
     }
 
     /**
