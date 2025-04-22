@@ -9,11 +9,7 @@ export function MediaProvider({ children, api }) {
     const dispatch = useDispatch();
 
     // State for creating media
-    const [formData, setFormData] = useState({
-        title: "",
-        file: null,
-        type: "",
-    });
+    const [formData, setFormData] = useState({ title: "", file: null, type: "" });
 
     const createMediaContext = {
         formData,
@@ -50,13 +46,14 @@ export function MediaProvider({ children, api }) {
             try {
                 const formData = new FormData();
                 formData.append("title", data.title);
-                if (data.file) {
-                    formData.append("file", data.file);
+                if (!data.file) {
+                    throw new Error("No file selected for update");
                 }
+                formData.append("file", data.file);
                 formData.append("type", data.type);
                 formData.append("_method", "PUT"); // Spoof the PUT method
-
-                const response = await api.post(`/api/media/${id}`, formData);
+        
+                const response = await api.post(`/api/media/${id}`, formData); // Use POST instead of PUT
                 dispatch({ type: "media/updateMedia", payload: response.data });
             } catch (error) {
                 console.error("Failed to update media:", error);
@@ -78,15 +75,10 @@ export function MediaProvider({ children, api }) {
             setEditingMedia(null);
             setIsModalOpen(false);
         },
-        fetchMedia: async (page = 1, perPage = 10) => {
+        fetchMedia: async () => {
             try {
-                const response = await api.get(
-                    `/api/media?perPage=${perPage}&page=${page}`
-                );
-                dispatch({
-                    type: "media/setMedia",
-                    payload: response.data,
-                });
+                const response = await api.get("/api/media");
+                dispatch({ type: "media/setMedia", payload: response.data });
             } catch (error) {
                 console.error("Failed to fetch media:", error);
                 throw error;

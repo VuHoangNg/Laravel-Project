@@ -18,6 +18,7 @@ class BlogController extends Controller
         $this->blogs = $blogs;
     }
 
+<<<<<<< HEAD
     public function index(Request $request)
     {
         $perPage = min(max((int)$request->query('perPage', 10), 1), 100);
@@ -32,6 +33,29 @@ class BlogController extends Controller
             'total' => $blogs->total(),
             'last_page' => $blogs->lastPage(),
         ]);
+=======
+    public function index()
+    {
+        $blogs = Blog::with('thumbnail')->get()->map(function ($item) {
+            return [
+                'id' => $item->id,
+                'title' => $item->title,
+                'content' => $item->content,
+                'thumbnail_id' => $item->thumbnail_id,
+                'thumbnail' => $item->thumbnail ? [
+                    'id' => $item->thumbnail->id,
+                    'title' => $item->thumbnail->title,
+                    'type' => $item->thumbnail->type,
+                    'url' => Storage::url($item->thumbnail->path),
+                    'thumbnail' => $item->thumbnail->thumbnail_path
+                        ? Storage::url($item->thumbnail->thumbnail_path)
+                        : Storage::url($item->thumbnail->path),
+                ] : null,
+            ];
+        });
+
+        return response()->json($blogs, 200);
+>>>>>>> parent of daaceb5 (master)
     }
 
     public function store(Request $request)
