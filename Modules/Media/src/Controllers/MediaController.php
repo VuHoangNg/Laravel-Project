@@ -4,10 +4,12 @@ namespace Modules\Media\src\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Modules\Media\src\Repositories\MediaRepositoryInterface;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Http\JsonResponse;
+use Modules\Media\src\Jobs\ProcessVideoToHls;
+use Modules\Media\src\Repositories\MediaRepositoryInterface;
 
 class MediaController extends Controller
 {
@@ -18,34 +20,16 @@ class MediaController extends Controller
         $this->mediaRepository = $mediaRepository;
     }
 
-    /**
-     * Display a listing of the media.
-     *
-     * @param Request $request
-     * @return JsonResponse
-     */
     public function index(Request $request): JsonResponse
     {
         $perPage = $request->query('perPage', 10);
         $page = $request->query('page', 1);
 
-        \Log::info('Requested page: ' . $page);
-        \Log::info('Requested perPage: ' . $perPage);
-
-        $media = $this->mediaRepository->getPaginated((int)$perPage, (int)$page);
-
-        $transformedMedia = $media->map(function ($item) {
-            return [
-                'id' => $item->id,
-                'title' => $item->title,
-                'type' => $item->type,
-                'url' => Storage::url($item->path),
-                'thumbnail_url' => $item->thumbnail_path ? Storage::url($item->thumbnail_path) : null,
-            ];
-        });
+        $columns = ['id', 'title', 'path', 'thumbnail_path', 'status'];
+        $media = $this->mediaRepository->getPaginated((int) $perPage, (int) $page, $columns);
 
         return response()->json([
-            'data' => $transformedMedia,
+            'data' => $media->items(),
             'current_page' => $media->currentPage(),
             'per_page' => $media->perPage(),
             'total' => $media->total(),
@@ -53,103 +37,153 @@ class MediaController extends Controller
         ]);
     }
 
-    /**
-     * Store a newly created media in storage.
-     *
-     * @param Request $request
-     * @return JsonResponse
-     */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'title' => 'required|string|max:255',
-            'type' => 'required|in:image,video',
-            'file' => 'required|file|mimes:jpg,jpeg,png,mp4,mov,mkv,flv,avi,wmv|max:20480',
+            'file' => 'required|file|max:20480',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $media = $this->mediaRepository->create(
-            $request->only('title'),
-            $request->file('file'),
-            $request->input('type')
-        );
+        $file = $request->file('file');
+        $mime = $file->getMimeType();
+        $isVideo = str_starts_with($mime, 'video/');
+        $isImage = str_starts_with($mime, 'image/');
+
+        if (!$isVideo && !$isImage) {
+            return response()->json(['error' => 'Unsupported file type.'], 422);
+        }
+
+        $filename = Str::random(40) . '.' . $file->getClientOriginalExtension();
+        $path = $isVideo ? 'media/videos/' . Str::random(40) . '/playlist.m3u8' : 'media/images/' . $filename;
+        $thumbnailPath = $isVideo ? 'media/thumbnails/' . Str::random(40) . '.jpg' : null;
+        $status = $isVideo ? 0 : 1;
+
+        $media = $this->mediaRepository->create([
+            'title' => $request->input('title'),
+            'path' => $path,
+            'thumbnail_path' => $thumbnailPath,
+            'status' => $status,
+        ]);
+
+        if ($isVideo) {
+            $tempPath = $file->storeAs('temp', $filename, 'local');
+
+            ProcessVideoToHls::dispatch(
+                storage_path('app/' . $tempPath),
+                storage_path('app/public/' . dirname($path)),
+                $media->id,
+                storage_path('app/public/' . $thumbnailPath)
+            )->afterCommit();
+        } else {
+            $file->storeAs('public/' . dirname($path), basename($path));
+        }
 
         return response()->json([
             'id' => $media->id,
             'title' => $media->title,
-            'type' => $media->type,
-            'url' => Storage::url($media->path),
-            'thumbnail_url' => $media->thumbnail_path ? Storage::url($media->thumbnail_path) : null,
+            'url' => $media->url,
+            'thumbnail_url' => $media->thumbnail_url,
             'status' => $media->status,
         ], 201);
     }
 
-    /**
-     * Display the specified media.
-     *
-     * @param int $id
-     * @return JsonResponse
-     */
     public function show($id): JsonResponse
     {
-        $media = $this->mediaRepository->find($id);
+        $columns = ['id', 'title', 'path', 'thumbnail_path', 'status'];
+        $media = $this->mediaRepository->find($id, $columns);
 
         return response()->json([
             'id' => $media->id,
             'title' => $media->title,
-            'type' => $media->type,
-            'url' => Storage::url($media->path),
-            'thumbnail_url' => $media->thumbnail_path ? Storage::url($media->thumbnail_path) : null,
+            'url' => $media->url,
+            'thumbnail_url' => $media->thumbnail_url,
+            'status' => $media->status,
         ]);
     }
 
-    /**
-     * Update the specified media in storage.
-     *
-     * @param Request $request
-     * @param int $id
-     * @return JsonResponse
-     */
-    public function update(Request $request, $id)
+    public function update(Request $request, $id): JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'title' => 'required|string|max:255',
-            'type' => 'required|in:image,video',
-            'file' => 'required|file|mimes:jpg,jpeg,png,mp4,mov,mkv,flv,avi,wmv|max:20480',
+            'file' => 'nullable|file|max:20480',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $media = $this->mediaRepository->update(
-            $id,
-            $request->only('title'),
-            $request->file('file'),
-            $request->input('type')
-        );
+        $columns = ['id', 'title', 'path', 'thumbnail_path', 'status'];
+        $media = $this->mediaRepository->find($id, $columns);
+        $file = $request->file('file');
+
+        $updateData = [
+            'title' => $request->input('title'),
+        ];
+
+        if ($file) {
+            $mime = $file->getMimeType();
+            $isVideo = str_starts_with($mime, 'video/');
+            $isImage = str_starts_with($mime, 'image/');
+
+            if (!$isVideo && !$isImage) {
+                return response()->json(['error' => 'Unsupported file type.'], 422);
+            }
+
+            Storage::disk('public')->delete($media->path);
+            if ($media->thumbnail_path) {
+                Storage::disk('public')->delete($media->thumbnail_path);
+                Storage::disk('public')->deleteDirectory(dirname($media->path));
+            }
+
+            $filename = Str::random(40) . '.' . $file->getClientOriginalExtension();
+            $path = $isVideo ? 'media/videos/' . Str::random(40) . '/playlist.m3u8' : 'media/images/' . $filename;
+            $thumbnailPath = $isVideo ? 'media/thumbnails/' . Str::random(40) . '.jpg' : null;
+            $status = $isVideo ? 0 : 1;
+
+            $updateData['path'] = $path;
+            $updateData['thumbnail_path'] = $thumbnailPath;
+            $updateData['status'] = $status;
+
+            if ($isVideo) {
+                $tempPath = $file->storeAs('temp', $filename, 'local');
+
+                ProcessVideoToHls::dispatch(
+                    storage_path('app/' . $tempPath),
+                    storage_path('app/public/' . dirname($path)),
+                    $media->id,
+                    storage_path('app/public/' . $thumbnailPath)
+                )->afterCommit();
+            } else {
+                $file->storeAs('public/' . dirname($path), basename($path));
+            }
+        }
+
+        $updatedMedia = $this->mediaRepository->update($id, $updateData);
 
         return response()->json([
-            'id' => $media->id,
-            'title' => $media->title,
-            'type' => $media->type,
-            'url' => Storage::url($media->path),
-            'thumbnail_url' => $media->thumbnail_path ? Storage::url($media->thumbnail_path) : null,
-            'status' => $media->status,
+            'id' => $updatedMedia->id,
+            'title' => $updatedMedia->title,
+            'url' => $updatedMedia->url,
+            'thumbnail_url' => $updatedMedia->thumbnail_url,
+            'status' => $updatedMedia->status,
         ]);
     }
 
-    /**
-     * Remove the specified media from storage.
-     *
-     * @param int $id
-     * @return JsonResponse
-     */
     public function destroy($id): JsonResponse
     {
+        $columns = ['id', 'path', 'thumbnail_path'];
+        $media = $this->mediaRepository->find($id, $columns);
+
+        Storage::disk('public')->delete($media->path);
+        if ($media->thumbnail_path) {
+            Storage::disk('public')->delete($media->thumbnail_path);
+            Storage::disk('public')->deleteDirectory(dirname($media->path));
+        }
+
         $this->mediaRepository->delete($id);
 
         return response()->json(null, 204);

@@ -11,6 +11,7 @@ use FFMpeg\FFMpeg;
 use FFMpeg\Format\Video\X264;
 use Illuminate\Support\Facades\Log;
 use Modules\Media\src\Repositories\MediaRepositoryInterface;
+use Modules\Media\src\Models\Media1;
 
 class ProcessVideoToHls implements ShouldQueue
 {
@@ -37,7 +38,8 @@ class ProcessVideoToHls implements ShouldQueue
             'thumbnail_path' => $this->thumbnailPath,
         ]);
 
-        $mediaRepository->updateStatus($this->mediaId, 'processing'); // Mark as processing
+        // Set status to "processing"
+        Media1::find($this->mediaId)->update(['status' => 0]);
 
         try {
             $ffmpeg = FFMpeg::create([
@@ -75,8 +77,8 @@ class ProcessVideoToHls implements ShouldQueue
             $video->save($format, $this->outputDir . '/playlist.m3u8');
             Log::info("HLS conversion completed for Media ID: {$this->mediaId}");
 
-            // Update status to completed
-            $mediaRepository->updateStatus($this->mediaId, 'completed');
+            // Update status to "success"
+            Media1::find($this->mediaId)->update(['status' => 1]);
 
             // Clean up temporary file
             if (file_exists($this->inputPath)) {
@@ -86,8 +88,8 @@ class ProcessVideoToHls implements ShouldQueue
 
             Log::info("HLS conversion and thumbnail generation completed for Media ID: {$this->mediaId}");
         } catch (\Exception $e) {
-            // Update status to failed
-            $mediaRepository->updateStatus($this->mediaId, 'failed');
+            // Update status to "failed"
+            Media1::find($this->mediaId)->update(['status' => -1]);
             Log::error("FFmpeg processing failed for Media ID: {$this->mediaId}", [
                 'error' => $e->getMessage(),
                 'input_path' => $this->inputPath,

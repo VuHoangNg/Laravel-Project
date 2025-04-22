@@ -2,179 +2,44 @@
 
 namespace Modules\Media\src\Repositories;
 
-use Illuminate\Http\UploadedFile;
+use Modules\Media\src\Models\Media1;
+use Modules\Media\src\Repositories\MediaRepositoryInterface;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
-use Modules\Media\src\Jobs\ProcessVideoToHls;
-use Modules\Media\src\Models\Media;
 
 class MediaRepository implements MediaRepositoryInterface
 {
-    /**
-     * Get a paginated list of media.
-     *
-     * @param int $perPage
-     * @param int $page
-     * @return LengthAwarePaginator
-     */
-    public function getPaginated(int $perPage, int $page): LengthAwarePaginator
+    protected $model;
+
+    public function __construct(Media1 $model)
     {
-        $perPage = min(max($perPage, 1), 100);
-        return Media::paginate($perPage, ['*'], 'page', $page);
+        $this->model = $model;
     }
 
-    /**
-     * Create a new media record.
-     *
-     * @param array $data
-     * @param UploadedFile|null $file
-     * @param string $type
-     * @return Media
-     */
-    public function create(array $data, ?UploadedFile $file, string $type): Media
+    public function getPaginated(int $perPage, int $page, array $columns = ['*']): LengthAwarePaginator
     {
-        $filename = Str::random(40) . '.' . $file->getClientOriginalExtension();
-        $path = 'media/' . $type . 's/' . $filename;
-        $thumbnailPath = null;
-
-        if ($type === 'video') {
-            $hlsPath = 'media/videos/' . Str::random(40) . '/playlist.m3u8';
-            $thumbnailPath = 'media/thumbnails/' . Str::random(40) . '.jpg';
-            $path = $hlsPath;
-        }
-
-        // Create media record
-        $media = Media::create([
-            'title' => $data['title'],
-            'type' => $type,
-            'path' => $path,
-            'thumbnail_path' => $thumbnailPath,
-            'status' => $type === 'video' ? 'pending' : 'completed',
-        ]);
-
-        if ($type === 'video') {
-            // Store original video temporarily
-            $tempPath = $file->storeAs('temp', $filename, 'local');
-
-            // Dispatch job with Media ID and thumbnail path
-            ProcessVideoToHls::dispatch(
-                storage_path('app/' . $tempPath),
-                storage_path('app/public/' . dirname($path)),
-                $media->id,
-                storage_path('app/public/' . $thumbnailPath)
-            )->afterCommit();
-        } else {
-            // Store image
-            $file->storeAs('public', $path);
-        }
-
-        return $media;
+        return $this->model->newQuery()->select($columns)->paginate($perPage, ['*'], 'page', $page);
     }
 
-    /**
-     * Find a media record by ID.
-     *
-     * @param int $id
-     * @return Media
-     */
-    public function find(int $id): Media
+    public function find($id, array $columns = ['*']): Media1
     {
-        return Media::findOrFail($id);
+        return $this->model->newQuery()->select($columns)->findOrFail($id);
     }
 
-    /**
-     * Update a media record.
-     *
-     * @param int $id
-     * @param array $data
-     * @param UploadedFile|null $file
-     * @param string $type
-     * @return Media
-     */
-    public function update(int $id, array $data, ?UploadedFile $file, string $type): Media
+    public function create(array $data): Media1
     {
-        $media = Media::findOrFail($id);
-
-        $updateData = [
-            'title' => $data['title'],
-            'type' => $type,
-            'status' => $type === 'video' ? 'pending' : 'completed',
-        ];
-
-        if ($file) {
-            // Delete old file
-            Storage::disk('public')->delete($media->path);
-            if ($media->type === 'video') {
-                Storage::disk('public')->deleteDirectory(dirname($media->path));
-                if ($media->thumbnail_path) {
-                    Storage::disk('public')->delete($media->thumbnail_path);
-                }
-            }
-
-            $filename = Str::random(40) . '.' . $file->getClientOriginalExtension();
-            $path = 'media/' . $type . 's/' . $filename;
-            $thumbnailPath = null;
-
-            if ($type === 'video') {
-                $tempPath = $file->storeAs('temp', $filename, 'local');
-                $hlsPath = 'media/videos/' . Str::random(40) . '/playlist.m3u8';
-                $thumbnailPath = 'media/thumbnails/' . Str::random(40) . '.jpg';
-
-                // Dispatch job with Media ID and thumbnail path
-                ProcessVideoToHls::dispatch(
-                    storage_path('app/' . $tempPath),
-                    storage_path('app/public/' . dirname($hlsPath)),
-                    $media->id,
-                    storage_path('app/public/' . $thumbnailPath)
-                )->afterCommit();
-
-                $path = $hlsPath;
-            } else {
-                $file->storeAs('public', $path);
-            }
-
-            $updateData['path'] = $path;
-            $updateData['thumbnail_path'] = $thumbnailPath;
-        }
-
-        $media->update($updateData);
-
-        return $media;
+        return $this->model->create($data);
     }
 
-    /**
-     * Delete a media record.
-     *
-     * @param int $id
-     * @return void
-     */
-    public function delete(int $id): void
+    public function update($id, array $data): Media1
     {
-        $media = Media::findOrFail($id);
-
-        // Delete the file
-        Storage::disk('public')->delete($media->path);
-        if ($media->type === 'video') {
-            Storage::disk('public')->deleteDirectory(dirname($media->path));
-            if ($media->thumbnail_path) {
-                Storage::disk('public')->delete($media->thumbnail_path);
-            }
-        }
-
-        $media->delete();
+        $media = $this->find($id);
+        $media->update($data);
+        return $media->fresh();
     }
 
-    /**
-     * Update the status of a media record.
-     *
-     * @param int $id
-     * @param string $status
-     * @return void
-     */
-    public function updateStatus(int $id, string $status): void
+    public function delete($id): bool
     {
-        $media = Media::findOrFail($id);
-        $media->update(['status' => $status]);
+        $media = $this->find($id);
+        return $media->delete();
     }
 }

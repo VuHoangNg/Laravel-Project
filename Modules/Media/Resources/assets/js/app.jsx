@@ -221,55 +221,24 @@ function MediaContent() {
             key: "title",
         },
         {
-            title: "Type",
-            dataIndex: "type",
-            key: "type",
-        },
-        {
             title: "Preview",
-            dataIndex: "url",
-            key: "url",
-            render: (url, record) =>
-                record.type === "image" ? (
+            dataIndex: "thumbnail_url",
+            key: "thumbnail_url",
+            render: (_, record) => {
+                const previewUrl = record.thumbnail_url || record.url;
+                return (
                     <img
-                        src={url}
+                        src={previewUrl}
                         alt={record.title}
                         style={{ maxWidth: 400, maxHeight: 250 }}
                         onError={(e) => {
-                            console.error(`Failed to load image: ${url}`);
+                            console.error(`Failed to load image: ${previewUrl}`);
                             e.target.src =
                                 "https://via.placeholder.com/150?text=Image+Not+Found";
                         }}
                     />
-                ) : (
-                    <VideoPlayer
-                        src={url}
-                        style={{ maxWidth: 400, maxHeight: 250 }}
-                    />
-                ),
-        },
-        {
-            title: "Thumbnail",
-            dataIndex: "thumbnail_url",
-            key: "thumbnail_url",
-            render: (thumbnail_url, record) =>
-                record.type === "video" ? (
-                    <img
-                        src={
-                            thumbnail_url ||
-                            "https://via.placeholder.com/150?text=Thumbnail+Not+Found"
-                        }
-                        alt={record.title}
-                        style={{ maxWidth: 400, maxHeight: 250 }}
-                        onError={(e) => {
-                            console.error(
-                                `Failed to load thumbnail: ${thumbnail_url}`
-                            );
-                            e.target.src =
-                                "https://via.placeholder.com/150?text=Thumbnail+Not+Found";
-                        }}
-                    />
-                ) : null,
+                );
+            },
         },
         {
             title: "Actions",
@@ -363,21 +332,6 @@ function MediaContent() {
                         ]}
                     >
                         <Input />
-                    </Form.Item>
-                    <Form.Item
-                        name="type"
-                        label="Media Type"
-                        rules={[
-                            {
-                                required: true,
-                                message: "Please select a media type",
-                            },
-                        ]}
-                    >
-                        <Select>
-                            <Option value="image">Image</Option>
-                            <Option value="video">Video</Option>
-                        </Select>
                     </Form.Item>
                     <Form.Item
                         name="file"
