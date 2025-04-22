@@ -9,18 +9,22 @@ export function BlogProvider({ children, api }) {
     const dispatch = useDispatch();
 
     // State for creating blogs
-    const [formData, setFormData] = useState({ title: "", content: "", thumbnail_id: null });
+    const [formData, setFormData] = useState({
+        title: "",
+        content: "",
+        thumbnail_id: null,
+    });
 
     const createBlogContext = {
         formData,
         setFormData,
-        resetForm: () => setFormData({ title: "", content: "", thumbnail_id: null }),
+        resetForm: () =>
+            setFormData({ title: "", content: "", thumbnail_id: null }),
         createBlog: async (data) => {
             try {
                 const response = await api.post("/api/blogs", data);
                 dispatch({ type: "blogs/addBlog", payload: response.data });
             } catch (error) {
-                console.error("Failed to create blog:", error);
                 throw error;
             }
         },
@@ -37,13 +41,12 @@ export function BlogProvider({ children, api }) {
                 const response = await api.put(`/api/blogs/${id}`, data);
                 dispatch({ type: "blogs/updateBlog", payload: response.data });
             } catch (error) {
-                console.error("Failed to update blog:", error);
                 throw error;
             }
         },
     };
 
-    // State for getting blogs (modal control)
+    // State for getting blogs (modal control and pagination)
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     const getBlogContext = {
@@ -56,12 +59,13 @@ export function BlogProvider({ children, api }) {
             setEditingBlog(null);
             setIsModalOpen(false);
         },
-        fetchBlogs: async () => {
+        fetchBlogs: async (page = 1, perPage = 10) => {
             try {
-                const response = await api.get("/api/blogs");
+                const response = await api.get("/api/blogs", {
+                    params: { page, perPage },
+                });
                 dispatch({ type: "blogs/setBlogs", payload: response.data });
             } catch (error) {
-                console.error("Failed to fetch blogs:", error);
                 throw error;
             }
         },
@@ -87,7 +91,6 @@ export function BlogProvider({ children, api }) {
                 await api.delete(`/api/blogs/${id}`);
                 dispatch({ type: "blogs/deleteBlog", payload: id });
             } catch (error) {
-                console.error("Failed to delete blog:", error);
                 throw error;
             }
         },

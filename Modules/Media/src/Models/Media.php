@@ -9,7 +9,13 @@ class Media extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['title', 'type', 'path'];
+    protected $fillable = [
+        'title',
+        'type',
+        'path',
+        'thumbnail_path',
+        'status',
+    ];
 
     protected $casts = [
         'created_at' => 'datetime',

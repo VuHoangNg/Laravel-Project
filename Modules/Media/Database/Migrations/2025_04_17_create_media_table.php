@@ -11,8 +11,9 @@ return new class extends Migration
         Schema::create('media', function (Blueprint $table) {
             $table->id();
             $table->string('title');
-            $table->string('type'); // image or video
-            $table->string('path'); // file path
+            $table->string('type');
+            $table->string('path');
+            $table->string('status')->default('pending'); // Add status column
             $table->timestamps();
         });
     }

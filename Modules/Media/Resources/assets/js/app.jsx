@@ -249,6 +249,29 @@ function MediaContent() {
                 ),
         },
         {
+            title: "Thumbnail",
+            dataIndex: "thumbnail_url",
+            key: "thumbnail_url",
+            render: (thumbnail_url, record) =>
+                record.type === "video" ? (
+                    <img
+                        src={
+                            thumbnail_url ||
+                            "https://via.placeholder.com/150?text=Thumbnail+Not+Found"
+                        }
+                        alt={record.title}
+                        style={{ maxWidth: 400, maxHeight: 250 }}
+                        onError={(e) => {
+                            console.error(
+                                `Failed to load thumbnail: ${thumbnail_url}`
+                            );
+                            e.target.src =
+                                "https://via.placeholder.com/150?text=Thumbnail+Not+Found";
+                        }}
+                    />
+                ) : null,
+        },
+        {
             title: "Actions",
             key: "actions",
             render: (_, record) => (

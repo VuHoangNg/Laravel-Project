@@ -14,6 +14,14 @@ use Illuminate\Support\Facades\Artisan;
 |
 */
 
-Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
+Artisan::command('test:ffmpeg', function () {
+    try {
+        $ffmpeg = FFMpeg\FFMpeg::create([
+            'ffmpeg.binaries' => config('media.ffmpeg_path', 'ffmpeg'),
+            'ffprobe.binaries' => config('media.ffprobe_path', 'ffprobe'),
+        ]);
+        $this->info('FFmpeg initialized successfully!');
+    } catch (\Exception $e) {
+        $this->error('FFmpeg failed: ' . $e->getMessage());
+    }
+})->describe('Test FFmpeg integration');

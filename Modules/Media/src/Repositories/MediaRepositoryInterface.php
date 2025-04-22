@@ -2,18 +2,64 @@
 
 namespace Modules\Media\src\Repositories;
 
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Modules\Media\src\Models\Media;
 
 interface MediaRepositoryInterface
 {
-    public function index(Request $request): JsonResponse;
+    /**
+     * Get a paginated list of media.
+     *
+     * @param int $perPage
+     * @param int $page
+     * @return LengthAwarePaginator
+     */
+    public function getPaginated(int $perPage, int $page): LengthAwarePaginator;
 
-    public function store(Request $request): JsonResponse;
+    /**
+     * Create a new media record.
+     *
+     * @param array $data
+     * @param UploadedFile|null $file
+     * @param string $type
+     * @return Media
+     */
+    public function create(array $data, ?UploadedFile $file, string $type): Media;
 
-    public function show(int $id): JsonResponse;
+    /**
+     * Find a media record by ID.
+     *
+     * @param int $id
+     * @return Media
+     */
+    public function find(int $id): Media;
 
-    public function update(Request $request, int $id): JsonResponse;
+    /**
+     * Update a media record.
+     *
+     * @param int $id
+     * @param array $data
+     * @param UploadedFile|null $file
+     * @param string $type
+     * @return Media
+     */
+    public function update(int $id, array $data, ?UploadedFile $file, string $type): Media;
 
-    public function destroy(int $id): JsonResponse;
+    /**
+     * Delete a media record.
+     *
+     * @param int $id
+     * @return void
+     */
+    public function delete(int $id): void;
+
+    /**
+     * Update the status of a media record.
+     *
+     * @param int $id
+     * @param string $status
+     * @return void
+     */
+    public function updateStatus(int $id, string $status): void;
 }
