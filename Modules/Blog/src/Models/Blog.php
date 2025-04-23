@@ -3,14 +3,19 @@
 namespace Modules\Blog\src\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Modules\Media\src\Models\Media;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Blog extends Model
 {
-    protected $fillable = ['title', 'content', 'thumbnail_id'];
+    protected $fillable = ['title', 'content'];
 
-    public function thumbnail()
+    public function media(): BelongsToMany
     {
-        return $this->belongsTo(Media::class, 'thumbnail_id');
+        return $this->belongsToMany(
+            \Modules\Media\src\Models\Media1::class,
+            'blog_media',
+            'blog_id',
+            'media_id'
+        )->withTimestamps();
     }
 }

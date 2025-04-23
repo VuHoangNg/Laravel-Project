@@ -2,34 +2,55 @@
 
 namespace Modules\Blog\src\Repositories;
 
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Modules\Blog\src\Repositories\BlogRepositoryInterface;
 use Modules\Blog\src\Models\Blog;
 
 class BlogRepository implements BlogRepositoryInterface
 {
-    public function allPaginated(int $perPage): LengthAwarePaginator
+    public function getAll(int $perPage)
     {
-        return Blog::with('thumbnail')->paginate($perPage);
+        return Blog::with('media')->paginate($perPage);
     }
 
-    public function find(int $id): Blog
+    public function getById(int $id)
     {
-        return Blog::with('thumbnail')->findOrFail($id);
+        return Blog::with('media')->findOrFail($id);
     }
 
-    public function create(array $data): Blog
+    public function create(array $data)
     {
-        return Blog::create($data);
-    }
+        $blog = Blog::create([
+            'title' => $data['title'],
+            'content' => $data['content'],
+        ]);
 
-    public function update(Blog $blog, array $data): Blog
-    {
-        $blog->update($data);
+        if (!empty($data['media_ids'])) {
+            $blog->media()->sync($data['media_ids']);
+        }
+
         return $blog;
     }
 
-    public function delete(Blog $blog): void
+    public function update(int $id, array $data)
     {
+        $blog = Blog::findOrFail($id);
+        $blog->update([
+            'title' => $data['title'],
+            'content' => $data['content'],
+        ]);
+
+        if (isset($data['media_ids'])) {
+            $blog->media()->sync($data['media_ids']);
+        }
+
+        return $blog;
+    }
+
+    public function delete(int $id)
+    {
+        $blog = Blog::findOrFail($id);
+        $blog->media()->detach();
         $blog->delete();
+        return true;
     }
 }

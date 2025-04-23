@@ -13,6 +13,7 @@ import SignUp from "./components/SignUp";
 import Login from "./components/Login";
 import RootLayout from "./components/Layout";
 import { store } from "../../../../Core/Resources/assets/js/redux/store";
+import VerifySuccess from "./components/VerifySuccess";
 
 const { Title, Paragraph } = Typography;
 
@@ -106,6 +107,7 @@ function App() {
                                     />
                                     <Route path="/login" element={<Login />} />
                                     <Route path="/signup" element={<SignUp />} />
+                                    <Route path="/email-verified" element={<VerifySuccess />} />
                                     <Route
                                         path="*"
                                         element={<div>404 - Page Not Found</div>}

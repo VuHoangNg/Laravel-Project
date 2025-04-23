@@ -6,7 +6,8 @@ module.exports = {
         auth: "./Modules/Auth/Resources/assets/js/app.jsx", // Auth entry
         blog: "./Modules/Blog/Resources/assets/js/app.jsx", // Blog entry
         core: "./Modules/Core/Resources/assets/js/index.jsx", // Core entry
-        media: "./Modules/Media/Resources/assets/js/app.jsx", // Media entry
+        media: "./Modules/Media/Resources/assets/js/media.jsx", // Media entry
+        user: "./Modules/User/Resources/assets/js/user.jsx",// User entry
     },
     output: {
         // Correct the output directory to an absolute path

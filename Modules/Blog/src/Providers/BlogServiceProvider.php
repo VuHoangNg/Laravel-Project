@@ -4,8 +4,8 @@ namespace Modules\Blog\src\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Database\Eloquent\Factory;
-use Modules\Blog\src\Repositories\BlogRepositoryInterface;
 use Modules\Blog\src\Repositories\BlogRepository;
+use Modules\Blog\src\Repositories\BlogRepositoryInterface;
 class BlogServiceProvider extends ServiceProvider
 {
     /**

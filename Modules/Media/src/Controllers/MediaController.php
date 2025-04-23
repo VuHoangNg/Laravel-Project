@@ -57,9 +57,13 @@ class MediaController extends Controller
             return response()->json(['error' => 'Unsupported file type.'], 422);
         }
 
+        // Generate date-based directory (YYYY/MM/DD)
+        $datePath = date('Y/m/d');
         $filename = Str::random(40) . '.' . $file->getClientOriginalExtension();
-        $path = $isVideo ? 'media/videos/' . Str::random(40) . '/playlist.m3u8' : 'media/images/' . $filename;
-        $thumbnailPath = $isVideo ? 'media/thumbnails/' . Str::random(40) . '.jpg' : null;
+        $path = $isVideo
+            ? "media/videos/{$datePath}/" . Str::random(40) . '/playlist.m3u8'
+            : "media/images/{$datePath}/{$filename}";
+        $thumbnailPath = $isVideo ? "media/thumbnails/{$datePath}/" . Str::random(40) . '.jpg' : null;
         $status = $isVideo ? 0 : 1;
 
         $media = $this->mediaRepository->create([
@@ -133,15 +137,20 @@ class MediaController extends Controller
                 return response()->json(['error' => 'Unsupported file type.'], 422);
             }
 
+            // Delete old files
             Storage::disk('public')->delete($media->path);
             if ($media->thumbnail_path) {
                 Storage::disk('public')->delete($media->thumbnail_path);
                 Storage::disk('public')->deleteDirectory(dirname($media->path));
             }
 
+            // Generate date-based directory (YYYY/MM/DD)
+            $datePath = date('Y/m/d');
             $filename = Str::random(40) . '.' . $file->getClientOriginalExtension();
-            $path = $isVideo ? 'media/videos/' . Str::random(40) . '/playlist.m3u8' : 'media/images/' . $filename;
-            $thumbnailPath = $isVideo ? 'media/thumbnails/' . Str::random(40) . '.jpg' : null;
+            $path = $isVideo
+                ? "media/videos/{$datePath}/" . Str::random(40) . '/playlist.m3u8'
+                : "media/images/{$datePath}/{$filename}";
+            $thumbnailPath = $isVideo ? "media/thumbnails/{$datePath}/" . Str::random(40) . '.jpg' : null;
             $status = $isVideo ? 0 : 1;
 
             $updateData['path'] = $path;

@@ -6,7 +6,8 @@
         "auth": "webpack --config Modules/Auth/webpack.auth.config.js --watch",
         "core": "webpack --config Modules/Core/webpack.core.config.js --watch",
         "blog": "webpack --config Modules/Blog/webpack.blog.config.js --watch",
-        "media": "webpack --config Modules/Media/webpack.media.config.js --watch"
+        "media": "webpack --config Modules/Media/webpack.media.config.js --watch",
+        "user": "webpack --config Modules/User/webpack.user.config.js --watch"
     },
     "devDependencies": {
         "@babel/core": "^7.26.10",

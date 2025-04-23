@@ -11,10 +11,11 @@ import { Button, Layout, Menu, theme, Modal } from "antd";
 import { Routes, Route, Link } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { clearToken } from "./redux/actions";
-import Blog from "../../../../Blog/Resources/assets/js/app";
 import { logout } from "../../../../Auth/Resources/assets/js/redux/actions";
 import api from "./api/api";
-import Media from "../../../../Media/Resources/assets/js/app";
+import Blog from "../../../../Blog/Resources/assets/js/app";
+import Media from "../../../../Media/Resources/assets/js/media";
+import User from "../../../../User/Resources/assets/js/user";
 
 const { Header, Sider, Content } = Layout;
 
@@ -40,8 +41,7 @@ function Core() {
                     dispatch(clearToken());
                     window.location.href = "/auth/login";
                 } catch (error) {
-                    message.error("Logout failed. Please try again.");
-                    console.error(error);
+                    console.error("Logout failed:", error);
                 }
             },
         });
@@ -61,7 +61,7 @@ function Core() {
         {
             key: "3",
             icon: <UploadOutlined />,
-            label: <Link to="/nav3">Navigation 3</Link>,
+            label: <Link to="/users">Users</Link>,
         },
         {
             key: "4",
@@ -103,13 +103,9 @@ function Core() {
                 >
                     <Routes>
                         <Route path="/" element={<h2>Welcome to Core</h2>} />
-                        <Route path="/blog" element={<Blog api={api} />} />{" "}
-                        {/* Pass API as prop */}
-                        <Route path="/media" element={<Media api={api} />} />
-                        <Route
-                            path="/nav3"
-                            element={<div>Navigation 3 Page</div>}
-                        />
+                        <Route path="/blog" element={<Blog api={api} />} />
+                        <Route path="/media/*" element={<Media api={api} />} />
+                        <Route path="/users" element={<User api={api} />} />
                     </Routes>
                 </Content>
             </Layout>

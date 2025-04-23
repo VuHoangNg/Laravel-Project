@@ -20,7 +20,7 @@ export default function blogReducer(state = initialState, action) {
         case "blogs/setBlogs":
             return {
                 ...state,
-                blogs: action.payload, // Update state.blogs directly
+                blogs: action.payload,
             };
         case "blogs/addBlog":
             return {

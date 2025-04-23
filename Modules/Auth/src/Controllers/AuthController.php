@@ -8,7 +8,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Modules\Auth\src\Models\User;
 use Illuminate\Support\Facades\Cookie;
-
+use App\Mail\WelcomeEmail;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Auth\Events\Registered;
 class AuthController extends Controller
 {
     /**
@@ -121,26 +123,24 @@ class AuthController extends Controller
             ->withCookie(Cookie::forget('token'));
         }
 
-
-        public function register(Request $request)
+    public function register(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'username' => 'required|string|max:255|unique:users',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8',
         ]);
 
         $user = User::create([
-            'name' => $request->name,
-            'username' => $request->username,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
         ]);
 
+        event(new Registered($user)); // Fire email verification event
+
         return response()->json([
-            'name' => $user->name,
-            'message' => 'Account created successfully',
+            'message' => 'Account created successfully. Please check your email for verification.',
         ], 201);
     }
 
@@ -157,6 +157,22 @@ class AuthController extends Controller
     }
     return response()->json(['message' => 'Unauthorized'], 401);
 }
+
+
+    public function verifyEmail($id, $hash)
+    {
+        $user = User::findOrFail($id);
+
+        if (!hash_equals(sha1($user->getEmailForVerification()), $hash)) {
+            return response()->json(['message' => 'Invalid verification link'], 400);
+        }
+
+        if (!$user->hasVerifiedEmail()) {
+            $user->markEmailAsVerified();
+        }
+
+        return redirect('/auth/email-verified');
+    }
 }
 
 

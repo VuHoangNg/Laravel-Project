@@ -2,5 +2,6 @@
     "Auth": true,
     "Blog": true,
     "Core": true,
-    "Media": true
+    "Media": true,
+    "User": true
 }

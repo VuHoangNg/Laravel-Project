@@ -1,10 +1,8 @@
 import React, { createContext, useContext, useState } from "react";
 import { useDispatch } from "react-redux";
 
-// Create a single BlogContext
 const BlogContext = createContext();
 
-// BlogProvider to manage all context logic and API calls
 export function BlogProvider({ children, api }) {
     const dispatch = useDispatch();
 
@@ -13,13 +11,14 @@ export function BlogProvider({ children, api }) {
         title: "",
         content: "",
         thumbnail_id: null,
+        media_ids: [], // Add media_ids array
     });
 
     const createBlogContext = {
         formData,
         setFormData,
         resetForm: () =>
-            setFormData({ title: "", content: "", thumbnail_id: null }),
+            setFormData({ title: "", content: "", thumbnail_id: null, media_ids: [] }),
         createBlog: async (data) => {
             try {
                 const response = await api.post("/api/blogs", data);
@@ -46,7 +45,7 @@ export function BlogProvider({ children, api }) {
         },
     };
 
-    // State for getting blogs (modal control and pagination)
+    // State for getting blogs
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     const getBlogContext = {
@@ -54,6 +53,14 @@ export function BlogProvider({ children, api }) {
         openModal: (blog = null) => {
             setEditingBlog(blog);
             setIsModalOpen(true);
+            if (blog) {
+                setFormData({
+                    title: blog.title,
+                    content: blog.content,
+                    thumbnail_id: blog.thumbnail_id,
+                    media_ids: blog.media.map((m) => m.id),
+                });
+            }
         },
         closeModal: () => {
             setEditingBlog(null);
@@ -110,7 +117,6 @@ export function BlogProvider({ children, api }) {
     );
 }
 
-// Hook to access the context
 export function useBlogContext() {
     return useContext(BlogContext);
 }

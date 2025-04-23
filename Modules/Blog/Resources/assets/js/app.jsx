@@ -15,55 +15,13 @@ import {
     Pagination,
     Spin,
     Alert,
+    Tag,
 } from "antd";
 import { useSearchParams } from "react-router-dom";
-import Hls from "hls.js";
+import VideoPlayer from "../../../../Core/Resources/assets/js/components/videoPlayer";
 
 const { Title } = Typography;
 const { Meta } = Card;
-
-// Custom VideoPlayer component to handle HLS playback
-const VideoPlayer = ({ src, style }) => {
-    const videoRef = React.useRef(null);
-
-    React.useEffect(() => {
-        const video = videoRef.current;
-        if (!video) return;
-
-        if (Hls.isSupported()) {
-            const hls = new Hls();
-            hls.loadSource(src);
-            hls.attachMedia(video);
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                video.play().catch((error) => {
-                    console.error("Video playback failed:", error);
-                });
-            });
-            hls.on(Hls.Events.ERROR, (event, data) => {
-                console.error("HLS error:", event, data);
-            });
-            return () => {
-                hls.destroy();
-            };
-        } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-            video.src = src;
-            video.play().catch((error) => {
-                console.error("Video playback failed:", error);
-            });
-        } else {
-            console.error("HLS is not supported in this browser");
-        }
-    }, [src]);
-
-    return (
-        <video
-            ref={videoRef}
-            controls
-            style={style}
-            type="application/x-mpegURL"
-        />
-    );
-};
 
 function BlogContent({ api }) {
     const dispatch = useDispatch();
@@ -107,6 +65,7 @@ function BlogContent({ api }) {
     const [form] = Form.useForm();
     const [searchParams, setSearchParams] = useSearchParams();
     const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
+    const [selectedMediaIds, setSelectedMediaIds] = useState([]);
     const [mediaPagination, setMediaPagination] = useState({
         currentPage: 1,
         limit: 6,
@@ -117,7 +76,6 @@ function BlogContent({ api }) {
 
     useEffect(() => {
         const loadInitialData = async () => {
-
             setLoading(true);
             setError(null);
             try {
@@ -129,7 +87,7 @@ function BlogContent({ api }) {
             }
         };
         loadInitialData();
-    }, [fetchBlogs]);
+    }, []);
 
     useEffect(() => {
         const fetchMediaForModal = async () => {
@@ -168,15 +126,20 @@ function BlogContent({ api }) {
 
     const handleSubmit = async (values) => {
         try {
+            const payload = {
+                ...values,
+                media_ids: selectedMediaIds,
+            };
             if (editingBlog) {
-                await updateBlog(editingBlog.id, values);
+                await updateBlog(editingBlog.id, payload);
             } else {
-                await createBlog(values);
+                await createBlog(payload);
             }
             closeModal();
             setSearchParams({});
             form.resetFields();
             resetForm();
+            setSelectedMediaIds([]);
         } catch (error) {
             if (error.response?.status === 422) {
                 const errors = error.response.data.errors;
@@ -212,8 +175,9 @@ function BlogContent({ api }) {
 
     const handleOpenCreate = () => {
         openModal();
-        form.setFieldsValue({ title: "", content: "", thumbnail_id: null });
+        form.setFieldsValue({ title: "", content: "" });
         resetForm();
+        setSelectedMediaIds([]);
         setSearchParams({ action: "create" });
     };
 
@@ -222,8 +186,8 @@ function BlogContent({ api }) {
         form.setFieldsValue({
             title: blog.title,
             content: blog.content,
-            thumbnail_id: blog.thumbnail_id || null,
         });
+        setSelectedMediaIds(blog.media.map((m) => m.id));
         setSearchParams({ action: "edit", id: blog.id });
     };
 
@@ -232,6 +196,7 @@ function BlogContent({ api }) {
         setSearchParams({});
         form.resetFields();
         resetForm();
+        setSelectedMediaIds([]);
     };
 
     const handleOpenMediaModal = () => {
@@ -244,8 +209,11 @@ function BlogContent({ api }) {
     };
 
     const handleSelectMedia = (mediaId) => {
-        form.setFieldsValue({ thumbnail_id: mediaId });
-        setIsMediaModalOpen(false);
+        setSelectedMediaIds((prev) =>
+            prev.includes(mediaId)
+                ? prev.filter((id) => id !== mediaId)
+                : [...prev, mediaId]
+        );
     };
 
     const handleImageError = (e, item) => {
@@ -261,6 +229,14 @@ function BlogContent({ api }) {
         setMediaPagination((prev) => ({ ...prev, currentPage: page }));
     };
 
+    const isVideo = (url) => {
+        return (
+            typeof url === "string" &&
+            url.includes("/storage/media/videos/") &&
+            url.endsWith(".m3u8")
+        );
+    };
+
     const columns = [
         {
             title: "Title",
@@ -271,29 +247,23 @@ function BlogContent({ api }) {
             title: "Content",
             dataIndex: "content",
             key: "content",
-            render: (text) => text.substring(0, 50) + "...",
+            render: (text) => (text ? text.substring(0, 50) + "..." : ""),
         },
         {
-            title: "Thumbnail",
-            dataIndex: "thumbnail",
-            key: "thumbnail",
-            render: (thumbnail) =>
-                thumbnail ? (
-                    thumbnail.type === "image" ? (
-                        <img
-                            src={thumbnail.url}
-                            alt={thumbnail.title}
-                            style={{ maxWidth: 400, maxHeight: 250 }}
-                            onError={(e) => handleImageError(e, thumbnail)}
-                        />
-                    ) : (
-                        <VideoPlayer
-                            src={thumbnail.url}
-                            style={{ maxWidth: 400, maxHeight: 250 }}
-                        />
-                    )
+            title: "Media",
+            dataIndex: "media",
+            key: "media",
+            render: (media) =>
+                media.length > 0 ? (
+                    <Space wrap>
+                        {media.map((item) => (
+                            <Tag key={item.id} color="blue">
+                                {item.title}
+                            </Tag>
+                        ))}
+                    </Space>
                 ) : (
-                    "No Thumbnail Available"
+                    "No Media"
                 ),
         },
         {
@@ -301,7 +271,12 @@ function BlogContent({ api }) {
             key: "actions",
             render: (_, record) => (
                 <Space>
-                    <Button onClick={() => handleOpenEdit(record)}>Edit</Button>
+                    <Button
+                        type="primary"
+                        onClick={() => handleOpenEdit(record)}
+                    >
+                        Edit
+                    </Button>
                     <Button danger onClick={() => handleDelete(record.id)}>
                         Delete
                     </Button>
@@ -383,18 +358,9 @@ function BlogContent({ api }) {
                     >
                         <Input.TextArea rows={4} />
                     </Form.Item>
-                    <Form.Item
-                        name="thumbnail_id"
-                        label="Thumbnail"
-                        rules={[
-                            {
-                                required: true,
-                                message: "Please select a thumbnail",
-                            },
-                        ]}
-                    >
+                    <Form.Item label="Media">
                         <Button type="dashed" onClick={handleOpenMediaModal}>
-                            Select Thumbnail
+                            Select Media ({selectedMediaIds.length} selected)
                         </Button>
                     </Form.Item>
                     <Form.Item>
@@ -432,54 +398,77 @@ function BlogContent({ api }) {
                 ) : !media.data || media.data.length === 0 ? (
                     <Alert
                         message="No Media Available"
-                        description="Please upload some media to select a thumbnail."
+                        description="Please upload some media to select."
                         type="info"
                         showIcon
                     />
                 ) : (
                     <>
                         <Row gutter={[16, 16]}>
-                            {media.data.map((item) => (
-                                <Col span={8} key={item.id}>
-                                    <Card
-                                        hoverable
-                                        cover={
-                                            item.type === "image" ? (
-                                                <img
-                                                    alt={item.title}
-                                                    src={item.url}
+                            {media.data.map((item) => {
+                                const isVideoMedia = isVideo(item.url);
+                                const isSelected = selectedMediaIds.includes(item.id);
+
+                                return (
+                                    <Col span={8} key={item.id}>
+                                        <Card
+                                            hoverable
+                                            style={{
+                                                border: isSelected
+                                                    ? "2px solid #1890ff"
+                                                    : "1px solid #d9d9d9",
+                                            }}
+                                            cover={
+                                                isVideoMedia ? (
+                                                    <VideoPlayer
+                                                        src={item.url}
+                                                        style={{
+                                                            height: 250,
+                                                            objectFit: "cover",
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <img
+                                                        alt={item.title}
+                                                        src={
+                                                            item.thumbnail_url ||
+                                                            item.url ||
+                                                            "https://via.placeholder.com/150?text=Image+Not+Found"
+                                                        }
+                                                        style={{
+                                                            height: 250,
+                                                            objectFit: "cover",
+                                                        }}
+                                                        onError={(e) =>
+                                                            handleImageError(e, item)
+                                                        }
+                                                    />
+                                                )
+                                            }
+                                            onClick={() => handleSelectMedia(item.id)}
+                                        >
+                                            <Meta
+                                                title={item.title}
+                                                description={
+                                                    isVideoMedia ? "Video" : "Image"
+                                                }
+                                            />
+                                            {isSelected && (
+                                                <Tag
+                                                    color="blue"
                                                     style={{
-                                                        height: 250,
-                                                        objectFit: "cover",
+                                                        position: "absolute",
+                                                        top: 10,
+                                                        left: 10,
                                                     }}
-                                                    onError={(e) =>
-                                                        handleImageError(
-                                                            e,
-                                                            item
-                                                        )
-                                                    }
-                                                />
-                                            ) : (
-                                                <VideoPlayer
-                                                    src={item.url}
-                                                    style={{
-                                                        height: 250,
-                                                        objectFit: "cover",
-                                                    }}
-                                                />
-                                            )
-                                        }
-                                        onClick={() =>
-                                            handleSelectMedia(item.id)
-                                        }
-                                    >
-                                        <Meta
-                                            title={item.title}
-                                            description={item.type}
-                                        />
-                                    </Card>
-                                </Col>
-                            ))}
+                                                >
+                                                    Selected
+                                                </Tag>
+                                            )}
+                                        </Card>
+                                    </Col>
+                                );
+                            })}
                         </Row>
                         <Pagination
                             style={{ marginTop: 16, textAlign: "center" }}

@@ -12,7 +12,6 @@ export function MediaProvider({ children, api }) {
     const [formData, setFormData] = useState({
         title: "",
         file: null,
-        type: "",
     });
 
     const createMediaContext = {
@@ -28,11 +27,14 @@ export function MediaProvider({ children, api }) {
                 } else {
                     throw new Error("No file selected for upload");
                 }
-                formData.append("type", data.type);
                 const response = await api.post("/api/media", formData, {
                     headers: { "Content-Type": "multipart/form-data" },
                 });
-                dispatch({ type: "media/addMedia", payload: response.data });
+                // Dispatch media/addMedia to add new media at the top
+                dispatch({
+                    type: "media/addMedia",
+                    payload: response.data,
+                });
             } catch (error) {
                 console.error("Failed to create media:", error);
                 throw error;
@@ -53,11 +55,14 @@ export function MediaProvider({ children, api }) {
                 if (data.file) {
                     formData.append("file", data.file);
                 }
-                formData.append("type", data.type);
                 formData.append("_method", "PUT"); // Spoof the PUT method
 
                 const response = await api.post(`/api/media/${id}`, formData);
-                dispatch({ type: "media/updateMedia", payload: response.data });
+                // Dispatch media/updateMedia to update and move media to the top
+                dispatch({
+                    type: "media/updateMedia",
+                    payload: response.data,
+                });
             } catch (error) {
                 console.error("Failed to update media:", error);
                 throw error;
@@ -123,6 +128,7 @@ export function MediaProvider({ children, api }) {
     return (
         <MediaContext.Provider
             value={{
+                api,
                 createMediaContext,
                 editingMediaContext,
                 getMediaContext,
