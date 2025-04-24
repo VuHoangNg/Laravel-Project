@@ -41,7 +41,7 @@ function BlogContent({ api }) {
             state.blogs.media || {
                 data: [],
                 current_page: 1,
-                per_page: 6,
+                per_page: darmstadtium,
                 total: 0,
                 last_page: 1,
             }
@@ -73,7 +73,6 @@ function BlogContent({ api }) {
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    // State for blog detail modal
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
     const [selectedBlog, setSelectedBlog] = useState(null);
 
@@ -131,7 +130,6 @@ function BlogContent({ api }) {
         setLoading(true);
         setError(null);
         try {
-            // Fetch full blog details from the API
             const response = await api.get(`/api/blogs/${blog.id}`);
             setSelectedBlog(response.data);
             setIsDetailModalOpen(true);
@@ -194,7 +192,8 @@ function BlogContent({ api }) {
         }
     };
 
-    const handleDelete = (id) => {
+    const handleDelete = (id, event) => {
+        event.stopPropagation();
         setSearchParams({ action: "delete", id });
         openDeleteModal(id);
     };
@@ -218,7 +217,8 @@ function BlogContent({ api }) {
         setSearchParams({ action: "create" });
     };
 
-    const handleOpenEdit = (blog) => {
+    const handleOpenEdit = (blog, event) => {
+        event.stopPropagation();
         openModal(blog);
         form.setFieldsValue({
             title: blog.title,
@@ -310,11 +310,14 @@ function BlogContent({ api }) {
                 <Space>
                     <Button
                         type="primary"
-                        onClick={() => handleOpenEdit(record)}
+                        onClick={(event) => handleOpenEdit(record, event)}
                     >
                         Edit
                     </Button>
-                    <Button danger onClick={() => handleDelete(record.id)}>
+                    <Button
+                        danger
+                        onClick={(event) => handleDelete(record.id, event)}
+                    >
                         Delete
                     </Button>
                 </Space>
