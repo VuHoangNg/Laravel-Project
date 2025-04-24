@@ -16,6 +16,7 @@ import {
     Spin,
 } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
+import SkeletonImage from "antd/es/skeleton/Image";
 
 const { Title } = Typography;
 const { Content } = Layout;
@@ -67,13 +68,18 @@ function MediaContent() {
                 setError(
                     err.response?.data?.error ||
                         err.message ||
-                        "Failed to load media. Please try again."
+                        "Failed to load media."
                 );
             } finally {
                 setLoading(false);
             }
         };
+
         loadMedia();
+
+        // Poll every 30 seconds for updates
+        const interval = setInterval(loadMedia, 30000);
+        return () => clearInterval(interval);
     }, []);
 
     const handleTableChange = (pagination) => {
@@ -191,14 +197,21 @@ function MediaContent() {
             key: "thumbnail_url",
             render: (_, record) => {
                 const previewUrl = record.thumbnail_url || record.url;
-                console.log("url", previewUrl); // Debug URL
+                if (!previewUrl) {
+                    return (
+                        <SkeletonImage style={{ width: 400, height: 250 }} active/>
+                    );
+                }
                 return (
                     <img
                         src={previewUrl}
                         alt={record.title}
                         style={{ maxWidth: 400, maxHeight: 250 }}
+                        loading="lazy"
                         onError={(e) => {
-                            console.error(`Failed to load image: ${fullUrl}`);
+                            console.error(
+                                `Failed to load image: ${previewUrl}`
+                            );
                             e.target.src =
                                 "https://via.placeholder.com/150?text=Image+Not+Found";
                         }}
@@ -266,13 +279,19 @@ function MediaContent() {
             )}
             {!loading && (
                 <>
-                    <Button
-                        type="primary"
-                        onClick={handleOpenCreate}
-                        style={{ marginBottom: 16 }}
-                    >
-                        Add Media
-                    </Button>
+                    <Space style={{ marginBottom: 16 }}>
+                        <Button type="primary" onClick={handleOpenCreate}>
+                            Add Media
+                        </Button>
+                        <Button
+                            type="default"
+                            onClick={() =>
+                                fetchMedia(media.current_page, media.per_page)
+                            }
+                        >
+                            Refresh
+                        </Button>
+                    </Space>
                     <Table
                         columns={columns}
                         dataSource={media.data || []}

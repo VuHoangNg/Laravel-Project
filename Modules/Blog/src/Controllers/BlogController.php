@@ -4,35 +4,16 @@ namespace Modules\Blog\src\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Modules\Blog\src\Repositories\BlogRepository;
-use Illuminate\Support\Facades\Storage;
+use Modules\Blog\src\Repositories\BlogRepositoryInterface;
 
 class BlogController extends Controller
 {
     protected $blogRepository;
 
-    public function __construct(BlogRepository $blogRepository)
+    public function __construct(BlogRepositoryInterface $blogRepository)
     {
         $this->middleware('auth:sanctum')->except(['index', 'show']);
         $this->blogRepository = $blogRepository;
-    }
-
-    private function transformBlog($blog)
-    {
-        return [
-            'id' => $blog->id,
-            'title' => $blog->title,
-            'content' => $blog->content,
-            'media' => $blog->media->map(fn ($mediaItem) => [
-                'id' => $mediaItem->id,
-                'title' => $mediaItem->title,
-                'type' => $mediaItem->type,
-                'url' => Storage::url($mediaItem->path),
-                'thumbnail' => $mediaItem->thumbnail_path
-                    ? Storage::url($mediaItem->thumbnail_path)
-                    : Storage::url($mediaItem->path),
-            ]),
-        ];
     }
 
     public function index(Request $request)
@@ -46,7 +27,7 @@ class BlogController extends Controller
             'per_page' => $blogs->perPage(),
             'total' => $blogs->total(),
             'last_page' => $blogs->lastPage(),
-        ], 200);
+        ]);
     }
 
     public function store(Request $request)
@@ -88,5 +69,15 @@ class BlogController extends Controller
     {
         $this->blogRepository->delete($id);
         return response()->json(['message' => 'Blog deleted successfully'], 200);
+    }
+
+    private function transformBlog($blog)
+    {
+        return [
+            'id' => $blog->id,
+            'title' => $blog->title, // Uses accessor from Blog model
+            'content' => $blog->content, // Uses accessor from Blog model
+            'media' => $blog->media, // Automatically formatted by Media1 accessors
+        ];
     }
 }

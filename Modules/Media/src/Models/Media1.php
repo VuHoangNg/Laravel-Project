@@ -24,26 +24,53 @@ class Media1 extends Model
         )->withTimestamps();
     }
 
+    // Getter for title (Ensures consistent formatting)
+    public function getTitleAttribute($value): string
+    {
+        return ucfirst($value);
+    }
+
+    // Setter for title (Trims whitespace before saving)
+    public function setTitleAttribute($value)
+    {
+        $this->attributes['title'] = trim($value);
+    }
+
+    // Getter for path (Returns full URL if valid)
     public function getUrlAttribute(): ?string
     {
-        // Only return URL if status is 1 (ready) and path is valid
         if ($this->status == 1 && $this->path && Storage::disk('public')->exists($this->path)) {
             return Storage::url($this->path);
         }
         return null;
     }
 
+    // Getter for thumbnail (Caches the thumbnail URL)
     public function getThumbnailUrlAttribute(): ?string
     {
-        // Return thumbnail URL if status is 1 and thumbnail_path exists, otherwise fallback to path
-        if ($this->status == 1) {
-            if ($this->thumbnail_path && Storage::disk('public')->exists($this->thumbnail_path)) {
-                return Storage::url($this->thumbnail_path);
+        $cacheKey = "media_thumbnail_url_{$this->id}";
+        return cache()->remember($cacheKey, now()->addMinutes(60), function () {
+            if ($this->status == 1) {
+                if ($this->thumbnail_path && Storage::disk('public')->exists($this->thumbnail_path)) {
+                    return Storage::url($this->thumbnail_path);
+                }
+                if ($this->path && Storage::disk('public')->exists($this->path)) {
+                    return Storage::url($this->path);
+                }
             }
-            if ($this->path && Storage::disk('public')->exists($this->path)) {
-                return Storage::url($this->path);
-            }
-        }
-        return null;
+            return null;
+        });
+    }
+
+    // Setter for path (Sanitizes file path before saving)
+    public function setPathAttribute($value)
+    {
+        $this->attributes['path'] = trim($value);
+    }
+
+    // Setter for thumbnail path (Sanitizes file path)
+    public function setThumbnailPathAttribute($value)
+    {
+        $this->attributes['thumbnail_path'] = trim($value);
     }
 }

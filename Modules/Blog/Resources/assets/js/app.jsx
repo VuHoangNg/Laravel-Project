@@ -125,15 +125,26 @@ function BlogContent({ api }) {
     };
 
     const handleSubmit = async (values) => {
+        setLoading(true);
+        setError(null);
         try {
             const payload = {
                 ...values,
                 media_ids: selectedMediaIds,
             };
+            let response;
             if (editingBlog) {
-                await updateBlog(editingBlog.id, payload);
+                response = await updateBlog(editingBlog.id, payload);
+                dispatch({
+                    type: "blogs/updateBlog",
+                    payload: response.data,
+                });
             } else {
-                await createBlog(payload);
+                response = await createBlog(payload);
+                dispatch({
+                    type: "blogs/addBlog",
+                    payload: response.data,
+                });
             }
             closeModal();
             setSearchParams({});
@@ -151,9 +162,10 @@ function BlogContent({ api }) {
                         },
                     ]);
                 });
-            } else {
-                setError("Failed to save blog. Please try again.");
             }
+        } finally {
+            setLoading(false);
+            closeModal();
         }
     };
 
@@ -288,6 +300,7 @@ function BlogContent({ api }) {
     return (
         <div style={{ padding: "24px" }}>
             <Title level={2}>Blog Management</Title>
+
             {loading && (
                 <div style={{ textAlign: "center", margin: "20px 0" }}>
                     <Spin size="large" />
@@ -407,7 +420,9 @@ function BlogContent({ api }) {
                         <Row gutter={[16, 16]}>
                             {media.data.map((item) => {
                                 const isVideoMedia = isVideo(item.url);
-                                const isSelected = selectedMediaIds.includes(item.id);
+                                const isSelected = selectedMediaIds.includes(
+                                    item.id
+                                );
 
                                 return (
                                     <Col span={8} key={item.id}>
@@ -440,17 +455,24 @@ function BlogContent({ api }) {
                                                             objectFit: "cover",
                                                         }}
                                                         onError={(e) =>
-                                                            handleImageError(e, item)
+                                                            handleImageError(
+                                                                e,
+                                                                item
+                                                            )
                                                         }
                                                     />
                                                 )
                                             }
-                                            onClick={() => handleSelectMedia(item.id)}
+                                            onClick={() =>
+                                                handleSelectMedia(item.id)
+                                            }
                                         >
                                             <Meta
                                                 title={item.title}
                                                 description={
-                                                    isVideoMedia ? "Video" : "Image"
+                                                    isVideoMedia
+                                                        ? "Video"
+                                                        : "Image"
                                                 }
                                             />
                                             {isSelected && (

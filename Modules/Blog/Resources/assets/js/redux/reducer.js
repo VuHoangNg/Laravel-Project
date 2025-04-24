@@ -29,6 +29,7 @@ export default function blogReducer(state = initialState, action) {
                     ...state.blogs,
                     data: [action.payload, ...state.blogs.data],
                     total: state.blogs.total + 1,
+                    current_page: 1, // Reset to first page
                 },
             };
         case "blogs/updateBlog":
@@ -36,9 +37,13 @@ export default function blogReducer(state = initialState, action) {
                 ...state,
                 blogs: {
                     ...state.blogs,
-                    data: state.blogs.data.map((blog) =>
-                        blog.id === action.payload.id ? action.payload : blog
-                    ),
+                    data: [
+                        action.payload,
+                        ...state.blogs.data.filter(
+                            (blog) => blog.id !== action.payload.id
+                        ),
+                    ],
+                    current_page: 1, // Reset to first page
                 },
             };
         case "blogs/deleteBlog":
