@@ -6,6 +6,7 @@ import {
     UserOutlined,
     VideoCameraOutlined,
     LogoutOutlined,
+    ContainerOutlined,
 } from "@ant-design/icons";
 import { Button, Layout, Menu, theme, Modal } from "antd";
 import { Routes, Route, Link } from "react-router-dom";
@@ -50,7 +51,7 @@ function Core() {
     const menuItems = [
         {
             key: "1",
-            icon: <UserOutlined />,
+            icon: <ContainerOutlined />,
             label: <Link to="/blog">Blog</Link>,
         },
         {
@@ -60,7 +61,7 @@ function Core() {
         },
         {
             key: "3",
-            icon: <UploadOutlined />,
+            icon: <UserOutlined />,
             label: <Link to="/users">Users</Link>,
         },
         {
