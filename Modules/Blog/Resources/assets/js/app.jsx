@@ -1,5 +1,5 @@
 import React from "react";
-import { BlogProvider } from "./context/BlogContext";
+import { BlogProvider } from "./components/context/BlogContext";
 import { Routes, Route } from "react-router-dom";
 import { Layout } from "antd";
 import BlogContent from "./components/BlogContent";

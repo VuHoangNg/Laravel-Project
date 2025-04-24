@@ -17,7 +17,7 @@ import {
     Tag,
 } from "antd";
 import { useSearchParams } from "react-router-dom";
-import { useBlogContext } from "../context/BlogContext";
+import { useBlogContext } from "./context/BlogContext";
 import VideoPlayer from "../../../../../Core/Resources/assets/js/components/videoPlayer";
 
 const { Title, Paragraph } = Typography;

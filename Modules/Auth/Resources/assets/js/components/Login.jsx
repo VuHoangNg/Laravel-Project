@@ -2,8 +2,8 @@ import React, { useState } from "react";
 import { Form, Input, Button, message, Typography } from "antd";
 import { Link } from "react-router-dom";
 import { UserOutlined, LockOutlined } from "@ant-design/icons";
-import { login } from "../redux/actions";
 import { useDispatch } from "react-redux";
+import { login } from "./reducer/actions";
 
 const { Title } = Typography;
 

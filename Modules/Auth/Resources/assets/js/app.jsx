@@ -12,8 +12,8 @@ import { Button, Typography, Row, Col, Card } from "antd";
 import SignUp from "./components/SignUp";
 import Login from "./components/Login";
 import RootLayout from "./components/Layout";
-import { store } from "../../../../Core/Resources/assets/js/redux/store";
 import VerifySuccess from "./components/VerifySuccess";
+import { store } from "../../../../Core/Resources/assets/js/components/reducer/store";
 
 const { Title, Paragraph } = Typography;
 

@@ -3,12 +3,13 @@
 namespace Modules\User\src\Repositories;
 
 use Modules\Auth\src\Models\User;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 interface UserRepositoryInterface
 {
-    public function getAll($perPage): \Illuminate\Contracts\Pagination\LengthAwarePaginator;
-    public function getById($id): User;
+    public function getAll(int $perPage, array $columns = ['*']): LengthAwarePaginator;
+    public function getById(int $id, array $columns = ['*']): ?User;
     public function create(array $data): User;
-    public function update($id, array $data): User;
-    public function delete($id): bool;
+    public function update(int $id, array $data): ?User;
+    public function delete(int $id): bool;
 }

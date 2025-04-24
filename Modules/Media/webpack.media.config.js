@@ -3,7 +3,7 @@ const path = require("path");
 module.exports = {
   mode: "development",
   entry: {
-    media: "./Modules/Media/Resources/assets/js/media.jsx",
+    media: "./Modules/Media/Resources/assets/js/index.jsx",
   },
   output: {
     path: path.resolve(__dirname, "../../public/modules"),

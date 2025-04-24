@@ -4,6 +4,7 @@ namespace Modules\Blog\src\Repositories;
 
 use Modules\Blog\src\Repositories\BlogRepositoryInterface;
 use Modules\Blog\src\Models\Blog;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class BlogRepository implements BlogRepositoryInterface
 {
@@ -12,12 +13,16 @@ class BlogRepository implements BlogRepositoryInterface
         return Blog::with('media')->paginate($perPage);
     }
 
-    public function getById(int $id)
+    public function getById(int $id): ?Blog
     {
-        return Blog::with('media')->findOrFail($id);
+        $blog = Blog::with('media')->find($id);
+        if (!$blog) {
+            throw new ModelNotFoundException("Blog with ID {$id} not found.");
+        }
+        return $blog;
     }
 
-    public function create(array $data)
+    public function create(array $data): Blog
     {
         $blog = Blog::create([
             'title' => $data['title'],
@@ -31,9 +36,12 @@ class BlogRepository implements BlogRepositoryInterface
         return $blog;
     }
 
-    public function update(int $id, array $data)
+    public function update(int $id, array $data): ?Blog
     {
-        $blog = Blog::findOrFail($id);
+        $blog = Blog::find($id);
+        if (!$blog) {
+            throw new ModelNotFoundException("Blog with ID {$id} not found.");
+        }
         $blog->update([
             'title' => $data['title'],
             'content' => $data['content'],
@@ -46,11 +54,13 @@ class BlogRepository implements BlogRepositoryInterface
         return $blog;
     }
 
-    public function delete(int $id)
+    public function delete(int $id): bool
     {
-        $blog = Blog::findOrFail($id);
+        $blog = Blog::find($id);
+        if (!$blog) {
+            throw new ModelNotFoundException("Blog with ID {$id} not found.");
+        }
         $blog->media()->detach();
-        $blog->delete();
-        return true;
+        return $blog->delete();
     }
 }

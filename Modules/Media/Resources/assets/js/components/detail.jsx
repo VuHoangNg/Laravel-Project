@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Layout, Alert, Button, Card, Descriptions, Spin } from "antd";
-import { useMediaContext } from "../context/MediaContext";
 import VideoPlayer from "../../../../../Core/Resources/assets/js/components/videoPlayer";
+import { useMediaContext } from "./context/MediaContext";
 
 const { Content } = Layout;
 
 const MediaDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const { api } = useMediaContext();
     const mediaFromStore = useSelector(
         (state) => state.media.media?.data || []
@@ -18,32 +19,40 @@ const MediaDetail = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
+    // Extract page from URL query params, fallback to localStorage or 1
+    const fromPage =
+        parseInt(searchParams.get("page")) ||
+        parseInt(localStorage.getItem("lastMediaPage")) ||
+        1;
+
+    console.log("MediaDetail - fromPage:", fromPage);
+
     useEffect(() => {
-        const fetchMediaItem = async () => {
-            setLoading(true);
-            const itemFromStore = mediaFromStore.find(
-                (item) => item.id === parseInt(id)
-            );
-            if (itemFromStore) {
-                setMediaItem(itemFromStore);
-                setLoading(false);
-                return;
-            }
-
-            try {
-                const response = await api.get(`/api/media/${id}`);
-                setMediaItem(response.data);
-            } catch (err) {
-                setError(
-                    err.response?.data?.error || "Failed to load media details."
-                );
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchMediaItem();
     }, [id, api, mediaFromStore]);
+
+    const fetchMediaItem = async () => {
+        setLoading(true);
+        const itemFromStore = mediaFromStore.find(
+            (item) => item.id === parseInt(id)
+        );
+        if (itemFromStore) {
+            setMediaItem(itemFromStore);
+            setLoading(false);
+            return;
+        }
+
+        try {
+            const response = await api.get(`/api/media/${id}`);
+            setMediaItem(response.data);
+        } catch (err) {
+            setError(
+                err.response?.data?.error || "Failed to load media details."
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
 
     if (loading) {
         return (
@@ -72,7 +81,10 @@ const MediaDetail = () => {
                 />
                 <Button
                     type="primary"
-                    onClick={() => navigate("/media")}
+                    onClick={() => {
+                        console.log("Navigating back with page:", fromPage);
+                        navigate(`/media?page=${fromPage}`);
+                    }}
                     style={{ marginTop: 16, width: "100%" }}
                 >
                     Back to Media List
@@ -81,7 +93,6 @@ const MediaDetail = () => {
         );
     }
 
-    // Check if the media URL contains "/storage/media/videos/" and ends with ".m3u8"
     const isVideo =
         mediaItem.url.includes("/storage/media/videos/") &&
         mediaItem.url.endsWith(".m3u8");
@@ -97,7 +108,10 @@ const MediaDetail = () => {
         >
             <Button
                 type="primary"
-                onClick={() => navigate("/media")}
+                onClick={() => {
+                    console.log("Navigating back with page:", fromPage);
+                    navigate(`/media?page=${fromPage}`);
+                }}
                 style={{ marginBottom: 16 }}
             >
                 Back to Media List

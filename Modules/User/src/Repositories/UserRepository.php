@@ -5,17 +5,23 @@ namespace Modules\User\src\Repositories;
 use Modules\Auth\src\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Modules\User\src\Repositories\UserRepositoryInterface;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class UserRepository implements UserRepositoryInterface
 {
-    public function getAll($perPage): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    public function getAll($perPage, array $columns = ['*']): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {
-        return User::paginate($perPage);
+        return User::select($columns)->paginate($perPage);
     }
 
-    public function getById($id): User
+    public function getById($id, array $columns = ['*']): ?User
     {
-        return User::findOrFail($id);
+        $user = User::select($columns)->find($id);
+        if (!$user) {
+            throw new ModelNotFoundException("User with ID {$id} not found.");
+        }
+        return $user;
     }
 
     public function create(array $data): User
@@ -31,9 +37,12 @@ class UserRepository implements UserRepositoryInterface
         return User::create($data);
     }
 
-    public function update($id, array $data): User
+    public function update($id, array $data): ?User
     {
-        $user = User::findOrFail($id);
+        $user = User::find($id);
+        if (!$user) {
+            throw new ModelNotFoundException("User with ID {$id} not found.");
+        }
 
         if (isset($data['password'])) {
             $data['password'] = Hash::make($data['password']);
@@ -54,7 +63,10 @@ class UserRepository implements UserRepositoryInterface
 
     public function delete($id): bool
     {
-        $user = User::findOrFail($id);
+        $user = User::find($id);
+        if (!$user) {
+            throw new ModelNotFoundException("User with ID {$id} not found.");
+        }
 
         if ($user->id === auth()->id()) {
             return false;

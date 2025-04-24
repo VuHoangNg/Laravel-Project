@@ -37,29 +37,14 @@ class Media1 extends Model
     }
 
     // Getter for path (Returns full URL if valid)
-    public function getUrlAttribute(): ?string
+    public function getUrlAttribute()
     {
-        if ($this->status == 1 && $this->path && Storage::disk('public')->exists($this->path)) {
-            return Storage::url($this->path);
-        }
-        return null;
+        return $this->path ? Storage::url($this->path) : null;
     }
 
-    // Getter for thumbnail (Caches the thumbnail URL)
-    public function getThumbnailUrlAttribute(): ?string
+    public function getThumbnailUrlAttribute()
     {
-        $cacheKey = "media_thumbnail_url_{$this->id}";
-        return cache()->remember($cacheKey, now()->addMinutes(60), function () {
-            if ($this->status == 1) {
-                if ($this->thumbnail_path && Storage::disk('public')->exists($this->thumbnail_path)) {
-                    return Storage::url($this->thumbnail_path);
-                }
-                if ($this->path && Storage::disk('public')->exists($this->path)) {
-                    return Storage::url($this->path);
-                }
-            }
-            return null;
-        });
+        return $this->thumbnail_path ? Storage::url($this->thumbnail_path) : null;
     }
 
     // Setter for path (Sanitizes file path before saving)

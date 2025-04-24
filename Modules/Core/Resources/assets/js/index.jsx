@@ -2,8 +2,9 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { Provider } from "react-redux";
 import { BrowserRouter } from "react-router-dom";
-import { store } from "./redux/store";
-import Core from "./app";
+import { store } from "./components/reducer/store";
+import Core from "./components/core";
+
 
 const appElement = document.getElementById("core");
 if (appElement) {

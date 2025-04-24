@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useSelector } from "react-redux";
-import { useMediaContext } from "../context/MediaContext";
 import {
     Layout,
     Typography,
@@ -16,7 +15,7 @@ import {
     Spin,
 } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
-import SkeletonImage from "antd/es/skeleton/Image";
+import { useMediaContext } from "./context/MediaContext";
 
 const { Title } = Typography;
 const { Content } = Layout;
@@ -25,18 +24,15 @@ const BASE_API_URL = "";
 
 function MediaContent() {
     const navigate = useNavigate();
-    const media = useSelector((state) => {
-        console.log("Redux state:", state); // Debug Redux state
-        return (
-            state.media.media || {
-                data: [],
-                current_page: 1,
-                per_page: 10,
-                total: 0,
-                last_page: 1,
-            }
-        );
-    });
+    const media = useSelector((state) =>
+        state.media.media || {
+            data: [],
+            current_page: 1,
+            per_page: 10,
+            total: 0,
+            last_page: 1,
+        }
+    );
     const {
         createMediaContext,
         editingMediaContext,
@@ -59,32 +55,28 @@ function MediaContent() {
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        const loadMedia = async () => {
-            setLoading(true);
-            setError(null);
-            try {
-                await fetchMedia(1, 10);
-            } catch (err) {
-                setError(
-                    err.response?.data?.error ||
-                        err.message ||
-                        "Failed to load media."
-                );
-            } finally {
-                setLoading(false);
-            }
-        };
+        const page = parseInt(searchParams.get("page")) || 1;
+        loadMedia(page);
+    }, [searchParams]);
 
-        loadMedia();
-
-        // Poll every 30 seconds for updates
-        const interval = setInterval(loadMedia, 30000);
-        return () => clearInterval(interval);
-    }, []);
+    const loadMedia = async (page = 1) => {
+        setLoading(true);
+        setError(null);
+        try {
+            await fetchMedia(page, media.per_page);
+        } catch (err) {
+            setError(err.message || "Failed to load media.");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleTableChange = (pagination) => {
         setLoading(true);
-        fetchMedia(pagination.current, pagination.pageSize).finally(() => {
+        const newPage = pagination.current;
+        setSearchParams({ page: newPage.toString() });
+        localStorage.setItem("lastMediaPage", newPage);
+        fetchMedia(newPage, pagination.pageSize).finally(() => {
             setLoading(false);
         });
     };
@@ -99,10 +91,9 @@ function MediaContent() {
                 await createMedia(values);
             }
             closeModal();
-            setSearchParams({});
+            setSearchParams({ page: media.current_page.toString() });
             form.resetFields();
             resetForm();
-            // No need to fetch media; Redux store is updated in MediaProvider
         } catch (error) {
             if (error.response?.status === 422) {
                 const errors = error.response.data.errors;
@@ -115,11 +106,7 @@ function MediaContent() {
                     ]);
                 });
             } else {
-                setError(
-                    error.response?.data?.error ||
-                        error.message ||
-                        "Failed to save media. Please try again."
-                );
+                setError(error.message || "Failed to save media.");
             }
         } finally {
             setLoading(false);
@@ -127,7 +114,11 @@ function MediaContent() {
     };
 
     const handleDelete = (id) => {
-        setSearchParams({ action: "delete", id });
+        setSearchParams({
+            action: "delete",
+            id,
+            page: media.current_page.toString(),
+        });
         openDeleteModal(id);
     };
 
@@ -137,15 +128,10 @@ function MediaContent() {
         try {
             await deleteMedia(mediaToDelete);
             closeDeleteModal();
-            setSearchParams({});
-            // Fetch media after delete to update pagination
+            setSearchParams({ page: media.current_page.toString() });
             await fetchMedia(media.current_page, media.per_page);
         } catch (error) {
-            setError(
-                error.response?.data?.error ||
-                    error.message ||
-                    "Failed to delete media. Please try again."
-            );
+            setError(error.message || "Failed to delete media.");
         } finally {
             setLoading(false);
         }
@@ -153,15 +139,17 @@ function MediaContent() {
 
     const handleCancelDelete = () => {
         closeDeleteModal();
-        setSearchParams({});
+        setSearchParams({ page: media.current_page.toString() });
     };
 
     const handleOpenCreate = () => {
         openModal();
         form.resetFields();
-        form.setFieldsValue({ title: "", file: null, type: "" });
         resetForm();
-        setSearchParams({ action: "create" });
+        setSearchParams({
+            action: "create",
+            page: media.current_page.toString(),
+        });
     };
 
     const handleOpenEdit = (media) => {
@@ -169,20 +157,23 @@ function MediaContent() {
         form.resetFields();
         form.setFieldsValue({
             title: media.title,
-            type: media.status === 0 ? "video" : "image",
         });
-        setSearchParams({ action: "edit", id: media.id });
+        setSearchParams({
+            action: "edit",
+            id: media.id,
+            page: media.current_page.toString(),
+        });
     };
 
     const handleCancel = () => {
         closeModal();
-        setSearchParams({});
+        setSearchParams({ page: media.current_page.toString() });
         form.resetFields();
         resetForm();
     };
 
     const handleRowClick = (record) => {
-        navigate(`/media/${record.id}`);
+        navigate(`/media/${record.id}?page=${media.current_page}`);
     };
 
     const columns = [
@@ -199,7 +190,11 @@ function MediaContent() {
                 const previewUrl = record.thumbnail_url || record.url;
                 if (!previewUrl) {
                     return (
-                        <SkeletonImage style={{ width: 400, height: 250 }} active/>
+                        <img
+                            src="https://via.placeholder.com/150?text=No+Preview"
+                            alt="No Preview"
+                            style={{ maxWidth: 400, maxHeight: 250 }}
+                        />
                     );
                 }
                 return (
@@ -209,9 +204,6 @@ function MediaContent() {
                         style={{ maxWidth: 400, maxHeight: 250 }}
                         loading="lazy"
                         onError={(e) => {
-                            console.error(
-                                `Failed to load image: ${previewUrl}`
-                            );
                             e.target.src =
                                 "https://via.placeholder.com/150?text=Image+Not+Found";
                         }}
