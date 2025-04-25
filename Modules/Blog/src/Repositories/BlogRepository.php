@@ -5,16 +5,22 @@ namespace Modules\Blog\src\Repositories;
 use Modules\Blog\src\Repositories\BlogRepositoryInterface;
 use Modules\Blog\src\Models\Blog;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class BlogRepository implements BlogRepositoryInterface
 {
-    public function getAll(int $perPage, array $columns = ['*'], bool $withMedia = true)
+    public function getAll(int $perPage, array $columns = ['*'], bool $withMedia = false, array $orderBy = []): LengthAwarePaginator
     {
         $query = Blog::select($columns);
         if ($withMedia) {
             $query->with(['media' => function ($query) {
                 $query->select('media1.id', 'media1.title', 'media1.path', 'media1.thumbnail_path', 'media1.status');
             }]);
+        }
+        // Apply sorting: default to created_at desc if no orderBy provided
+        $orderBy = $orderBy ?: ['created_at' => 'desc'];
+        foreach ($orderBy as $column => $direction) {
+            $query->orderBy($column, $direction);
         }
         return $query->paginate($perPage);
     }

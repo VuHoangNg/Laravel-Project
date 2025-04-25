@@ -33,45 +33,67 @@ function UserDetail({ api }) {
     const { fetchUser } = getUserContext;
 
     useEffect(() => {
+        const abortController = new AbortController();
+        let isMounted = true; // Track if component is mounted
+
         const fetchUserData = async () => {
             setLoading(true);
             setError(null);
             try {
                 console.log(`Fetching user with ID: ${id}`);
-                const userData = await fetchUser(id);
-                console.log("User data received:", userData);
-                setUser(userData);
-                form.setFieldsValue({
-                    name: userData.name,
-                    email: userData.email,
-                    username: userData.username,
-                    password: "",
-                    password_confirmation: "",
+                const userData = await fetchUser(id, {
+                    signal: abortController.signal,
                 });
-                setFileList(
-                    userData.avatar_url
-                        ? [
-                              {
-                                  uid: "-1",
-                                  name: "avatar",
-                                  status: "done",
-                                  url: userData.avatar_url,
-                              },
-                          ]
-                        : []
-                );
+                console.log("User data received:", userData);
+                if (isMounted) {
+                    setUser(userData);
+                    form.setFieldsValue({
+                        name: userData.name,
+                        email: userData.email,
+                        username: userData.username,
+                        password: "",
+                        password_confirmation: "",
+                    });
+                    setFileList(
+                        userData.avatar_url
+                            ? [
+                                  {
+                                      uid: "-1",
+                                      name: "avatar",
+                                      status: "done",
+                                      url: userData.avatar_url,
+                                  },
+                              ]
+                            : []
+                    );
+                }
             } catch (err) {
+                if (err.name === "AbortError") {
+                    console.log("User fetch aborted for ID:", id);
+                    return;
+                }
                 console.error("Error fetching user:", err);
-                setError(
-                    err.response?.data?.message ||
-                        err.message ||
-                        "Failed to load user details. Please try again."
-                );
+                if (isMounted) {
+                    setError(
+                        err.response?.data?.message ||
+                            err.message ||
+                            "Failed to load user details. Please try again."
+                    );
+                }
             } finally {
-                setLoading(false);
+                if (isMounted) {
+                    setLoading(false);
+                }
             }
         };
         fetchUserData();
+
+        // Cleanup: Abort the fetch request and mark component as unmounted
+        return () => {
+            console.log("Cleaning up UserDetail useEffect for ID:", id);
+            abortController.abort();
+            isMounted = false;
+        };
     }, [id, fetchUser, form]);
 
     const handleSubmitEdit = async (values) => {
@@ -85,7 +107,10 @@ function UserDetail({ api }) {
             formData.append("email", values.email);
             if (values.password) {
                 formData.append("password", values.password);
-                formData.append("password_confirmation", values.password_confirmation);
+                formData.append(
+                    "password_confirmation",
+                    values.password_confirmation
+                );
             }
             if (fileList.length > 0 && fileList[0].originFileObj) {
                 formData.append("avatar", fileList[0].originFileObj);
@@ -212,7 +237,9 @@ function UserDetail({ api }) {
                     <Form.Item
                         name="name"
                         label="Name"
-                        rules={[{ required: true, message: "Please enter a name" }]}
+                        rules={[
+                            { required: true, message: "Please enter a name" },
+                        ]}
                     >
                         <Input />
                     </Form.Item>
@@ -220,7 +247,10 @@ function UserDetail({ api }) {
                         name="username"
                         label="User Name"
                         rules={[
-                            { required: true, message: "Please enter a user name" },
+                            {
+                                required: true,
+                                message: "Please enter a user name",
+                            },
                         ]}
                     >
                         <Input />
@@ -246,23 +276,36 @@ function UserDetail({ api }) {
                             accept="image/*"
                             listType="picture"
                         >
-                            <Button icon={<UploadOutlined />}>Upload Avatar</Button>
+                            <Button icon={<UploadOutlined />}>
+                                Upload Avatar
+                            </Button>
                         </Upload>
                     </Form.Item>
                     <Form.Item
                         name="password"
                         label="Password"
                         rules={[
-                            { min: 8, message: "Password must be at least 8 characters" },
+                            {
+                                min: 8,
+                                message:
+                                    "Password must be at least 8 characters",
+                            },
                         ]}
                     >
                         <Input.Password />
                     </Form.Item>
-                    <Form.Item name="password_confirmation" label="Confirm Password">
+                    <Form.Item
+                        name="password_confirmation"
+                        label="Confirm Password"
+                    >
                         <Input.Password />
                     </Form.Item>
                     <Space style={{ marginBottom: 16 }}>
-                        <Button type="primary" htmlType="submit" loading={loading}>
+                        <Button
+                            type="primary"
+                            htmlType="submit"
+                            loading={loading}
+                        >
                             Save
                         </Button>
                         <Button danger onClick={handleOpenDelete}>

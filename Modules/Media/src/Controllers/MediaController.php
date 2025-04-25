@@ -45,7 +45,13 @@ class MediaController extends Controller
         ];
         $columns = $fields ? array_values(array_intersect_key($columnMap, array_flip($fields))) : ['id', 'title', 'path', 'thumbnail_path', 'status'];
 
-        $mediaQuery = $this->mediaRepository->getPaginated((int) $perPage, (int) $page, $columns);
+        // Fetch media sorted by created_at in descending order
+        $mediaQuery = $this->mediaRepository->getPaginated(
+            (int) $perPage,
+            (int) $page,
+            $columns,
+            ['created_at' => 'desc']
+        );
 
         $data = $mediaQuery->getCollection()->map(function ($item) use ($fields) {
             $itemArray = [

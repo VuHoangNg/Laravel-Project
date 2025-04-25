@@ -36,7 +36,13 @@ class BlogController extends Controller
             ? array_intersect($fields, ['id', 'title', 'content'])
             : ['id', 'title', 'content'];
 
-        $blogs = $this->blogRepository->getAll($perPage, $columns, in_array('media', $fields));
+        // Fetch blogs sorted by created_at in descending order
+        $blogs = $this->blogRepository->getAll(
+            $perPage,
+            $columns,
+            in_array('media', $fields),
+            ['created_at' => 'desc']
+        );
 
         $data = $blogs->getCollection()->map(function ($blog) use ($fields) {
             $blogArray = [

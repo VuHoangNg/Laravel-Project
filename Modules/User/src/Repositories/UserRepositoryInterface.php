@@ -7,7 +7,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 interface UserRepositoryInterface
 {
-    public function getAll(int $perPage, array $columns = ['*']): LengthAwarePaginator;
+    public function getAll(int $perPage, array $columns = ['*'], array $orderBy = []): LengthAwarePaginator;
     public function getById(int $id, array $columns = ['*']): ?User;
     public function create(array $data): User;
     public function update(int $id, array $data): ?User;

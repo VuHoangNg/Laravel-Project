@@ -29,9 +29,15 @@ class MediaRepository implements MediaRepositoryInterface
         $this->model = $model;
     }
 
-    public function getPaginated(int $perPage, int $page, array $columns = ['*']): LengthAwarePaginator
+    public function getPaginated(int $perPage, int $page, array $columns = ['*'], array $orderBy = []): LengthAwarePaginator
     {
-        return $this->getModel()->newQuery()->select($columns)->paginate($perPage, ['*'], 'page', $page);
+        $query = $this->getModel()->newQuery()->select($columns);
+        // Apply sorting: default to created_at desc if no orderBy provided
+        $orderBy = $orderBy ?: ['created_at' => 'desc'];
+        foreach ($orderBy as $column => $direction) {
+            $query->orderBy($column, $direction);
+        }
+        return $query->paginate($perPage, ['*'], 'page', $page);
     }
 
     public function find($id, array $columns = ['*']): ?Media1

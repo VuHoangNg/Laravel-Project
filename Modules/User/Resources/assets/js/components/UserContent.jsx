@@ -34,10 +34,7 @@ function UserContent({ api }) {
             }
     );
 
-    const {
-        createUserContext,
-        getUserContext,
-    } = useUserContext();
+    const { createUserContext, getUserContext } = useUserContext();
 
     const { resetForm, createUser } = createUserContext;
     const { isModalOpen, openModal, closeModal, fetchUsers } = getUserContext;
@@ -53,24 +50,39 @@ function UserContent({ api }) {
 
     useEffect(() => {
         const abortController = new AbortController();
+        let isMounted = true; // Track if component is mounted
+
         const loadUsers = async () => {
             setLoading(true);
             setError(null);
             try {
+                console.log(`Loading users: page=${page}, perPage=${perPage}`);
                 await fetchUsers(page, perPage, {
                     signal: abortController.signal,
                 });
             } catch (err) {
-                if (err.name !== "AbortError") {
+                if (err.name === "AbortError") {
+                    console.log("User fetch aborted");
+                    return;
+                }
+                if (isMounted) {
                     setError("Failed to load users. Please try again.");
                 }
             } finally {
-                setLoading(false);
+                if (isMounted) {
+                    setLoading(false);
+                }
             }
         };
 
         loadUsers();
-        return () => abortController.abort();
+
+        // Cleanup: Abort the fetch request and mark component as unmounted
+        return () => {
+            console.log("Cleaning up UserContent useEffect");
+            abortController.abort();
+            isMounted = false;
+        };
     }, [page, perPage, fetchUsers]);
 
     const handleTableChange = (pagination) => {

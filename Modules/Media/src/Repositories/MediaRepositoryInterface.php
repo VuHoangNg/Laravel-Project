@@ -7,7 +7,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 
 interface MediaRepositoryInterface
 {
-    public function getPaginated(int $perPage, int $page, array $columns = ['*']): LengthAwarePaginator;
+    public function getPaginated(int $perPage, int $page, array $columns = ['*'], array $orderBy = []): LengthAwarePaginator;
     public function find($id, array $columns = ['*']): ?Media1;
     public function create(array $data): Media1;
     public function update($id, array $data): ?Media1;

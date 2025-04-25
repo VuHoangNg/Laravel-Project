@@ -7,15 +7,22 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Modules\User\src\Repositories\UserRepositoryInterface;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 class UserRepository implements UserRepositoryInterface
 {
-    public function getAll($perPage, array $columns = ['*']): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    public function getAll(int $perPage, array $columns = ['*'], array $orderBy = []): LengthAwarePaginator
     {
-        return User::select($columns)->paginate($perPage);
+        $query = User::select($columns);
+        // Apply sorting: default to created_at desc if no orderBy provided
+        $orderBy = $orderBy ?: ['created_at' => 'desc'];
+        foreach ($orderBy as $column => $direction) {
+            $query->orderBy($column, $direction);
+        }
+        return $query->paginate($perPage);
     }
 
-    public function getById($id, array $columns = ['*']): ?User
+    public function getById(int $id, array $columns = ['*']): ?User
     {
         $user = User::select($columns)->find($id);
         if (!$user) {
@@ -37,7 +44,7 @@ class UserRepository implements UserRepositoryInterface
         return User::create($data);
     }
 
-    public function update($id, array $data): ?User
+    public function update(int $id, array $data): ?User
     {
         $user = User::find($id);
         if (!$user) {
@@ -61,7 +68,7 @@ class UserRepository implements UserRepositoryInterface
         return $user;
     }
 
-    public function delete($id): bool
+    public function delete(int $id): bool
     {
         $user = User::find($id);
         if (!$user) {

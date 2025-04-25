@@ -18,9 +18,8 @@ import {
 } from "antd";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useBlogContext } from "./context/BlogContext";
-
 import { setMedia } from "../../../../../Media/Resources/assets/js/components/reducer/action";
-import VideoPlayer from "../../../../../Core/Resources/assets/js/components/VideoPlayer";
+import VideoPlayer from "../../../../../Core/Resources/assets/js/components/videoPlayer";
 
 const { Title } = Typography;
 const { Meta } = Card;
@@ -65,32 +64,46 @@ function BlogContent({ api }) {
     const [error, setError] = useState(null);
 
     useEffect(() => {
+        const abortController = new AbortController(); // Create AbortController
         const loadInitialData = async () => {
             setLoading(true);
             setError(null);
             try {
-                // Read page and perPage from query parameters, default to 1 and 10
                 const page =
                     parseInt(searchParams.get("page")) || blogs.current_page;
                 const perPage =
                     parseInt(searchParams.get("perPage")) || blogs.per_page;
-                await fetchBlogs(page, perPage);
+                await fetchBlogs(page, perPage, {
+                    signal: abortController.signal,
+                });
             } catch (err) {
+                if (err.name === "AbortError") {
+                    console.log("Fetch aborted");
+                    return;
+                }
                 setError("Failed to load blogs. Please try again.");
             } finally {
                 setLoading(false);
             }
         };
         loadInitialData();
-    }, []);
+
+        // Cleanup: Abort the fetch request on unmount
+        return () => {
+            abortController.abort();
+        };
+    }, []); // Empty dependency array since this runs once on mount
 
     useEffect(() => {
+        const abortController = new AbortController(); // Create AbortController
         const fetchMediaForModal = async () => {
+            if (!isMediaModalOpen) return; // Avoid fetching if modal is closed
             setLoading(true);
             setError(null);
             try {
                 const response = await api.get(
-                    `/api/media?perPage=${mediaPagination.limit}&page=${mediaPagination.currentPage}`
+                    `/api/media?perPage=${mediaPagination.limit}&page=${mediaPagination.currentPage}`,
+                    { signal: abortController.signal }
                 );
                 dispatch(setMedia(response.data));
                 setMediaPagination((prev) => ({
@@ -98,15 +111,22 @@ function BlogContent({ api }) {
                     total: response.data.total,
                 }));
             } catch (error) {
+                if (error.name === "AbortError") {
+                    console.log("Media fetch aborted");
+                    return;
+                }
                 setError("Failed to fetch media. Please try again.");
                 console.error("Failed to fetch media:", error);
             } finally {
                 setLoading(false);
             }
         };
-        if (isMediaModalOpen) {
-            fetchMediaForModal();
-        }
+        fetchMediaForModal();
+
+        // Cleanup: Abort the fetch request on unmount or when dependencies change
+        return () => {
+            abortController.abort();
+        };
     }, [
         api,
         dispatch,

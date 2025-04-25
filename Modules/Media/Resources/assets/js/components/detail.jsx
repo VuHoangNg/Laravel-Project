@@ -14,7 +14,7 @@ import {
 import { useMediaContext } from "./context/MediaContext";
 import { UploadOutlined } from "@ant-design/icons";
 import ImageWithSkeleton from "../../../../../Core/Resources/assets/js/components/SkeletonImage";
-import VideoPlayer from "../../../../../Core/Resources/assets/js/components/VideoPlayer";
+import VideoPlayer from "../../../../../Core/Resources/assets/js/components/videoPlayer";
 
 const { Title } = Typography;
 
@@ -33,6 +33,8 @@ function MediaDetail({ api }) {
 
     useEffect(() => {
         const abortController = new AbortController();
+        let isMounted = true; // Track if component is mounted
+
         const fetchMediaData = async () => {
             setLoading(true);
             setError(null);
@@ -42,15 +44,19 @@ function MediaDetail({ api }) {
                     signal: abortController.signal,
                 });
                 console.log("Media data received:", mediaData);
-                setMedia(mediaData);
-                form.setFieldsValue({
-                    title: mediaData.title,
-                });
+                if (isMounted) {
+                    setMedia(mediaData);
+                    form.setFieldsValue({
+                        title: mediaData.title,
+                    });
+                }
             } catch (err) {
                 if (err.name === "AbortError") {
                     console.log("Fetch aborted for media ID:", id);
-                } else {
-                    console.error("Error fetching media:", err);
+                    return;
+                }
+                console.error("Error fetching media:", err);
+                if (isMounted) {
                     setError(
                         err.response?.data?.message ||
                             err.message ||
@@ -58,13 +64,17 @@ function MediaDetail({ api }) {
                     );
                 }
             } finally {
-                setLoading(false);
+                if (isMounted) {
+                    setLoading(false);
+                }
             }
         };
         fetchMediaData();
+
+        // Cleanup: Abort the fetch request and mark component as unmounted
         return () => {
-            console.log("Cleaning up MediaDetail useEffect for ID:", id);
             abortController.abort();
+            isMounted = false;
         };
     }, [id, fetchMediaById, form]);
 
@@ -76,7 +86,6 @@ function MediaDetail({ api }) {
         setLoading(true);
         setError(null);
         try {
-            console.log("Submitting media update:", values);
             const formData = new FormData();
             formData.append("title", values.title);
             if (values.file) {
@@ -87,13 +96,11 @@ function MediaDetail({ api }) {
                 headers: { "Content-Type": "multipart/form-data" },
             });
             const mediaData = await fetchMediaById(id);
-            console.log("Updated media data:", mediaData);
             setMedia(mediaData);
             form.setFieldsValue({
                 title: mediaData.title,
             });
         } catch (error) {
-            console.error("Error updating media:", error);
             if (error.response?.status === 422) {
                 const errors = error.response.data.errors;
                 Object.keys(errors).forEach((key) => {
@@ -160,7 +167,9 @@ function MediaDetail({ api }) {
     const handleBack = () => {
         const page = searchParams.get("page") || "1";
         const perPage = searchParams.get("perPage") || "10";
-        console.log(`Navigating back to /media?page=${page}&perPage=${perPage}`);
+        console.log(
+            `Navigating back to /media?page=${page}&perPage=${perPage}`
+        );
         navigate(`/media?page=${page}&perPage=${perPage}`);
     };
 
@@ -231,7 +240,12 @@ function MediaDetail({ api }) {
                         <Form.Item
                             name="title"
                             label="Title"
-                            rules={[{ required: true, message: "Please enter a title" }]}
+                            rules={[
+                                {
+                                    required: true,
+                                    message: "Please enter a title",
+                                },
+                            ]}
                         >
                             <Input />
                         </Form.Item>
@@ -245,11 +259,17 @@ function MediaDetail({ api }) {
                                 accept="image/*,video/*"
                                 maxCount={1}
                             >
-                                <Button icon={<UploadOutlined />}>Upload File</Button>
+                                <Button icon={<UploadOutlined />}>
+                                    Upload File
+                                </Button>
                             </Upload>
                         </Form.Item>
                         <Space style={{ marginBottom: 16 }}>
-                            <Button type="primary" htmlType="submit" loading={loading}>
+                            <Button
+                                type="primary"
+                                htmlType="submit"
+                                loading={loading}
+                            >
                                 Save
                             </Button>
                             <Button danger onClick={handleOpenDelete}>

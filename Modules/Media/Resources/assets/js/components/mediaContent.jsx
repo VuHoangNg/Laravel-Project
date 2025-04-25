@@ -48,6 +48,8 @@ function MediaContent() {
 
     useEffect(() => {
         const abortController = new AbortController();
+        let isMounted = true; // Track if component is mounted
+
         const loadMedia = async () => {
             setLoading(true);
             setError(null);
@@ -57,17 +59,30 @@ function MediaContent() {
                     signal: abortController.signal,
                 });
             } catch (err) {
-                if (err.name !== "AbortError") {
+                if (err.name === "AbortError") {
+                    console.log("Media fetch aborted");
+                    return;
+                }
+                if (isMounted) {
                     setError(err.message || "Failed to load media.");
                 }
             } finally {
-                setLoading(false);
+                if (isMounted) {
+                    setLoading(false);
+                }
             }
         };
 
         loadMedia();
-        return () => abortController.abort();
+
+        // Cleanup: Abort the fetch request and mark component as unmounted
+        return () => {
+            console.log("Cleaning up MediaContent useEffect");
+            abortController.abort();
+            isMounted = false;
+        };
     }, [page, perPage, fetchMedia]);
+
 
     const handleTableChange = (pagination) => {
         const newPage = pagination.current;

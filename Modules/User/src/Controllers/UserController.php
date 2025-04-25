@@ -43,7 +43,8 @@ class UserController extends Controller
         ];
         $columns = $fields ? array_values(array_intersect_key($columnMap, array_flip($fields))) : ['id', 'username', 'name', 'email', 'avatar'];
 
-        $users = $this->userRepository->getAll($perPage, $columns);
+        // Fetch users sorted by created_at in descending order
+        $users = $this->userRepository->getAll($perPage, $columns, ['created_at' => 'desc']);
 
         // Directly transform paginated collection using model attributes
         $data = $users->getCollection()->map(function ($user) use ($fields) {

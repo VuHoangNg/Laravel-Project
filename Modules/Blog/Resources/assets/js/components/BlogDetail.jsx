@@ -15,10 +15,11 @@ import {
     Pagination,
     Tag,
 } from "antd";
-import VideoPlayer from "../../../../../Core/Resources/assets/js/components/videoPlayer";
+
 import { useBlogContext } from "./context/BlogContext";
 import { useSelector, useDispatch } from "react-redux";
 import { setMedia } from "../../../../../Media/Resources/assets/js/components/reducer/action";
+import VideoPlayer from "../../../../../Core/Resources/assets/js/components/videoPlayer";
 
 const { Title, Paragraph } = Typography;
 const { Meta } = Card;
@@ -59,49 +60,89 @@ function BlogDetail({ api }) {
     const { deleteBlog } = deleteBlogContext;
 
     useEffect(() => {
+        const abortController = new AbortController(); // Create AbortController
+        let isMounted = true; // Track if component is mounted
+
         const fetchBlog = async () => {
             setLoading(true);
             setError(null);
             try {
-                const response = await api.get(`/api/blogs/${id}`);
-                setBlog(response.data);
-                form.setFieldsValue({
-                    title: response.data.title,
-                    content: response.data.content,
+                const response = await api.get(`/api/blogs/${id}`, {
+                    signal: abortController.signal,
                 });
-                setSelectedMediaIds(response.data.media.map((m) => m.id));
+                if (isMounted) {
+                    setBlog(response.data);
+                    form.setFieldsValue({
+                        title: response.data.title,
+                        content: response.data.content,
+                    });
+                    setSelectedMediaIds(response.data.media.map((m) => m.id));
+                }
             } catch (err) {
-                setError("Failed to load blog details. Please try again.");
+                if (err.name === "AbortError") {
+                    console.log("Blog fetch aborted");
+                    return;
+                }
+                if (isMounted) {
+                    setError("Failed to load blog details. Please try again.");
+                }
             } finally {
-                setLoading(false);
+                if (isMounted) {
+                    setLoading(false);
+                }
             }
         };
         fetchBlog();
+
+        // Cleanup: Abort the fetch request and mark component as unmounted
+        return () => {
+            abortController.abort();
+            isMounted = false;
+        };
     }, [api, id, form]);
 
     useEffect(() => {
+        const abortController = new AbortController(); // Create AbortController
+        let isMounted = true; // Track if component is mounted
+
         const fetchMediaForModal = async () => {
+            if (!isMediaModalOpen) return; // Avoid fetching if modal is closed
             setLoading(true);
             setError(null);
             try {
                 const response = await api.get(
-                    `/api/media?perPage=${mediaPagination.limit}&page=${mediaPagination.currentPage}`
+                    `/api/media?perPage=${mediaPagination.limit}&page=${mediaPagination.currentPage}`,
+                    { signal: abortController.signal }
                 );
-                dispatch(setMedia(response.data));
-                setMediaPagination((prev) => ({
-                    ...prev,
-                    total: response.data.total,
-                }));
+                if (isMounted) {
+                    dispatch(setMedia(response.data));
+                    setMediaPagination((prev) => ({
+                        ...prev,
+                        total: response.data.total,
+                    }));
+                }
             } catch (error) {
-                setError("Failed to fetch media. Please try again.");
-                console.error("Failed to fetch media:", error);
+                if (error.name === "AbortError") {
+                    console.log("Media fetch aborted");
+                    return;
+                }
+                if (isMounted) {
+                    setError("Failed to fetch media. Please try again.");
+                    console.error("Failed to fetch media:", error);
+                }
             } finally {
-                setLoading(false);
+                if (isMounted) {
+                    setLoading(false);
+                }
             }
         };
-        if (isMediaModalOpen) {
-            fetchMediaForModal();
-        }
+        fetchMediaForModal();
+
+        // Cleanup: Abort the fetch request and mark component as unmounted
+        return () => {
+            abortController.abort();
+            isMounted = false;
+        };
     }, [
         api,
         dispatch,
