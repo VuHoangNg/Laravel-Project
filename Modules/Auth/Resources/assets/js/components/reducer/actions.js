@@ -18,9 +18,11 @@ export const register = (userData) => async (dispatch) => {
         const response = await api.post("/api/register", userData);
         dispatch({ type: "register", payload: response.data });
         message.success(`Account created successfully, ${response.data.name}!`);
+        return response; // Trả về phản hồi từ API
     } catch (error) {
         message.error(error.response?.data?.message || "Sign up failed");
         console.error(error);
+        throw error; // Ném lỗi để xử lý ở nơi gọi
     }
 };
 

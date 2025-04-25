@@ -47,7 +47,6 @@ class MediaController extends Controller
 
         $mediaQuery = $this->mediaRepository->getPaginated((int) $perPage, (int) $page, $columns);
 
-        // Directly use the paginated collection, relying on model accessors
         $data = $mediaQuery->getCollection()->map(function ($item) use ($fields) {
             $itemArray = [
                 'id' => $item->id,
@@ -108,12 +107,17 @@ class MediaController extends Controller
 
         if ($isVideo) {
             $tempPath = $file->storeAs('temp', $filename, 'local');
+            \Log::info("Dispatching ProcessVideoToHls for Media ID: {$media->id}", [
+                'temp_path' => $tempPath,
+                'output_dir' => dirname($path),
+                'thumbnail_path' => $thumbnailPath,
+            ]);
             ProcessVideoToHls::dispatch(
                 storage_path('app/' . $tempPath),
                 storage_path('app/public/' . dirname($path)),
                 $media->id,
                 storage_path('app/public/' . $thumbnailPath)
-            )->afterCommit();
+            )->onQueue('video-processing')->afterCommit();
         } else {
             $file->storeAs('public/' . dirname($path), basename($path));
         }
@@ -149,7 +153,7 @@ class MediaController extends Controller
                 'id' => $media->id,
                 'title' => $media->title,
                 'url' => $media->url,
-                'thumbnail_url' => $media->thumbnail_url,
+                'thumbnail_url' => $media->thumbnail_url, // Fixed from 'thumbnail_path'
                 'status' => $media->status,
             ];
 
@@ -164,7 +168,7 @@ class MediaController extends Controller
     public function update(Request $request, $id): JsonResponse
     {
         try {
-            \Log::info('Update request data:', $request->all());
+            \Log::info('Update request data for Media ID: ' . $id, $request->all());
 
             $validator = Validator::make($request->all(), [
                 'title' => 'required|string|max:255',
@@ -215,12 +219,17 @@ class MediaController extends Controller
 
                 if ($isVideo) {
                     $tempPath = $file->storeAs('temp', $filename, 'local');
+                    \Log::info("Dispatching ProcessVideoToHls for Media ID: {$id}", [
+                        'temp_path' => $tempPath,
+                        'output_dir' => dirname($path),
+                        'thumbnail_path' => $thumbnailPath,
+                    ]);
                     ProcessVideoToHls::dispatch(
                         storage_path('app/' . $tempPath),
                         storage_path('app/public/' . dirname($path)),
                         $media->id,
                         storage_path('app/public/' . $thumbnailPath)
-                    )->afterCommit();
+                    )->onQueue('video-processing')->afterCommit();
                 } else {
                     $file->storeAs('public/' . dirname($path), basename($path));
                 }

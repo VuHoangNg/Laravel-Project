@@ -19,49 +19,36 @@ class SendVerifyEmail implements ShouldQueue
     protected $user;
     protected $verificationUrl;
 
-    /**
-     * The number of times the job may be attempted.
-     *
-     * @var int
-     */
     public $tries = 3;
-
-    /**
-     * The number of seconds to wait before retrying the job.
-     *
-     * @var int
-     */
     public $backoff = 60;
 
-    /**
-     * Create a new job instance.
-     */
     public function __construct(User $user, string $verificationUrl)
     {
         $this->user = $user;
         $this->verificationUrl = $verificationUrl;
+        $this->onQueue('emails');
     }
 
-    /**
-     * Execute the job.
-     */
     public function handle(): void
     {
         try {
             Mail::to($this->user->email)->send(new VerifyEmail($this->user, $this->verificationUrl));
+            Log::info('Verification email sent successfully', [
+                'user_id' => $this->user->id,
+                'email' => $this->user->email,
+            ]);
         } catch (\Exception $e) {
             Log::error('Failed to send verification email in SendVerifyEmail job', [
                 'user_id' => $this->user->id,
                 'email' => $this->user->email,
                 'error' => $e->getMessage(),
             ]);
-            throw $e; // Re-throw to trigger retry or failure
+            if (str_contains($e->getMessage(), 'Invalid recipient') || str_contains($e->getMessage(), 'SMTP connect() failed')) {
+                throw $e;
+            }
         }
     }
 
-    /**
-     * Handle a job failure.
-     */
     public function failed(\Throwable $exception): void
     {
         Log::error('SendVerifyEmail job failed after all retries', [

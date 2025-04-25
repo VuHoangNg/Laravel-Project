@@ -16,85 +16,84 @@ import {
 } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
 import { useMediaContext } from "./context/MediaContext";
+import ImageWithSkeleton from "../../../../../Core/Resources/assets/js/components/SkeletonImage";
 
 const { Title } = Typography;
 const { Content } = Layout;
 
-const BASE_API_URL = "";
+const BASE_API_URL = "http://127.0.0.1:8000";
 
 function MediaContent() {
     const navigate = useNavigate();
-    const media = useSelector((state) =>
-        state.media.media || {
-            data: [],
-            current_page: 1,
-            per_page: 10,
-            total: 0,
-            last_page: 1,
-        }
+    const media = useSelector(
+        (state) =>
+            state.media.media || {
+                data: [],
+                current_page: 1,
+                per_page: 10,
+                total: 0,
+                last_page: 1,
+            }
     );
-    const {
-        createMediaContext,
-        editingMediaContext,
-        getMediaContext,
-        deleteMediaContext,
-    } = useMediaContext();
+    const { createMediaContext, getMediaContext } = useMediaContext();
     const { resetForm, createMedia } = createMediaContext;
-    const { editingMedia, updateMedia } = editingMediaContext;
     const { isModalOpen, openModal, closeModal, fetchMedia } = getMediaContext;
-    const {
-        isDeleteModalOpen,
-        mediaToDelete,
-        openDeleteModal,
-        closeDeleteModal,
-        deleteMedia,
-    } = deleteMediaContext;
     const [form] = Form.useForm();
     const [searchParams, setSearchParams] = useSearchParams();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    useEffect(() => {
-        const page = parseInt(searchParams.get("page")) || 1;
-        loadMedia(page);
-    }, [searchParams]);
+    const page = parseInt(searchParams.get("page") || "1");
+    const perPage = parseInt(searchParams.get("perPage") || "10");
 
-    const loadMedia = async (page = 1) => {
-        setLoading(true);
-        setError(null);
-        try {
-            await fetchMedia(page, media.per_page);
-        } catch (err) {
-            setError(err.message || "Failed to load media.");
-        } finally {
-            setLoading(false);
-        }
-    };
+    useEffect(() => {
+        const abortController = new AbortController();
+        const loadMedia = async () => {
+            setLoading(true);
+            setError(null);
+            try {
+                console.log(`Loading media: page=${page}, perPage=${perPage}`);
+                await fetchMedia(page, perPage, {
+                    signal: abortController.signal,
+                });
+            } catch (err) {
+                if (err.name !== "AbortError") {
+                    setError(err.message || "Failed to load media.");
+                }
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadMedia();
+        return () => abortController.abort();
+    }, [page, perPage, fetchMedia]);
 
     const handleTableChange = (pagination) => {
-        setLoading(true);
         const newPage = pagination.current;
-        setSearchParams({ page: newPage.toString() });
-        localStorage.setItem("lastMediaPage", newPage);
-        fetchMedia(newPage, pagination.pageSize).finally(() => {
-            setLoading(false);
+        const newPerPage = pagination.pageSize;
+        setSearchParams({
+            page: newPage.toString(),
+            perPage: newPerPage.toString(),
         });
+        localStorage.setItem("lastMediaPage", newPage);
     };
 
     const handleSubmit = async (values) => {
         setLoading(true);
         setError(null);
         try {
-            if (editingMedia) {
-                await updateMedia(editingMedia.id, values);
-            } else {
-                await createMedia(values);
-            }
+            console.log("Creating media:", values);
+            await createMedia(values);
             closeModal();
-            setSearchParams({ page: media.current_page.toString() });
+            setSearchParams({
+                page: media.current_page.toString(),
+                perPage: perPage.toString(),
+            });
             form.resetFields();
             resetForm();
         } catch (error) {
+            console.error("Error creating media:", error);
             if (error.response?.status === 422) {
                 const errors = error.response.data.errors;
                 Object.keys(errors).forEach((key) => {
@@ -113,35 +112,6 @@ function MediaContent() {
         }
     };
 
-    const handleDelete = (id) => {
-        setSearchParams({
-            action: "delete",
-            id,
-            page: media.current_page.toString(),
-        });
-        openDeleteModal(id);
-    };
-
-    const handleConfirmDelete = async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            await deleteMedia(mediaToDelete);
-            closeDeleteModal();
-            setSearchParams({ page: media.current_page.toString() });
-            await fetchMedia(media.current_page, media.per_page);
-        } catch (error) {
-            setError(error.message || "Failed to delete media.");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleCancelDelete = () => {
-        closeDeleteModal();
-        setSearchParams({ page: media.current_page.toString() });
-    };
-
     const handleOpenCreate = () => {
         openModal();
         form.resetFields();
@@ -149,31 +119,24 @@ function MediaContent() {
         setSearchParams({
             action: "create",
             page: media.current_page.toString(),
-        });
-    };
-
-    const handleOpenEdit = (media) => {
-        openModal(media);
-        form.resetFields();
-        form.setFieldsValue({
-            title: media.title,
-        });
-        setSearchParams({
-            action: "edit",
-            id: media.id,
-            page: media.current_page.toString(),
+            perPage: perPage.toString(),
         });
     };
 
     const handleCancel = () => {
         closeModal();
-        setSearchParams({ page: media.current_page.toString() });
+        setSearchParams({
+            page: media.current_page.toString(),
+            perPage: perPage.toString(),
+        });
         form.resetFields();
         resetForm();
     };
 
     const handleRowClick = (record) => {
-        navigate(`/media/${record.id}?page=${media.current_page}`);
+        navigate(
+            `/media/${record.id}?page=${media.current_page}&perPage=${perPage}`
+        );
     };
 
     const columns = [
@@ -188,53 +151,17 @@ function MediaContent() {
             key: "thumbnail_url",
             render: (_, record) => {
                 const previewUrl = record.thumbnail_url || record.url;
-                if (!previewUrl) {
-                    return (
-                        <img
-                            src="https://via.placeholder.com/150?text=No+Preview"
-                            alt="No Preview"
-                            style={{ maxWidth: 400, maxHeight: 250 }}
-                        />
-                    );
-                }
                 return (
-                    <img
-                        src={previewUrl}
+                    <ImageWithSkeleton
+                        src={
+                            previewUrl ||
+                            "https://placehold.co/150x100?text=No+Preview"
+                        }
                         alt={record.title}
                         style={{ maxWidth: 400, maxHeight: 250 }}
-                        loading="lazy"
-                        onError={(e) => {
-                            e.target.src =
-                                "https://via.placeholder.com/150?text=Image+Not+Found";
-                        }}
                     />
                 );
             },
-        },
-        {
-            title: "Actions",
-            key: "actions",
-            render: (_, record) => (
-                <Space>
-                    <Button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenEdit(record);
-                        }}
-                    >
-                        Edit
-                    </Button>
-                    <Button
-                        danger
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(record.id);
-                        }}
-                    >
-                        Delete
-                    </Button>
-                </Space>
-            ),
         },
     ];
 
@@ -277,9 +204,7 @@ function MediaContent() {
                         </Button>
                         <Button
                             type="default"
-                            onClick={() =>
-                                fetchMedia(media.current_page, media.per_page)
-                            }
+                            onClick={() => fetchMedia(page, perPage)}
                         >
                             Refresh
                         </Button>
@@ -291,7 +216,7 @@ function MediaContent() {
                         scroll={{ x: "max-content" }}
                         pagination={{
                             current: media.current_page,
-                            pageSize: media.per_page,
+                            pageSize: perPage,
                             total: media.total,
                             showSizeChanger: true,
                             pageSizeOptions: ["10", "20", "50"],
@@ -309,7 +234,7 @@ function MediaContent() {
                 </>
             )}
             <Modal
-                title={editingMedia ? "Edit Media" : "Add Media"}
+                title="Add Media"
                 open={isModalOpen}
                 onCancel={handleCancel}
                 footer={null}
@@ -333,7 +258,7 @@ function MediaContent() {
                         getValueFromEvent={normFile}
                         rules={[
                             {
-                                required: !editingMedia,
+                                required: true,
                                 message: "Please upload a file",
                             },
                         ]}
@@ -355,22 +280,12 @@ function MediaContent() {
                                 htmlType="submit"
                                 loading={loading}
                             >
-                                {editingMedia ? "Update" : "Create"}
+                                Create
                             </Button>
                             <Button onClick={handleCancel}>Cancel</Button>
                         </Space>
                     </Form.Item>
                 </Form>
-            </Modal>
-            <Modal
-                title="Confirm Delete"
-                open={isDeleteModalOpen}
-                onOk={handleConfirmDelete}
-                onCancel={handleCancelDelete}
-                okText="Delete"
-                okType="danger"
-            >
-                <p>Are you sure you want to delete this media?</p>
             </Modal>
         </Content>
     );

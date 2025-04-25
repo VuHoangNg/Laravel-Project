@@ -104,9 +104,9 @@ function Core() {
                 >
                     <Routes>
                         <Route path="/" element={<h2>Welcome to Core</h2>} />
-                        <Route path="/blog" element={<Blog api={api} />} />
+                        <Route path="/blog/*" element={<Blog api={api} />} />
                         <Route path="/media/*" element={<Media api={api} />} />
-                        <Route path="/users" element={<User api={api} />} />
+                        <Route path="/users/*" element={<User api={api} />} />
                     </Routes>
                 </Content>
             </Layout>

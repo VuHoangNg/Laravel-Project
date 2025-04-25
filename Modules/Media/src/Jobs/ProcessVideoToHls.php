@@ -22,14 +22,43 @@ class ProcessVideoToHls implements ShouldQueue
     protected $mediaId;
     protected $thumbnailPath;
 
+    /**
+     * The number of times the job may be attempted.
+     *
+     * @var int
+     */
+    public $tries = 3;
+
+    /**
+     * The number of seconds to wait before retrying the job.
+     *
+     * @var int
+     */
+    public $backoff = 60;
+
+    /**
+     * Create a new job instance.
+     *
+     * @param string $inputPath
+     * @param string $outputDir
+     * @param int $mediaId
+     * @param string $thumbnailPath
+     */
     public function __construct(string $inputPath, string $outputDir, int $mediaId, string $thumbnailPath)
     {
         $this->inputPath = $inputPath;
         $this->outputDir = $outputDir;
         $this->mediaId = $mediaId;
         $this->thumbnailPath = $thumbnailPath;
+        $this->onQueue('video-processing'); // Dedicated queue for video processing
     }
 
+    /**
+     * Execute the job.
+     *
+     * @param MediaRepositoryInterface $mediaRepository
+     * @return void
+     */
     public function handle(MediaRepositoryInterface $mediaRepository)
     {
         Log::info("Starting HLS conversion and thumbnail generation for Media ID: {$this->mediaId}", [
@@ -43,8 +72,8 @@ class ProcessVideoToHls implements ShouldQueue
 
         try {
             $ffmpeg = FFMpeg::create([
-                'ffmpeg.binaries' => config('media.ffmpeg_path', 'C:\FFMPEG\bin\ffmpeg'),
-                'ffprobe.binaries' => config('media.ffprobe_path', 'C:\FFMPEG\bin\ffprobe'),
+                'ffmpeg.binaries' => config('media.ffmpeg_path', 'C:\FFMPEG\bin\ffmpeg.exe'),
+                'ffprobe.binaries' => config('media.ffprobe_path', 'C:\FFMPEG\bin\ffprobe.exe'),
             ]);
 
             // Ensure thumbnail directory exists
@@ -98,5 +127,20 @@ class ProcessVideoToHls implements ShouldQueue
             ]);
             throw $e;
         }
+    }
+
+    /**
+     * Handle a job failure.
+     *
+     * @param \Throwable $exception
+     * @return void
+     */
+    public function failed(\Throwable $exception): void
+    {
+        Log::error('ProcessVideoToHls job failed after all retries', [
+            'media_id' => $this->mediaId,
+            'error' => $exception->getMessage(),
+        ]);
+        Media1::find($this->mediaId)->update(['status' => -1]);
     }
 }

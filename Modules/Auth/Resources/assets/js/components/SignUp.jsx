@@ -16,16 +16,14 @@ function SignUp() {
     const onFinish = async (values) => {
         setLoading(true);
         try {
-            const response = await dispatch(register(values));
-            if (response?.payload) {
+            const response = await dispatch(register(values)); // Nhận phản hồi từ API
+            if (response && response.status === 201) {
+                // Kiểm tra status code từ API
                 setEmailModalVisible(true);
-            } else {
-                throw new Error("Unexpected error");
             }
         } catch (error) {
             message.error(error.response?.data?.message || "Sign up failed");
         } finally {
-            setEmailModalVisible(false);
             setLoading(false);
         }
     };

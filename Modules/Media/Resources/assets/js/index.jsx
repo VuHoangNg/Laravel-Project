@@ -5,7 +5,6 @@ import MediaContent from "./components/mediaContent";
 import MediaDetail from "./components/detail";
 import { MediaProvider } from "./components/context/MediaContext";
 
-
 const { Content } = Layout;
 
 function Media({ api }) {
@@ -14,7 +13,7 @@ function Media({ api }) {
             <Content>
                 <Routes>
                     <Route path="/" element={<MediaContent />} />
-                    <Route path="/:id" element={<MediaDetail />} />
+                    <Route path="/:id" element={<MediaDetail api={api} />} />
                     <Route path="*" element={<div>404 - Page Not Found</div>} />
                 </Routes>
             </Content>

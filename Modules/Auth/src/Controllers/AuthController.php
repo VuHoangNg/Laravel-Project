@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Modules\Auth\src\Jobs\SendVerifyEmail;
+use Illuminate\Support\Facades\RateLimiter;
 
 class AuthController extends Controller
 {
@@ -119,6 +120,13 @@ class AuthController extends Controller
 
     public function register(Request $request): JsonResponse
     {
+        // Apply rate limiting: 5 attempts per minute per IP
+        if (RateLimiter::tooManyAttempts('register:'.$request->ip(), 5)) {
+            return response()->json(['message' => 'Too many registration attempts'], 429);
+        }
+        RateLimiter::hit('register:'.$request->ip(), 60); // Fixed: increment -> hit
+
+        //ස: // Validate input
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:255|unique:users',
@@ -126,6 +134,7 @@ class AuthController extends Controller
             'password' => 'required|string|min:8',
         ]);
 
+        // Create user
         $user = User::create([
             'name' => ucfirst(trim($validated['name'])),
             'username' => trim($validated['username']),
@@ -133,14 +142,16 @@ class AuthController extends Controller
             'password' => Hash::make(trim($validated['password'])),
         ]);
 
+        // Trigger Laravel's registered event
         event(new Registered($user));
 
         // Generate verification URL for frontend route
         $verificationUrl = url('/auth/verify-email/' . $user->id . '/' . sha1($user->getEmailForVerification()));
 
-        // Dispatch SendVerifyEmail job
-        SendVerifyEmail::dispatch($user, $verificationUrl);
+        // Dispatch SendVerifyEmail job asynchronously on 'emails' queue
+        SendVerifyEmail::dispatch($user, $verificationUrl)->onQueue('emails');
 
+        // Return response immediately
         return response()->json(array_merge(
             $this->userToArray($user, $this->getRequestedFields($request)),
             ['message' => 'Account created successfully. Please check your email for verification.']
@@ -172,7 +183,8 @@ class AuthController extends Controller
                 $user->markEmailAsVerified();
             }
 
-            return redirect('/auth/email-verified');
+            // Redirect to React frontend
+            return redirect('/auth/email-verified'); // Adjust to your frontend URL
         } catch (ModelNotFoundException $e) {
             return response()->json(['message' => $e->getMessage()], 404);
         }

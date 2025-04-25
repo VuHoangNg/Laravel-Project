@@ -16,16 +16,18 @@ import {
     Alert,
     Tag,
 } from "antd";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useBlogContext } from "./context/BlogContext";
-import VideoPlayer from "../../../../../Core/Resources/assets/js/components/videoPlayer";
-import { setMedia } from "../../../../../Media/Resources/assets/js/components/reducer/action";
 
-const { Title, Paragraph } = Typography;
+import { setMedia } from "../../../../../Media/Resources/assets/js/components/reducer/action";
+import VideoPlayer from "../../../../../Core/Resources/assets/js/components/VideoPlayer";
+
+const { Title } = Typography;
 const { Meta } = Card;
 
 function BlogContent({ api }) {
     const dispatch = useDispatch();
+    const navigate = useNavigate();
     const blogs = useSelector((state) => {
         return (
             state.blogs.blogs || {
@@ -47,22 +49,9 @@ function BlogContent({ api }) {
                 last_page: 1,
             }
     );
-    const {
-        createBlogContext,
-        editingBlogContext,
-        getBlogContext,
-        deleteBlogContext,
-    } = useBlogContext();
+    const { createBlogContext, getBlogContext } = useBlogContext();
     const { resetForm, createBlog } = createBlogContext;
-    const { editingBlog, updateBlog } = editingBlogContext;
     const { isModalOpen, openModal, closeModal, fetchBlogs } = getBlogContext;
-    const {
-        isDeleteModalOpen,
-        blogToDelete,
-        openDeleteModal,
-        closeDeleteModal,
-        deleteBlog,
-    } = deleteBlogContext;
     const [form] = Form.useForm();
     const [searchParams, setSearchParams] = useSearchParams();
     const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
@@ -74,15 +63,18 @@ function BlogContent({ api }) {
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-    const [selectedBlog, setSelectedBlog] = useState(null);
 
     useEffect(() => {
         const loadInitialData = async () => {
             setLoading(true);
             setError(null);
             try {
-                await fetchBlogs(1, 10);
+                // Read page and perPage from query parameters, default to 1 and 10
+                const page =
+                    parseInt(searchParams.get("page")) || blogs.current_page;
+                const perPage =
+                    parseInt(searchParams.get("perPage")) || blogs.per_page;
+                await fetchBlogs(page, perPage);
             } catch (err) {
                 setError("Failed to load blogs. Please try again.");
             } finally {
@@ -115,34 +107,32 @@ function BlogContent({ api }) {
         if (isMediaModalOpen) {
             fetchMediaForModal();
         }
-    }, [api, dispatch, mediaPagination.currentPage, isMediaModalOpen]);
+    }, [
+        api,
+        dispatch,
+        mediaPagination.currentPage,
+        mediaPagination.limit,
+        isMediaModalOpen,
+    ]);
 
-    const handleTableChange = (pagination) => {
-        setLoading(true);
-        fetchBlogs(pagination.current, pagination.pageSize).finally(() => {
-            setLoading(false);
-        });
-    };
-
-    const handleRowClick = async (blog) => {
+    const handleTableChange = async (pagination) => {
         setLoading(true);
         setError(null);
         try {
-            const response = await api.get(`/api/blogs/${blog.id}`);
-            setSelectedBlog(response.data);
-            setIsDetailModalOpen(true);
-            setSearchParams({ action: "view", id: blog.id });
+            await fetchBlogs(pagination.current, pagination.pageSize);
+            setSearchParams({
+                page: pagination.current.toString(),
+                perPage: pagination.pageSize.toString(),
+            });
         } catch (err) {
-            setError("Failed to load blog details. Please try again.");
+            setError("Failed to load blogs. Please try again.");
         } finally {
             setLoading(false);
         }
     };
 
-    const handleCloseDetailModal = () => {
-        setIsDetailModalOpen(false);
-        setSelectedBlog(null);
-        setSearchParams({});
+    const handleRowClick = (blog) => {
+        navigate(`/blog/${blog.id}?page=${blogs.current_page}`);
     };
 
     const handleSubmit = async (values) => {
@@ -153,16 +143,13 @@ function BlogContent({ api }) {
                 ...values,
                 media_ids: selectedMediaIds,
             };
-            if (editingBlog) {
-                await updateBlog(editingBlog.id, payload);
-            } else {
-                await createBlog(payload);
-            }
+            await createBlog(payload);
             closeModal();
             setSearchParams({});
             form.resetFields();
             resetForm();
             setSelectedMediaIds([]);
+            await fetchBlogs(blogs.current_page, blogs.per_page);
         } catch (error) {
             if (error.response?.status === 422) {
                 const errors = error.response.data.errors;
@@ -179,25 +166,7 @@ function BlogContent({ api }) {
             }
         } finally {
             setLoading(false);
-            closeModal();
         }
-    };
-
-    const handleDelete = (id, event) => {
-        event.stopPropagation();
-        setSearchParams({ action: "delete", id });
-        openDeleteModal(id);
-    };
-
-    const handleConfirmDelete = () => {
-        deleteBlog(blogToDelete);
-        closeDeleteModal();
-        setSearchParams({});
-    };
-
-    const handleCancelDelete = () => {
-        closeDeleteModal();
-        setSearchParams({});
     };
 
     const handleOpenCreate = () => {
@@ -206,17 +175,6 @@ function BlogContent({ api }) {
         resetForm();
         setSelectedMediaIds([]);
         setSearchParams({ action: "create" });
-    };
-
-    const handleOpenEdit = (blog, event) => {
-        event.stopPropagation();
-        openModal(blog);
-        form.setFieldsValue({
-            title: blog.title,
-            content: blog.content,
-        });
-        setSelectedMediaIds(blog.media.map((m) => m.id));
-        setSearchParams({ action: "edit", id: blog.id });
     };
 
     const handleCancel = () => {
@@ -253,8 +211,24 @@ function BlogContent({ api }) {
         e.target.src = "https://via.placeholder.com/150?text=Image+Not+Found";
     };
 
-    const handleMediaPageChange = (page) => {
-        setMediaPagination((prev) => ({ ...prev, currentPage: page }));
+    const handleMediaPageChange = async (page, pageSize) => {
+        setLoading(true);
+        setError(null);
+        try {
+            setMediaPagination((prev) => ({
+                ...prev,
+                currentPage: page,
+                limit: pageSize,
+            }));
+            setSearchParams({
+                mediaPage: page.toString(),
+                mediaPerPage: pageSize.toString(),
+            });
+        } catch (err) {
+            setError("Failed to load media. Please try again.");
+        } finally {
+            setLoading(false);
+        }
     };
 
     const isVideo = (url) => {
@@ -293,26 +267,6 @@ function BlogContent({ api }) {
                 ) : (
                     "No Media"
                 ),
-        },
-        {
-            title: "Actions",
-            key: "actions",
-            render: (_, record) => (
-                <Space>
-                    <Button
-                        type="primary"
-                        onClick={(event) => handleOpenEdit(record, event)}
-                    >
-                        Edit
-                    </Button>
-                    <Button
-                        danger
-                        onClick={(event) => handleDelete(record.id, event)}
-                    >
-                        Delete
-                    </Button>
-                </Space>
-            ),
         },
     ];
 
@@ -370,7 +324,7 @@ function BlogContent({ api }) {
                 </>
             )}
             <Modal
-                title={editingBlog ? "Edit Blog" : "Add Blog"}
+                title="Add Blog"
                 open={isModalOpen}
                 onCancel={handleCancel}
                 footer={null}
@@ -402,7 +356,7 @@ function BlogContent({ api }) {
                     <Form.Item>
                         <Space>
                             <Button type="primary" htmlType="submit">
-                                {editingBlog ? "Update" : "Create"}
+                                Create
                             </Button>
                             <Button onClick={handleCancel}>Cancel</Button>
                         </Space>
@@ -521,92 +475,10 @@ function BlogContent({ api }) {
                             pageSize={mediaPagination.limit}
                             total={mediaPagination.total}
                             onChange={handleMediaPageChange}
-                            showSizeChanger={false}
+                            showSizeChanger={true}
+                            pageSizeOptions={["6", "12", "24"]}
                         />
                     </>
-                )}
-            </Modal>
-            <Modal
-                title="Confirm Delete"
-                open={isDeleteModalOpen}
-                onOk={handleConfirmDelete}
-                onCancel={handleCancelDelete}
-                okText="Delete"
-                okType="danger"
-            >
-                <p>Are you sure you want to delete this blog?</p>
-            </Modal>
-            <Modal
-                title={selectedBlog?.title || "Blog Details"}
-                open={isDetailModalOpen}
-                onCancel={handleCloseDetailModal}
-                footer={null}
-                width="80%"
-            >
-                {loading ? (
-                    <div style={{ textAlign: "center", margin: "20px 0" }}>
-                        <Spin size="large" />
-                    </div>
-                ) : error ? (
-                    <Alert
-                        message="Error"
-                        description={error}
-                        type="error"
-                        showIcon
-                        closable
-                        onClose={() => setError(null)}
-                        style={{ marginBottom: 16 }}
-                    />
-                ) : selectedBlog ? (
-                    <div>
-                        <Title level={3}>{selectedBlog.title}</Title>
-                        <Paragraph>{selectedBlog.content}</Paragraph>
-                        {selectedBlog.media &&
-                            selectedBlog.media.length > 0 && (
-                                <>
-                                    <Title level={4}>Media</Title>
-                                    <Row gutter={[16, 16]}>
-                                        {selectedBlog.media.map((item) => (
-                                            <Col span={8} key={item.id}>
-                                                {isVideo(item.url) ? (
-                                                    <VideoPlayer
-                                                        src={item.url}
-                                                        style={{
-                                                            height: 200,
-                                                            objectFit: "cover",
-                                                            width: "100%",
-                                                        }}
-                                                    />
-                                                ) : (
-                                                    <img
-                                                        alt={item.title}
-                                                        src={
-                                                            item.thumbnail_url ||
-                                                            item.url ||
-                                                            "https://via.placeholder.com/150?text=Image+Not+Found"
-                                                        }
-                                                        style={{
-                                                            height: 200,
-                                                            objectFit: "cover",
-                                                            width: "100%",
-                                                        }}
-                                                        onError={(e) =>
-                                                            handleImageError(
-                                                                e,
-                                                                item
-                                                            )
-                                                        }
-                                                    />
-                                                )}
-                                                <p>{item.title}</p>
-                                            </Col>
-                                        ))}
-                                    </Row>
-                                </>
-                            )}
-                    </div>
-                ) : (
-                    <p>No blog data available.</p>
                 )}
             </Modal>
         </div>

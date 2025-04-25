@@ -14,7 +14,7 @@ class VerifyEmail extends Mailable
     public $user;
     public $verificationUrl;
 
-    public function __construct($user, $verificationUrl)
+    public function __construct($user, string $verificationUrl)
     {
         $this->user = $user;
         $this->verificationUrl = $verificationUrl;

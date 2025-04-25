@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState } from "react";
 import { useDispatch } from "react-redux";
-import { setUsers, addUser, updateUser, deleteUser } from "../reducer/action";
+import { setUsers, addUser } from "../reducer/action";
 
 const UserContext = createContext();
 
@@ -39,77 +39,32 @@ export function UserProvider({ children, api }) {
         },
     };
 
-    // State for editing users
-    const [editingUser, setEditingUser] = useState(null);
-
-    const editingUserContext = {
-        editingUser,
-        setEditingUser,
-        updateUser: async (id, formData) => {
-            try {
-                const response = await api.post(`/api/user/${id}`, formData, {
-                    headers: { "Content-Type": "multipart/form-data" },
-                });
-                dispatch(updateUser(response.data.user));
-            } catch (error) {
-                throw error;
-            }
-        },
-    };
-
     // State for getting users
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     const getUserContext = {
         isModalOpen,
-        openModal: (user = null) => {
-            setEditingUser(user);
+        openModal: () => {
             setIsModalOpen(true);
-            if (user) {
-                setFormData({
-                    name: user.name,
-                    email: user.email,
-                    username: user.username,
-                    password: "",
-                    password_confirmation: "",
-                });
-            }
         },
         closeModal: () => {
-            setEditingUser(null);
             setIsModalOpen(false);
         },
-        fetchUsers: async (page = 1, perPage = 10) => {
+        fetchUsers: async (page = 1, perPage = 10, { signal } = {}) => {
             try {
                 const response = await api.get("/api/users", {
                     params: { page, per_page: perPage },
+                    signal,
                 });
                 dispatch(setUsers(response.data));
             } catch (error) {
                 throw error;
             }
         },
-    };
-
-    // State for deleting users
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [userToDelete, setUserToDelete] = useState(null);
-
-    const deleteUserContext = {
-        isDeleteModalOpen,
-        userToDelete,
-        openDeleteModal: (userId) => {
-            setUserToDelete(userId);
-            setIsDeleteModalOpen(true);
-        },
-        closeDeleteModal: () => {
-            setUserToDelete(null);
-            setIsDeleteModalOpen(false);
-        },
-        deleteUser: async (id) => {
+        fetchUser: async (id) => {
             try {
-                await api.delete(`/api/user/${id}`);
-                dispatch(deleteUser(id));
+                const response = await api.get(`/api/user/${id}`);
+                return response.data.user;
             } catch (error) {
                 throw error;
             }
@@ -120,9 +75,7 @@ export function UserProvider({ children, api }) {
         <UserContext.Provider
             value={{
                 createUserContext,
-                editingUserContext,
                 getUserContext,
-                deleteUserContext,
             }}
         >
             {children}

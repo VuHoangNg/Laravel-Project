@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState } from "react";
 import { useDispatch } from "react-redux";
-import { addMedia, updateMedia, setMedia, deleteMedia } from "../reducer/action";
+import { addMedia, setMedia } from "../reducer/action";
 
 const MediaContext = createContext();
 
@@ -29,31 +29,7 @@ export function MediaProvider({ children, api }) {
                 const response = await api.post("/api/media", formData, {
                     headers: { "Content-Type": "multipart/form-data" },
                 });
-                dispatch(addMedia(response.data)); // Using action creator
-            } catch (error) {
-                throw error;
-            }
-        },
-    };
-
-    // State for editing media
-    const [editingMedia, setEditingMedia] = useState(null);
-
-    const editingMediaContext = {
-        editingMedia,
-        setEditingMedia,
-        updateMedia: async (id, data) => {
-            try {
-                const formData = new FormData();
-                formData.append("title", data.title);
-                if (data.file) {
-                    formData.append("file", data.file);
-                }
-                formData.append("_method", "PUT"); // Spoof PUT method
-                const response = await api.post(`/api/media/${id}`, formData, {
-                    headers: { "Content-Type": "multipart/form-data" },
-                });
-                dispatch(updateMedia(response.data)); // Using action creator
+                dispatch(addMedia(response.data));
             } catch (error) {
                 throw error;
             }
@@ -65,51 +41,30 @@ export function MediaProvider({ children, api }) {
 
     const getMediaContext = {
         isModalOpen,
-        openModal: (media = null) => {
-            setEditingMedia(media);
+        openModal: () => {
             setIsModalOpen(true);
-            if (media) {
-                setFormData({
-                    title: media.title,
-                    file: null,
-                });
-            }
         },
         closeModal: () => {
-            setEditingMedia(null);
             setIsModalOpen(false);
         },
-        fetchMedia: async (page = 1, perPage = 10) => {
+        fetchMedia: async (page = 1, perPage = 10, { signal } = {}) => {
             try {
+                console.log(`Fetching media: page=${page}, perPage=${perPage}`);
                 const response = await api.get("/api/media", {
                     params: { page, perPage },
+                    signal,
                 });
-                dispatch(setMedia(response.data)); // Using action creator
+                console.log("Media response:", response.data);
+                dispatch(setMedia(response.data));
             } catch (error) {
+                console.error("Error fetching media:", error);
                 throw error;
             }
         },
-    };
-
-    // State for deleting media
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [mediaToDelete, setMediaToDelete] = useState(null);
-
-    const deleteMediaContext = {
-        isDeleteModalOpen,
-        mediaToDelete,
-        openDeleteModal: (mediaId) => {
-            setMediaToDelete(mediaId);
-            setIsDeleteModalOpen(true);
-        },
-        closeDeleteModal: () => {
-            setMediaToDelete(null);
-            setIsDeleteModalOpen(false);
-        },
-        deleteMedia: async (id) => {
+        fetchMediaById: async (id) => {
             try {
-                await api.delete(`/api/media/${id}`);
-                dispatch(deleteMedia(id)); // Using action creator
+                const response = await api.get(`/api/media/${id}`);
+                return response.data;
             } catch (error) {
                 throw error;
             }
@@ -120,9 +75,7 @@ export function MediaProvider({ children, api }) {
         <MediaContext.Provider
             value={{
                 createMediaContext,
-                editingMediaContext,
                 getMediaContext,
-                deleteMediaContext,
             }}
         >
             {children}
