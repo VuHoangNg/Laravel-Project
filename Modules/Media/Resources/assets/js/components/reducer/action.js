@@ -1,19 +1,28 @@
+// src/reducer/action.js
+
+// Media Action Types
+export const SET_MEDIA = "media/setMedia";
+export const ADD_MEDIA = "media/addMedia";
+export const UPDATE_MEDIA = "media/updateMedia";
+export const DELETE_MEDIA = "media/deleteMedia";
+
+// Media Action Creators
+export const setMedia = (media) => ({
+    type: SET_MEDIA,
+    payload: media,
+});
+
 export const addMedia = (media) => ({
-    type: "media/addMedia",
+    type: ADD_MEDIA,
     payload: media,
 });
 
 export const updateMedia = (media) => ({
-    type: "media/updateMedia",
-    payload: media,
-});
-
-export const setMedia = (media) => ({
-    type: "media/setMedia",
+    type: UPDATE_MEDIA,
     payload: media,
 });
 
 export const deleteMedia = (mediaId) => ({
-    type: "media/deleteMedia",
+    type: DELETE_MEDIA,
     payload: mediaId,
 });

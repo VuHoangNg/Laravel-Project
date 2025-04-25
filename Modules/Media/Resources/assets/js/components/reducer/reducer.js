@@ -1,3 +1,10 @@
+import {
+    SET_MEDIA,
+    ADD_MEDIA,
+    UPDATE_MEDIA,
+    DELETE_MEDIA,
+} from "../reducer/action";
+
 const initialState = {
     media: {
         data: [],
@@ -10,12 +17,12 @@ const initialState = {
 
 const mediaReducer = (state = initialState, action) => {
     switch (action.type) {
-        case "media/setMedia":
+        case SET_MEDIA:
             return {
                 ...state,
                 media: action.payload,
             };
-        case "media/addMedia":
+        case ADD_MEDIA:
             return {
                 ...state,
                 media: {
@@ -24,7 +31,7 @@ const mediaReducer = (state = initialState, action) => {
                     total: state.media.total + 1,
                 },
             };
-        case "media/updateMedia":
+        case UPDATE_MEDIA:
             return {
                 ...state,
                 media: {
@@ -34,7 +41,7 @@ const mediaReducer = (state = initialState, action) => {
                     ),
                 },
             };
-        case "media/deleteMedia":
+        case DELETE_MEDIA:
             return {
                 ...state,
                 media: {

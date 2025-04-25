@@ -1,3 +1,10 @@
+import {
+    SET_USERS,
+    ADD_USER,
+    UPDATE_USER,
+    DELETE_USER,
+} from "../reducer/action";
+
 const initialState = {
     users: {
         data: [],
@@ -10,12 +17,12 @@ const initialState = {
 
 export default function userReducer(state = initialState, action) {
     switch (action.type) {
-        case "users/setUsers":
+        case SET_USERS:
             return {
                 ...state,
                 users: action.payload,
             };
-        case "users/addUser":
+        case ADD_USER:
             return {
                 ...state,
                 users: {
@@ -24,23 +31,27 @@ export default function userReducer(state = initialState, action) {
                     total: state.users.total + 1,
                 },
             };
-        case "users/updateUser":
+        case UPDATE_USER:
             return {
                 ...state,
                 users: {
                     ...state.users,
                     data: [
                         action.payload,
-                        ...state.users.data.filter((user) => user.id !== action.payload.id),
+                        ...state.users.data.filter(
+                            (user) => user.id !== action.payload.id
+                        ),
                     ],
                 },
             };
-        case "users/deleteUser":
+        case DELETE_USER:
             return {
                 ...state,
                 users: {
                     ...state.users,
-                    data: state.users.data.filter((user) => user.id !== action.payload),
+                    data: state.users.data.filter(
+                        (user) => user.id !== action.payload
+                    ),
                     total: state.users.total - 1,
                 },
             };

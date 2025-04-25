@@ -2,10 +2,8 @@ import React, { createContext, useContext, useState } from "react";
 import { useDispatch } from "react-redux";
 import { addMedia, updateMedia, setMedia, deleteMedia } from "../reducer/action";
 
-// Create a single MediaContext
 const MediaContext = createContext();
 
-// MediaProvider to manage all context logic and API calls
 export function MediaProvider({ children, api }) {
     const dispatch = useDispatch();
 
@@ -31,7 +29,7 @@ export function MediaProvider({ children, api }) {
                 const response = await api.post("/api/media", formData, {
                     headers: { "Content-Type": "multipart/form-data" },
                 });
-                dispatch(addMedia(response.data));
+                dispatch(addMedia(response.data)); // Using action creator
             } catch (error) {
                 throw error;
             }
@@ -55,14 +53,14 @@ export function MediaProvider({ children, api }) {
                 const response = await api.post(`/api/media/${id}`, formData, {
                     headers: { "Content-Type": "multipart/form-data" },
                 });
-                dispatch(updateMedia(response.data));
+                dispatch(updateMedia(response.data)); // Using action creator
             } catch (error) {
                 throw error;
             }
         },
     };
 
-    // State for getting media (modal control)
+    // State for getting media
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     const getMediaContext = {
@@ -86,7 +84,7 @@ export function MediaProvider({ children, api }) {
                 const response = await api.get("/api/media", {
                     params: { page, perPage },
                 });
-                dispatch(setMedia(response.data));
+                dispatch(setMedia(response.data)); // Using action creator
             } catch (error) {
                 throw error;
             }
@@ -111,7 +109,7 @@ export function MediaProvider({ children, api }) {
         deleteMedia: async (id) => {
             try {
                 await api.delete(`/api/media/${id}`);
-                dispatch(deleteMedia(id));
+                dispatch(deleteMedia(id)); // Using action creator
             } catch (error) {
                 throw error;
             }
@@ -132,7 +130,6 @@ export function MediaProvider({ children, api }) {
     );
 }
 
-// Hook to access the context
 export function useMediaContext() {
     return useContext(MediaContext);
 }

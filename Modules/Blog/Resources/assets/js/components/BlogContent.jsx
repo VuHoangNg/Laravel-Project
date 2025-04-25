@@ -19,6 +19,7 @@ import {
 import { useSearchParams } from "react-router-dom";
 import { useBlogContext } from "./context/BlogContext";
 import VideoPlayer from "../../../../../Core/Resources/assets/js/components/videoPlayer";
+import { setMedia } from "../../../../../Media/Resources/assets/js/components/reducer/action";
 
 const { Title, Paragraph } = Typography;
 const { Meta } = Card;
@@ -41,7 +42,7 @@ function BlogContent({ api }) {
             state.blogs.media || {
                 data: [],
                 current_page: 1,
-                per_page: darmstadtium,
+                per_page: 6,
                 total: 0,
                 last_page: 1,
             }
@@ -99,10 +100,7 @@ function BlogContent({ api }) {
                 const response = await api.get(
                     `/api/media?perPage=${mediaPagination.limit}&page=${mediaPagination.currentPage}`
                 );
-                dispatch({
-                    type: "media/setMedia",
-                    payload: response.data,
-                });
+                dispatch(setMedia(response.data));
                 setMediaPagination((prev) => ({
                     ...prev,
                     total: response.data.total,
@@ -155,19 +153,10 @@ function BlogContent({ api }) {
                 ...values,
                 media_ids: selectedMediaIds,
             };
-            let response;
             if (editingBlog) {
-                response = await updateBlog(editingBlog.id, payload);
-                dispatch({
-                    type: "blogs/updateBlog",
-                    payload: response.data,
-                });
+                await updateBlog(editingBlog.id, payload);
             } else {
-                response = await createBlog(payload);
-                dispatch({
-                    type: "blogs/addBlog",
-                    payload: response.data,
-                });
+                await createBlog(payload);
             }
             closeModal();
             setSearchParams({});
@@ -185,6 +174,8 @@ function BlogContent({ api }) {
                         },
                     ]);
                 });
+            } else {
+                setError("Failed to save blog. Please try again.");
             }
         } finally {
             setLoading(false);
@@ -570,45 +561,49 @@ function BlogContent({ api }) {
                     <div>
                         <Title level={3}>{selectedBlog.title}</Title>
                         <Paragraph>{selectedBlog.content}</Paragraph>
-                        {selectedBlog.media && selectedBlog.media.length > 0 && (
-                            <>
-                                <Title level={4}>Media</Title>
-                                <Row gutter={[16, 16]}>
-                                    {selectedBlog.media.map((item) => (
-                                        <Col span={8} key={item.id}>
-                                            {isVideo(item.url) ? (
-                                                <VideoPlayer
-                                                    src={item.url}
-                                                    style={{
-                                                        height: 200,
-                                                        objectFit: "cover",
-                                                        width: "100%",
-                                                    }}
-                                                />
-                                            ) : (
-                                                <img
-                                                    alt={item.title}
-                                                    src={
-                                                        item.thumbnail_url ||
-                                                        item.url ||
-                                                        "https://via.placeholder.com/150?text=Image+Not+Found"
-                                                    }
-                                                    style={{
-                                                        height: 200,
-                                                        objectFit: "cover",
-                                                        width: "100%",
-                                                    }}
-                                                    onError={(e) =>
-                                                        handleImageError(e, item)
-                                                    }
-                                                />
-                                            )}
-                                            <p>{item.title}</p>
-                                        </Col>
-                                    ))}
-                                </Row>
-                            </>
-                        )}
+                        {selectedBlog.media &&
+                            selectedBlog.media.length > 0 && (
+                                <>
+                                    <Title level={4}>Media</Title>
+                                    <Row gutter={[16, 16]}>
+                                        {selectedBlog.media.map((item) => (
+                                            <Col span={8} key={item.id}>
+                                                {isVideo(item.url) ? (
+                                                    <VideoPlayer
+                                                        src={item.url}
+                                                        style={{
+                                                            height: 200,
+                                                            objectFit: "cover",
+                                                            width: "100%",
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <img
+                                                        alt={item.title}
+                                                        src={
+                                                            item.thumbnail_url ||
+                                                            item.url ||
+                                                            "https://via.placeholder.com/150?text=Image+Not+Found"
+                                                        }
+                                                        style={{
+                                                            height: 200,
+                                                            objectFit: "cover",
+                                                            width: "100%",
+                                                        }}
+                                                        onError={(e) =>
+                                                            handleImageError(
+                                                                e,
+                                                                item
+                                                            )
+                                                        }
+                                                    />
+                                                )}
+                                                <p>{item.title}</p>
+                                            </Col>
+                                        ))}
+                                    </Row>
+                                </>
+                            )}
                     </div>
                 ) : (
                     <p>No blog data available.</p>

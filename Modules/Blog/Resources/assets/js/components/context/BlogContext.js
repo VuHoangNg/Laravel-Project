@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState } from "react";
 import { useDispatch } from "react-redux";
+import { setBlogs, addBlog, updateBlog, deleteBlog } from "../reducer/action";
 
 const BlogContext = createContext();
 
@@ -11,18 +12,23 @@ export function BlogProvider({ children, api }) {
         title: "",
         content: "",
         thumbnail_id: null,
-        media_ids: [], // Add media_ids array
+        media_ids: [],
     });
 
     const createBlogContext = {
         formData,
         setFormData,
         resetForm: () =>
-            setFormData({ title: "", content: "", thumbnail_id: null, media_ids: [] }),
+            setFormData({
+                title: "",
+                content: "",
+                thumbnail_id: null,
+                media_ids: [],
+            }),
         createBlog: async (data) => {
             try {
                 const response = await api.post("/api/blogs", data);
-                dispatch({ type: "blogs/addBlog", payload: response.data });
+                dispatch(addBlog(response.data)); // Using action creator
             } catch (error) {
                 throw error;
             }
@@ -38,7 +44,7 @@ export function BlogProvider({ children, api }) {
         updateBlog: async (id, data) => {
             try {
                 const response = await api.put(`/api/blogs/${id}`, data);
-                dispatch({ type: "blogs/updateBlog", payload: response.data });
+                dispatch(updateBlog(response.data)); // Using action creator
             } catch (error) {
                 throw error;
             }
@@ -71,7 +77,7 @@ export function BlogProvider({ children, api }) {
                 const response = await api.get("/api/blogs", {
                     params: { page, perPage },
                 });
-                dispatch({ type: "blogs/setBlogs", payload: response.data });
+                dispatch(setBlogs(response.data));
             } catch (error) {
                 throw error;
             }
@@ -96,7 +102,7 @@ export function BlogProvider({ children, api }) {
         deleteBlog: async (id) => {
             try {
                 await api.delete(`/api/blogs/${id}`);
-                dispatch({ type: "blogs/deleteBlog", payload: id });
+                dispatch(deleteBlog(id)); // Use action creator
             } catch (error) {
                 throw error;
             }

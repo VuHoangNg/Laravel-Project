@@ -8,14 +8,26 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class BlogRepository implements BlogRepositoryInterface
 {
-    public function getAll(int $perPage)
+    public function getAll(int $perPage, array $columns = ['*'], bool $withMedia = true)
     {
-        return Blog::with('media')->paginate($perPage);
+        $query = Blog::select($columns);
+        if ($withMedia) {
+            $query->with(['media' => function ($query) {
+                $query->select('media1.id', 'media1.title', 'media1.path', 'media1.thumbnail_path', 'media1.status');
+            }]);
+        }
+        return $query->paginate($perPage);
     }
 
-    public function getById(int $id): ?Blog
+    public function getById(int $id, array $columns = ['*'], bool $withMedia = true): ?Blog
     {
-        $blog = Blog::with('media')->find($id);
+        $query = Blog::select($columns);
+        if ($withMedia) {
+            $query->with(['media' => function ($query) {
+                $query->select('media1.id', 'media1.title', 'media1.path', 'media1.thumbnail_path', 'media1.status');
+            }]);
+        }
+        $blog = $query->find($id);
         if (!$blog) {
             throw new ModelNotFoundException("Blog with ID {$id} not found.");
         }
@@ -32,6 +44,11 @@ class BlogRepository implements BlogRepositoryInterface
         if (!empty($data['media_ids'])) {
             $blog->media()->sync($data['media_ids']);
         }
+
+        // Load media for response
+        $blog->load(['media' => function ($query) {
+            $query->select('media1.id', 'media1.title', 'media1.path', 'media1.thumbnail_path', 'media1.status');
+        }]);
 
         return $blog;
     }
@@ -50,6 +67,11 @@ class BlogRepository implements BlogRepositoryInterface
         if (isset($data['media_ids'])) {
             $blog->media()->sync($data['media_ids']);
         }
+
+        // Load media for response
+        $blog->load(['media' => function ($query) {
+            $query->select('media1.id', 'media1.title', 'media1.path', 'media1.thumbnail_path', 'media1.status');
+        }]);
 
         return $blog;
     }

@@ -15,79 +15,11 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 class MediaController extends Controller
 {
     private $mediaRepository;
-    private $id;
-    private $title;
-    private $url;
-    private $thumbnailUrl;
-    private $status;
 
     public function __construct(MediaRepositoryInterface $mediaRepository)
     {
         $this->middleware('auth:sanctum')->except(['index', 'show']);
-        $this->setMediaRepository($mediaRepository);
-    }
-
-    public function getMediaRepository(): MediaRepositoryInterface
-    {
-        return $this->mediaRepository;
-    }
-
-    public function setMediaRepository(MediaRepositoryInterface $mediaRepository): void
-    {
-        if (!$mediaRepository instanceof MediaRepositoryInterface) {
-            throw new \InvalidArgumentException('The mediaRepository must implement MediaRepositoryInterface.');
-        }
         $this->mediaRepository = $mediaRepository;
-    }
-
-    public function getId(): ?int
-    {
-        return $this->id;
-    }
-
-    public function setId(?int $id): void
-    {
-        $this->id = $id;
-    }
-
-    public function getTitle(): ?string
-    {
-        return $this->title;
-    }
-
-    public function setTitle(?string $title): void
-    {
-        $this->title = $title;
-    }
-
-    public function getUrl(): ?string
-    {
-        return $this->url;
-    }
-
-    public function setUrl(?string $url): void
-    {
-        $this->url = $url;
-    }
-
-    public function getThumbnailUrl(): ?string
-    {
-        return $this->thumbnailUrl;
-    }
-
-    public function setThumbnailUrl(?string $thumbnailUrl): void
-    {
-        $this->thumbnailUrl = $thumbnailUrl;
-    }
-
-    public function getStatus(): ?int
-    {
-        return $this->status;
-    }
-
-    public function setStatus(?int $status): void
-    {
-        $this->status = $status;
     }
 
     private function getRequestedFields(Request $request): array
@@ -96,28 +28,6 @@ class MediaController extends Controller
         $allowedFields = ['id', 'title', 'url', 'thumbnail_url', 'status'];
         $requestedFields = $fields ? array_filter(explode(',', $fields)) : [];
         return array_intersect($requestedFields, $allowedFields);
-    }
-
-    private function toArray(array $fields = []): array
-    {
-        $data = [
-            'id' => $this->getId(),
-            'title' => $this->getTitle(),
-            'url' => $this->getUrl(),
-            'thumbnail_url' => $this->getThumbnailUrl(),
-            'status' => $this->getStatus(),
-        ];
-
-        return empty($fields) ? $data : array_intersect_key($data, array_flip($fields));
-    }
-
-    private function setFromModel(object $media): void
-    {
-        $this->setId($media->id);
-        $this->setTitle($media->title);
-        $this->setUrl($media->path ? Storage::url($media->path) : null);
-        $this->setThumbnailUrl($media->thumbnail_path ? Storage::url($media->thumbnail_path) : null);
-        $this->setStatus($media->status);
     }
 
     public function index(Request $request): JsonResponse
@@ -135,20 +45,26 @@ class MediaController extends Controller
         ];
         $columns = $fields ? array_values(array_intersect_key($columnMap, array_flip($fields))) : ['id', 'title', 'path', 'thumbnail_path', 'status'];
 
-        $media = $this->getMediaRepository()->getPaginated((int) $perPage, (int) $page, $columns);
+        $mediaQuery = $this->mediaRepository->getPaginated((int) $perPage, (int) $page, $columns);
 
-        $data = [];
-        foreach ($media->items() as $item) {
-            $this->setFromModel($item);
-            $data[] = $this->toArray($fields);
-        }
+        // Directly use the paginated collection, relying on model accessors
+        $data = $mediaQuery->getCollection()->map(function ($item) use ($fields) {
+            $itemArray = [
+                'id' => $item->id,
+                'title' => $item->title,
+                'url' => $item->url,
+                'thumbnail_url' => $item->thumbnail_url,
+                'status' => $item->status,
+            ];
+            return empty($fields) ? $itemArray : array_intersect_key($itemArray, array_flip($fields));
+        })->all();
 
         return response()->json([
             'data' => $data,
-            'current_page' => $media->currentPage(),
-            'per_page' => $media->perPage(),
-            'total' => $media->total(),
-            'last_page' => $media->lastPage(),
+            'current_page' => $mediaQuery->currentPage(),
+            'per_page' => $mediaQuery->perPage(),
+            'total' => $mediaQuery->total(),
+            'last_page' => $mediaQuery->lastPage(),
         ]);
     }
 
@@ -156,7 +72,10 @@ class MediaController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'title' => 'required|string|max:255',
-            'file' => 'required|file|max:20480',
+            'file' => 'required|file|mimes:jpg,jpeg,png,mp4,mov,avi|max:20480',
+        ], [
+            'file.mimes' => 'Only images (jpg, jpeg, png) or videos (mp4, mov, avi) are allowed.',
+            'file.max' => 'The file may not be greater than 20MB.',
         ]);
 
         if ($validator->fails()) {
@@ -165,11 +84,11 @@ class MediaController extends Controller
 
         $file = $request->file('file');
         $mime = $file->getMimeType();
-        $isVideo = str_starts_with($mime, 'video/');
-        $isImage = str_starts_with($mime, 'image/');
+        $isVideo = in_array($mime, ['video/mp4', 'video/quicktime', 'video/x-msvideo']);
+        $isImage = in_array($mime, ['image/jpeg', 'image/png']);
 
         if (!$isVideo && !$isImage) {
-            return response()->json(['error' => 'Unsupported file type.'], 422);
+            return response()->json(['error' => 'Only images (jpg, jpeg, png) or videos (mp4, mov, avi) are allowed.'], 422);
         }
 
         $datePath = date('Y/m/d');
@@ -180,7 +99,7 @@ class MediaController extends Controller
         $thumbnailPath = $isVideo ? "media/thumbnails/{$datePath}/" . Str::random(40) . '.jpg' : null;
         $status = $isVideo ? 0 : 1;
 
-        $media = $this->getMediaRepository()->create([
+        $media = $this->mediaRepository->create([
             'title' => $request->input('title'),
             'path' => $path,
             'thumbnail_path' => $thumbnailPath,
@@ -189,7 +108,6 @@ class MediaController extends Controller
 
         if ($isVideo) {
             $tempPath = $file->storeAs('temp', $filename, 'local');
-
             ProcessVideoToHls::dispatch(
                 storage_path('app/' . $tempPath),
                 storage_path('app/public/' . dirname($path)),
@@ -200,8 +118,18 @@ class MediaController extends Controller
             $file->storeAs('public/' . dirname($path), basename($path));
         }
 
-        $this->setFromModel($media);
-        return response()->json($this->toArray($this->getRequestedFields($request)), 201);
+        $mediaArray = [
+            'id' => $media->id,
+            'title' => $media->title,
+            'url' => $media->url,
+            'thumbnail_url' => $media->thumbnail_url,
+            'status' => $media->status,
+        ];
+        $fields = $this->getRequestedFields($request);
+        return response()->json(
+            empty($fields) ? $mediaArray : array_intersect_key($mediaArray, array_flip($fields)),
+            201
+        );
     }
 
     public function show($id): JsonResponse
@@ -216,10 +144,18 @@ class MediaController extends Controller
                 'status' => 'status',
             ], array_flip($fields))) : ['id', 'title', 'path', 'thumbnail_path', 'status'];
 
-            $media = $this->getMediaRepository()->find($id, $columns);
-            $this->setFromModel($media);
+            $media = $this->mediaRepository->find($id, $columns);
+            $mediaArray = [
+                'id' => $media->id,
+                'title' => $media->title,
+                'url' => $media->url,
+                'thumbnail_url' => $media->thumbnail_url,
+                'status' => $media->status,
+            ];
 
-            return response()->json($this->toArray($fields));
+            return response()->json(
+                empty($fields) ? $mediaArray : array_intersect_key($mediaArray, array_flip($fields))
+            );
         } catch (ModelNotFoundException $e) {
             return response()->json(['message' => $e->getMessage()], 404);
         }
@@ -228,16 +164,13 @@ class MediaController extends Controller
     public function update(Request $request, $id): JsonResponse
     {
         try {
-            // Log request data for debugging
             \Log::info('Update request data:', $request->all());
 
             $validator = Validator::make($request->all(), [
                 'title' => 'required|string|max:255',
-                'file' => 'nullable|file|max:20480',
+                'file' => 'nullable|file|mimes:jpg,jpeg,png,mp4,mov,avi|max:20480',
             ], [
-                'title.required' => 'The title field is required.',
-                'title.string' => 'The title must be a string.',
-                'title.max' => 'The title may not be greater than 255 characters.',
+                'file.mimes' => 'Only images (jpg, jpeg, png) or videos (mp4, mov, avi) are allowed.',
                 'file.max' => 'The file may not be greater than 20MB.',
             ]);
 
@@ -246,7 +179,7 @@ class MediaController extends Controller
             }
 
             $columns = ['id', 'title', 'path', 'thumbnail_path', 'status'];
-            $media = $this->getMediaRepository()->find($id, $columns);
+            $media = $this->mediaRepository->find($id, $columns);
             $file = $request->file('file');
 
             $updateData = [
@@ -255,14 +188,13 @@ class MediaController extends Controller
 
             if ($file) {
                 $mime = $file->getMimeType();
-                $isVideo = str_starts_with($mime, 'video/');
-                $isImage = str_starts_with($mime, 'image/');
+                $isVideo = in_array($mime, ['video/mp4', 'video/quicktime', 'video/x-msvideo']);
+                $isImage = in_array($mime, ['image/jpeg', 'image/png']);
 
                 if (!$isVideo && !$isImage) {
-                    return response()->json(['error' => 'Unsupported file type.'], 422);
+                    return response()->json(['error' => 'Only images (jpg, jpeg, png) or videos (mp4, mov, avi) are allowed.'], 422);
                 }
 
-                // Delete existing files
                 Storage::disk('public')->delete($media->path);
                 if ($media->thumbnail_path) {
                     Storage::disk('public')->delete($media->thumbnail_path);
@@ -283,7 +215,6 @@ class MediaController extends Controller
 
                 if ($isVideo) {
                     $tempPath = $file->storeAs('temp', $filename, 'local');
-
                     ProcessVideoToHls::dispatch(
                         storage_path('app/' . $tempPath),
                         storage_path('app/public/' . dirname($path)),
@@ -295,10 +226,19 @@ class MediaController extends Controller
                 }
             }
 
-            $updatedMedia = $this->getMediaRepository()->update($id, $updateData);
-            $this->setFromModel($updatedMedia);
+            $updatedMedia = $this->mediaRepository->update($id, $updateData);
+            $mediaArray = [
+                'id' => $updatedMedia->id,
+                'title' => $updatedMedia->title,
+                'url' => $updatedMedia->url,
+                'thumbnail_url' => $updatedMedia->thumbnail_url,
+                'status' => $updatedMedia->status,
+            ];
 
-            return response()->json($this->toArray($this->getRequestedFields($request)));
+            $fields = $this->getRequestedFields($request);
+            return response()->json(
+                empty($fields) ? $mediaArray : array_intersect_key($mediaArray, array_flip($fields))
+            );
         } catch (ModelNotFoundException $e) {
             return response()->json(['message' => $e->getMessage()], 404);
         }
@@ -308,7 +248,7 @@ class MediaController extends Controller
     {
         try {
             $columns = ['id', 'path', 'thumbnail_path'];
-            $media = $this->getMediaRepository()->find($id, $columns);
+            $media = $this->mediaRepository->find($id, $columns);
 
             Storage::disk('public')->delete($media->path);
             if ($media->thumbnail_path) {
@@ -316,7 +256,7 @@ class MediaController extends Controller
                 Storage::disk('public')->deleteDirectory(dirname($media->path));
             }
 
-            $this->getMediaRepository()->delete($id);
+            $this->mediaRepository->delete($id);
 
             return response()->json(null, 204);
         } catch (ModelNotFoundException $e) {

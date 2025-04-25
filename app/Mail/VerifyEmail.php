@@ -22,8 +22,8 @@ class VerifyEmail extends Mailable
 
     public function build()
     {
-        return $this->from(config('mail.from.address'))
-            ->subject("Verify Your Email for ${config('app.name')}")
+        return $this->from(config('mail.from.address'), config('mail.from.name'))
+            ->subject('Verify Your Email for ' . config('app.name'))
             ->view('emails.verify')
             ->with([
                 'name' => $this->user->name,

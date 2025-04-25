@@ -9,89 +9,16 @@ use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\Storage;
 
 class UserController extends Controller
 {
     private $userRepository;
-    private $id;
-    private $username;
-    private $name;
-    private $email;
-    private $password;
-    private $avatarUrl;
 
     public function __construct(UserRepositoryInterface $userRepository)
     {
         $this->middleware('auth:sanctum')->except(['index', 'show']);
-        $this->setUserRepository($userRepository);
-    }
-
-    public function getUserRepository(): UserRepositoryInterface
-    {
-        return $this->userRepository;
-    }
-
-    public function setUserRepository(UserRepositoryInterface $userRepository): void
-    {
-        if (!$userRepository instanceof UserRepositoryInterface) {
-            throw new \InvalidArgumentException('The userRepository must implement UserRepositoryInterface.');
-        }
         $this->userRepository = $userRepository;
-    }
-
-    public function getId(): ?int
-    {
-        return $this->id;
-    }
-
-    public function setId(?int $id): void
-    {
-        $this->id = $id;
-    }
-
-    public function getUsername(): ?string
-    {
-        return $this->username;
-    }
-
-    public function setUsername(?string $username): void
-    {
-        $this->username = $username ? trim($username) : null;
-    }
-
-    public function getName(): ?string
-    {
-        return $this->name;
-    }
-
-    public function setName(?string $name): void
-    {
-        $this->name = $name ? ucfirst(trim($name)) : null;
-    }
-
-    public function getEmail(): ?string
-    {
-        return $this->email;
-    }
-
-    public function setEmail(?string $email): void
-    {
-        $this->email = $email ? strtolower(trim($email)) : null;
-    }
-
-    public function setPassword(?string $password): void
-    {
-        $this->password = $password ? \Illuminate\Support\Facades\Hash::make(trim($password)) : null;
-    }
-
-    public function getAvatarUrl(): ?string
-    {
-        return $this->avatarUrl;
-    }
-
-    public function setAvatarUrl(?string $avatarPath): void
-    {
-        $this->avatarUrl = $avatarPath ? \Illuminate\Support\Facades\Storage::url($avatarPath) : null;
     }
 
     private function getRequestedFields(Request $request): array
@@ -100,28 +27,6 @@ class UserController extends Controller
         $allowedFields = ['id', 'username', 'name', 'email', 'avatar_url'];
         $requestedFields = $fields ? array_filter(explode(',', $fields)) : [];
         return array_intersect($requestedFields, $allowedFields);
-    }
-
-    private function toArray(array $fields = []): array
-    {
-        $data = [
-            'id' => $this->getId(),
-            'username' => $this->getUsername(),
-            'name' => $this->getName(),
-            'email' => $this->getEmail(),
-            'avatar_url' => $this->getAvatarUrl(),
-        ];
-
-        return empty($fields) ? $data : array_intersect_key($data, array_flip($fields));
-    }
-
-    private function setFromModel(\Modules\Auth\src\Models\User $user): void
-    {
-        $this->setId($user->id);
-        $this->setUsername($user->username);
-        $this->setName($user->name);
-        $this->setEmail($user->email);
-        $this->setAvatarUrl($user->avatar);
     }
 
     public function index(Request $request): JsonResponse
@@ -138,13 +43,19 @@ class UserController extends Controller
         ];
         $columns = $fields ? array_values(array_intersect_key($columnMap, array_flip($fields))) : ['id', 'username', 'name', 'email', 'avatar'];
 
-        $users = $this->getUserRepository()->getAll($perPage, $columns);
+        $users = $this->userRepository->getAll($perPage, $columns);
 
-        $data = [];
-        foreach ($users->items() as $user) {
-            $this->setFromModel($user);
-            $data[] = $this->toArray($fields);
-        }
+        // Directly transform paginated collection using model attributes
+        $data = $users->getCollection()->map(function ($user) use ($fields) {
+            $userArray = [
+                'id' => $user->id,
+                'username' => $user->username,
+                'name' => $user->name,
+                'email' => $user->email,
+                'avatar_url' => $user->avatar ? Storage::url($user->avatar) : null,
+            ];
+            return empty($fields) ? $userArray : array_intersect_key($userArray, array_flip($fields));
+        })->all();
 
         return response()->json([
             'data' => $data,
@@ -165,12 +76,19 @@ class UserController extends Controller
             'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
-        $user = $this->getUserRepository()->create($validated);
-        $this->setFromModel($user);
+        $user = $this->userRepository->create($validated);
+        $userArray = [
+            'id' => $user->id,
+            'username' => $user->username,
+            'name' => $user->name,
+            'email' => $user->email,
+            'avatar_url' => $user->avatar ? Storage::url($user->avatar) : null,
+        ];
+        $fields = $this->getRequestedFields($request);
 
         return response()->json([
             'message' => 'User created successfully',
-            'user' => $this->toArray($this->getRequestedFields($request))
+            'user' => empty($fields) ? $userArray : array_intersect_key($userArray, array_flip($fields)),
         ], 201);
     }
 
@@ -186,11 +104,19 @@ class UserController extends Controller
                 'avatar_url' => 'avatar',
             ], array_flip($fields))) : ['id', 'username', 'name', 'email', 'avatar'];
 
-            $user = $this->getUserRepository()->getById($id, $columns);
-            $this->setFromModel($user);
+            $user = $this->userRepository->getById($id, $columns);
+            $userArray = [
+                'id' => $user->id,
+                'username' => $user->username,
+                'name' => $user->name,
+                'email' => $user->email,
+                'avatar_url' => $user->avatar ? Storage::url($user->avatar) : null,
+            ];
 
-            return response()->json(['user' => $this->toArray($fields)]);
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'user' => empty($fields) ? $userArray : array_intersect_key($userArray, array_flip($fields)),
+            ]);
+        } catch (ModelNotFoundException $e) {
             return response()->json(['message' => $e->getMessage()], 404);
         }
     }
@@ -206,14 +132,21 @@ class UserController extends Controller
                 'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             ]);
 
-            $user = $this->getUserRepository()->update($id, $validated);
-            $this->setFromModel($user);
+            $user = $this->userRepository->update($id, $validated);
+            $userArray = [
+                'id' => $user->id,
+                'username' => $user->username,
+                'name' => $user->name,
+                'email' => $user->email,
+                'avatar_url' => $user->avatar ? Storage::url($user->avatar) : null,
+            ];
+            $fields = $this->getRequestedFields($request);
 
             return response()->json([
                 'message' => 'User updated successfully',
-                'user' => $this->toArray($this->getRequestedFields($request))
+                'user' => empty($fields) ? $userArray : array_intersect_key($userArray, array_flip($fields)),
             ]);
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+        } catch (ModelNotFoundException $e) {
             return response()->json(['message' => $e->getMessage()], 404);
         }
     }
@@ -221,14 +154,14 @@ class UserController extends Controller
     public function destroy($id): JsonResponse
     {
         try {
-            $deleted = $this->getUserRepository()->delete($id);
+            $deleted = $this->userRepository->delete($id);
 
             if (!$deleted) {
                 return response()->json(['message' => 'You cannot delete your own account'], 403);
             }
 
             return response()->json(['message' => 'User deleted successfully']);
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+        } catch (ModelNotFoundException $e) {
             return response()->json(['message' => $e->getMessage()], 404);
         }
     }

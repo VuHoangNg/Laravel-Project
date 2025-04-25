@@ -16,17 +16,18 @@ function SignUp() {
     const onFinish = async (values) => {
         setLoading(true);
         try {
-            await dispatch(register(values));
-            setEmailModalVisible(true); // Show modal after sign-up
+            const response = await dispatch(register(values));
+            if (response?.payload) {
+                setEmailModalVisible(true);
+            } else {
+                throw new Error("Unexpected error");
+            }
         } catch (error) {
             message.error(error.response?.data?.message || "Sign up failed");
         } finally {
+            setEmailModalVisible(false);
             setLoading(false);
         }
-    };
-
-    const onFinishFailed = () => {
-        message.error("Please check the fields and try again!");
     };
 
     return (
@@ -64,7 +65,6 @@ function SignUp() {
                 <Form
                     name="signup-form"
                     onFinish={onFinish}
-                    onFinishFailed={onFinishFailed}
                     autoComplete="off"
                     layout="vertical"
                 >
@@ -173,7 +173,7 @@ function SignUp() {
             <Modal
                 title="Verify Your Email"
                 open={emailModalVisible}
-                onCancel={() => navigate("/login")} // Redirect to login after confirmation
+                onCancel={() => navigate("/login")}
                 footer={[
                     <Button
                         key="login"

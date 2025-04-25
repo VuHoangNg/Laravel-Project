@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState } from "react";
 import { useDispatch } from "react-redux";
+import { setUsers, addUser, updateUser, deleteUser } from "../reducer/action";
 
 const UserContext = createContext();
 
@@ -10,7 +11,7 @@ export function UserProvider({ children, api }) {
     const [formData, setFormData] = useState({
         name: "",
         email: "",
-        username:"",
+        username: "",
         password: "",
         password_confirmation: "",
     });
@@ -22,7 +23,7 @@ export function UserProvider({ children, api }) {
             setFormData({
                 name: "",
                 email: "",
-                username:"",
+                username: "",
                 password: "",
                 password_confirmation: "",
             }),
@@ -31,7 +32,7 @@ export function UserProvider({ children, api }) {
                 const response = await api.post("/api/user", formData, {
                     headers: { "Content-Type": "multipart/form-data" },
                 });
-                dispatch({ type: "users/addUser", payload: response.data.user });
+                dispatch(addUser(response.data.user));
             } catch (error) {
                 throw error;
             }
@@ -49,7 +50,7 @@ export function UserProvider({ children, api }) {
                 const response = await api.post(`/api/user/${id}`, formData, {
                     headers: { "Content-Type": "multipart/form-data" },
                 });
-                dispatch({ type: "users/updateUser", payload: response.data.user });
+                dispatch(updateUser(response.data.user));
             } catch (error) {
                 throw error;
             }
@@ -68,7 +69,7 @@ export function UserProvider({ children, api }) {
                 setFormData({
                     name: user.name,
                     email: user.email,
-                    username:user.username,
+                    username: user.username,
                     password: "",
                     password_confirmation: "",
                 });
@@ -83,7 +84,7 @@ export function UserProvider({ children, api }) {
                 const response = await api.get("/api/users", {
                     params: { page, per_page: perPage },
                 });
-                dispatch({ type: "users/setUsers", payload: response.data });
+                dispatch(setUsers(response.data));
             } catch (error) {
                 throw error;
             }
@@ -108,7 +109,7 @@ export function UserProvider({ children, api }) {
         deleteUser: async (id) => {
             try {
                 await api.delete(`/api/user/${id}`);
-                dispatch({ type: "users/deleteUser", payload: id });
+                dispatch(deleteUser(id));
             } catch (error) {
                 throw error;
             }

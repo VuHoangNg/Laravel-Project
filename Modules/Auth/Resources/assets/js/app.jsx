@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { Provider } from "react-redux"; // Add this
+import { Provider } from "react-redux";
 import {
     BrowserRouter as Router,
     Routes,
@@ -19,7 +19,7 @@ const { Title, Paragraph } = Typography;
 
 function App() {
     return (
-        <Provider store={store}> {/* Add this */}
+        <Provider store={store}>
             <Router basename="/auth">
                 <Routes>
                     <Route

@@ -1,25 +1,28 @@
+// action.js
+
+// Blog Action Types
+export const SET_BLOGS = "blogs/setBlogs";
+export const ADD_BLOG = "blogs/addBlog";
+export const UPDATE_BLOG = "blogs/updateBlog";
+export const DELETE_BLOG = "blogs/deleteBlog";
+
+// Blog Action Creators
+export const setBlogs = (blogs) => ({
+    type: SET_BLOGS,
+    payload: blogs,
+});
+
 export const addBlog = (blog) => ({
-    type: "blogs/addBlog",
+    type: ADD_BLOG,
     payload: blog,
 });
 
 export const updateBlog = (blog) => ({
-    type: "blogs/updateBlog",
+    type: UPDATE_BLOG,
     payload: blog,
 });
 
-export const setBlogs = (blogs) => ({
-    type: "blogs/setBlogs",
-    payload: {
-        data: blogs.data || [],
-        total: blogs.total || 0,
-        current_page: blogs.current_page || 1,
-        per_page: blogs.per_page || 10,
-        last_page: blogs.last_page || 1,
-    },
-});
-
 export const deleteBlog = (blogId) => ({
-    type: "blogs/deleteBlog",
+    type: DELETE_BLOG,
     payload: blogId,
 });

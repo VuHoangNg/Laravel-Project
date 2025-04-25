@@ -14,16 +14,10 @@ use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Modules\Auth\src\Jobs\SendVerifyEmail;
 
 class AuthController extends Controller
 {
-    private $id;
-    private $username;
-    private $name;
-    private $email;
-    private $password;
-    private $avatarUrl;
-
     public function __construct()
     {
         $this->middleware('auth:sanctum')->only(['logout', 'getUser', 'updateAvatar']);
@@ -64,61 +58,6 @@ class AuthController extends Controller
         return response()->json(['message' => 'Not implemented'], 501);
     }
 
-    public function getId(): ?int
-    {
-        return $this->id;
-    }
-
-    public function setId(?int $id): void
-    {
-        $this->id = $id;
-    }
-
-    public function getUsername(): ?string
-    {
-        return $this->username;
-    }
-
-    public function setUsername(?string $username): void
-    {
-        $this->username = $username ? trim($username) : null;
-    }
-
-    public function getName(): ?string
-    {
-        return $this->name;
-    }
-
-    public function setName(?string $name): void
-    {
-        $this->name = $name ? ucfirst(trim($name)) : null;
-    }
-
-    public function getEmail(): ?string
-    {
-        return $this->email;
-    }
-
-    public function setEmail(?string $email): void
-    {
-        $this->email = $email ? strtolower(trim($email)) : null;
-    }
-
-    public function setPassword(?string $password): void
-    {
-        $this->password = $password ? Hash::make(trim($password)) : null;
-    }
-
-    public function getAvatarUrl(): ?string
-    {
-        return $this->avatarUrl;
-    }
-
-    public function setAvatarUrl(?string $avatarPath): void
-    {
-        $this->avatarUrl = $avatarPath ? Storage::url($avatarPath) : null;
-    }
-
     private function getRequestedFields(Request $request): array
     {
         $fields = $request->query('fields', '');
@@ -127,26 +66,17 @@ class AuthController extends Controller
         return array_intersect($requestedFields, $allowedFields);
     }
 
-    private function toArray(array $fields = []): array
+    private function userToArray(User $user, array $fields = []): array
     {
         $data = [
-            'id' => $this->getId(),
-            'username' => $this->getUsername(),
-            'name' => $this->getName(),
-            'email' => $this->getEmail(),
-            'avatar_url' => $this->getAvatarUrl(),
+            'id' => $user->id,
+            'username' => $user->username,
+            'name' => $user->name,
+            'email' => $user->email,
+            'avatar_url' => $user->avatar ? Storage::url($user->avatar) : null,
         ];
 
         return empty($fields) ? $data : array_intersect_key($data, array_flip($fields));
-    }
-
-    private function setFromModel(User $user): void
-    {
-        $this->setId($user->id);
-        $this->setUsername($user->username);
-        $this->setName($user->name);
-        $this->setEmail($user->email);
-        $this->setAvatarUrl($user->avatar);
     }
 
     public function login(Request $request): JsonResponse
@@ -161,18 +91,16 @@ class AuthController extends Controller
         if ($user && Hash::check($request->password, $user->password)) {
             $token = $user->createToken('auth_token')->plainTextToken;
 
-            $this->setFromModel($user);
-
             $fields = $this->getRequestedFields($request);
-            $responseData = $this->toArray($fields);
+            $responseData = $this->userToArray($user, $fields);
             if (empty($fields) || in_array('token', $fields)) {
                 $responseData['token'] = $token;
             }
             $responseData['message'] = 'Login successful';
 
             return response()->json($responseData)
-                ->withCookie(Cookie::forever('username', $this->getUsername()))
-                ->withCookie(Cookie::forever('email', $this->getEmail()))
+                ->withCookie(Cookie::forever('username', $user->username))
+                ->withCookie(Cookie::forever('email', $user->email))
                 ->withCookie(Cookie::forever('token', $token));
         }
 
@@ -199,18 +127,22 @@ class AuthController extends Controller
         ]);
 
         $user = User::create([
-            'name' => $this->setName($validated['name']),
-            'username' => $this->setUsername($validated['username']),
-            'email' => $this->setEmail($validated['email']),
-            'password' => $this->setPassword($validated['password']),
+            'name' => ucfirst(trim($validated['name'])),
+            'username' => trim($validated['username']),
+            'email' => strtolower(trim($validated['email'])),
+            'password' => Hash::make(trim($validated['password'])),
         ]);
-
-        $this->setFromModel($user);
 
         event(new Registered($user));
 
+        // Generate verification URL for frontend route
+        $verificationUrl = url('/auth/verify-email/' . $user->id . '/' . sha1($user->getEmailForVerification()));
+
+        // Dispatch SendVerifyEmail job
+        SendVerifyEmail::dispatch($user, $verificationUrl);
+
         return response()->json(array_merge(
-            $this->toArray($this->getRequestedFields($request)),
+            $this->userToArray($user, $this->getRequestedFields($request)),
             ['message' => 'Account created successfully. Please check your email for verification.']
         ), 201);
     }
@@ -219,8 +151,7 @@ class AuthController extends Controller
     {
         $user = $request->user();
         if ($user) {
-            $this->setFromModel($user);
-            return response()->json($this->toArray($this->getRequestedFields($request)));
+            return response()->json($this->userToArray($user, $this->getRequestedFields($request)));
         }
         return response()->json(['message' => 'Unauthorized'], 401);
     }
@@ -255,26 +186,17 @@ class AuthController extends Controller
 
         $user = $request->user();
 
-        $avatarPath = $this->setAvatarPath($request, $user);
-        $user->avatar = $avatarPath;
-        $user->save();
-
-        $this->setFromModel($user);
-
-        return response()->json(array_merge(
-            $this->toArray($this->getRequestedFields($request)),
-            ['message' => 'Avatar updated successfully']
-        ));
-    }
-
-    private function setAvatarPath(Request $request, User $user): ?string
-    {
         if ($request->hasFile('avatar')) {
             if ($user->avatar) {
                 Storage::disk('public')->delete($user->avatar);
             }
-            return $request->file('avatar')->store('avatars', 'public');
+            $user->avatar = $request->file('avatar')->store('avatars', 'public');
+            $user->save();
         }
-        return $user->avatar;
+
+        return response()->json(array_merge(
+            $this->userToArray($user, $this->getRequestedFields($request)),
+            ['message' => 'Avatar updated successfully']
+        ));
     }
 }

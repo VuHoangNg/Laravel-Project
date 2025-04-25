@@ -1,3 +1,11 @@
+import { SET_MEDIA } from "../../../../../../Media/Resources/assets/js/components/reducer/action";
+import {
+    SET_BLOGS,
+    ADD_BLOG,
+    UPDATE_BLOG,
+    DELETE_BLOG,
+} from "./action";
+
 const initialState = {
     blogs: {
         data: [],
@@ -17,12 +25,12 @@ const initialState = {
 
 export default function blogReducer(state = initialState, action) {
     switch (action.type) {
-        case "blogs/setBlogs":
+        case SET_BLOGS:
             return {
                 ...state,
                 blogs: action.payload,
             };
-        case "blogs/addBlog":
+        case ADD_BLOG:
             return {
                 ...state,
                 blogs: {
@@ -32,7 +40,7 @@ export default function blogReducer(state = initialState, action) {
                     current_page: 1, // Reset to first page
                 },
             };
-        case "blogs/updateBlog":
+        case UPDATE_BLOG:
             return {
                 ...state,
                 blogs: {
@@ -46,7 +54,7 @@ export default function blogReducer(state = initialState, action) {
                     current_page: 1, // Reset to first page
                 },
             };
-        case "blogs/deleteBlog":
+        case DELETE_BLOG:
             return {
                 ...state,
                 blogs: {
@@ -57,7 +65,7 @@ export default function blogReducer(state = initialState, action) {
                     total: state.blogs.total - 1,
                 },
             };
-        case "media/setMedia":
+        case SET_MEDIA:
             return { ...state, media: action.payload };
         default:
             return state;
