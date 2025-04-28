@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useSelector } from "react-redux";
 import {
@@ -15,8 +15,8 @@ import {
     Spin,
 } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
-import { useMediaContext } from "./context/MediaContext";
-import ImageWithSkeleton from "../../../../../Core/Resources/assets/js/components/SkeletonImage";
+import { useMediaContext } from "../context/MediaContext";
+import ImageWithSkeleton from "../../../../../../Core/Resources/assets/js/components/SkeletonImage";
 
 const { Title } = Typography;
 const { Content } = Layout;
@@ -46,43 +46,35 @@ function MediaContent() {
     const page = parseInt(searchParams.get("page") || "1");
     const perPage = parseInt(searchParams.get("perPage") || "10");
 
-    useEffect(() => {
-        const abortController = new AbortController();
-        let isMounted = true; // Track if component is mounted
+    // Track mounted state
+    const isMounted = useRef(false);
 
-        const loadMedia = async () => {
-            setLoading(true);
-            setError(null);
-            try {
-                console.log(`Loading media: page=${page}, perPage=${perPage}`);
-                await fetchMedia(page, perPage, {
-                    signal: abortController.signal,
-                });
-            } catch (err) {
-                if (err.name === "AbortError") {
-                    console.log("Media fetch aborted");
-                    return;
-                }
-                if (isMounted) {
-                    setError(err.message || "Failed to load media.");
-                }
-            } finally {
-                if (isMounted) {
-                    setLoading(false);
-                }
-            }
-        };
+    useEffect(() => {
+        isMounted.current = true;
 
         loadMedia();
 
-        // Cleanup: Abort the fetch request and mark component as unmounted
         return () => {
-            console.log("Cleaning up MediaContent useEffect");
-            abortController.abort();
-            isMounted = false;
+            isMounted.current = false;
         };
-    }, [page, perPage, fetchMedia]);
+    }, [page, perPage]);
 
+    const loadMedia = async () => {
+        if (!isMounted.current) return;
+        setLoading(true);
+        setError(null);
+        try {
+            await fetchMedia(page, perPage);
+        } catch (err) {
+            if (isMounted.current) {
+                setError(err.message || "Failed to load media.");
+            }
+        } finally {
+            if (isMounted.current) {
+                setLoading(false);
+            }
+        }
+    };
 
     const handleTableChange = (pagination) => {
         const newPage = pagination.current;
@@ -108,7 +100,6 @@ function MediaContent() {
             form.resetFields();
             resetForm();
         } catch (error) {
-            console.error("Error creating media:", error);
             if (error.response?.status === 422) {
                 const errors = error.response.data.errors;
                 Object.keys(errors).forEach((key) => {

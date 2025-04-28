@@ -1,10 +1,10 @@
 import React from "react";
 import { Routes, Route } from "react-router-dom";
 import { Layout } from "antd";
-
-import MediaDetail from "./components/MediaDetail";
 import { MediaProvider } from "./components/context/MediaContext";
-import MediaContent from "./components/mediaContent";
+import MediaContent from "./components/page/MediaContent";
+import MediaDetail from "./components/action/MediaDetail";
+
 
 const { Content } = Layout;
 

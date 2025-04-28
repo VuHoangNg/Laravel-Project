@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import {
     Typography,
@@ -48,42 +48,34 @@ function UserContent({ api }) {
     const page = parseInt(searchParams.get("page") || "1");
     const perPage = parseInt(searchParams.get("per_page") || "10");
 
+    const isMounted = useRef(false);
+
     useEffect(() => {
-        const abortController = new AbortController();
-        let isMounted = true; // Track if component is mounted
-
-        const loadUsers = async () => {
-            setLoading(true);
-            setError(null);
-            try {
-                console.log(`Loading users: page=${page}, perPage=${perPage}`);
-                await fetchUsers(page, perPage, {
-                    signal: abortController.signal,
-                });
-            } catch (err) {
-                if (err.name === "AbortError") {
-                    console.log("User fetch aborted");
-                    return;
-                }
-                if (isMounted) {
-                    setError("Failed to load users. Please try again.");
-                }
-            } finally {
-                if (isMounted) {
-                    setLoading(false);
-                }
-            }
-        };
-
+        isMounted.current = true;
         loadUsers();
 
-        // Cleanup: Abort the fetch request and mark component as unmounted
         return () => {
-            console.log("Cleaning up UserContent useEffect");
-            abortController.abort();
-            isMounted = false;
+            isMounted.current = false;
         };
-    }, [page, perPage, fetchUsers]);
+    }, [page, perPage]);
+
+    const loadUsers = async () => {
+        if (!isMounted.current) return;
+        setLoading(true);
+        setError(null);
+
+        try {
+            await fetchUsers(page, perPage);
+        } catch (err) {
+            if (isMounted.current) {
+                setError("Failed to load users. Please try again.");
+            }
+        } finally {
+            if (isMounted.current) {
+                setLoading(false);
+            }
+        }
+    };
 
     const handleTableChange = (pagination) => {
         const newPage = pagination.current;

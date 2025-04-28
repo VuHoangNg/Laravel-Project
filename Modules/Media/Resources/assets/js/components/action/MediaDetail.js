@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
     Typography,
@@ -11,10 +11,10 @@ import {
     Space,
     Upload,
 } from "antd";
-import { useMediaContext } from "./context/MediaContext";
+import { useMediaContext } from "../context/MediaContext";
 import { UploadOutlined } from "@ant-design/icons";
-import ImageWithSkeleton from "../../../../../Core/Resources/assets/js/components/SkeletonImage";
-import VideoPlayer from "../../../../../Core/Resources/assets/js/components/VideoPlayer";
+import ImageWithSkeleton from "../../../../../../Core/Resources/assets/js/components/SkeletonImage";
+import VideoPlayer from "../../../../../../Core/Resources/assets/js/components/VideoPlayer";
 
 const { Title } = Typography;
 
@@ -31,52 +31,42 @@ function MediaDetail({ api }) {
     const { getMediaContext } = useMediaContext();
     const { fetchMediaById } = getMediaContext;
 
-    useEffect(() => {
-        const abortController = new AbortController();
-        let isMounted = true; // Track if component is mounted
+    const isMounted = useRef(false);
 
-        const fetchMediaData = async () => {
-            setLoading(true);
-            setError(null);
-            try {
-                console.log(`Fetching media with ID: ${id}`);
-                const mediaData = await fetchMediaById(id, {
-                    signal: abortController.signal,
-                });
-                console.log("Media data received:", mediaData);
-                if (isMounted) {
-                    setMedia(mediaData);
-                    form.setFieldsValue({
-                        title: mediaData.title,
-                    });
-                }
-            } catch (err) {
-                if (err.name === "AbortError") {
-                    console.log("Fetch aborted for media ID:", id);
-                    return;
-                }
-                console.error("Error fetching media:", err);
-                if (isMounted) {
-                    setError(
-                        err.response?.data?.message ||
-                            err.message ||
-                            "Failed to load media details. Please try again."
-                    );
-                }
-            } finally {
-                if (isMounted) {
-                    setLoading(false);
-                }
-            }
-        };
+    useEffect(() => {
+        isMounted.current = true;
         fetchMediaData();
 
-        // Cleanup: Abort the fetch request and mark component as unmounted
         return () => {
-            abortController.abort();
-            isMounted = false;
+            isMounted.current = false;
         };
-    }, [id, fetchMediaById, form]);
+    }, []);
+
+    const fetchMediaData = async () => {
+        if (!isMounted.current) return;
+        setLoading(true);
+        setError(null);
+
+        try {
+            const mediaData = await fetchMediaById(id);
+            if (isMounted.current) {
+                setMedia(mediaData);
+                form.setFieldsValue({ title: mediaData.title });
+            }
+        } catch (err) {
+            if (isMounted.current) {
+                setError(
+                    err.response?.data?.message ||
+                        err.message ||
+                        "Failed to load media details. Please try again."
+                );
+            }
+        } finally {
+            if (isMounted.current) {
+                setLoading(false);
+            }
+        }
+    };
 
     const handleSubmitEdit = async (values) => {
         if (!api) {
@@ -137,7 +127,6 @@ function MediaDetail({ api }) {
             const perPage = searchParams.get("perPage") || "10";
             navigate(`/media?page=${page}&perPage=${perPage}`);
         } catch (err) {
-            console.error("Error deleting media:", err);
             setError(
                 err.response?.data?.message ||
                     err.message ||
@@ -167,9 +156,6 @@ function MediaDetail({ api }) {
     const handleBack = () => {
         const page = searchParams.get("page") || "1";
         const perPage = searchParams.get("perPage") || "10";
-        console.log(
-            `Navigating back to /media?page=${page}&perPage=${perPage}`
-        );
         navigate(`/media?page=${page}&perPage=${perPage}`);
     };
 

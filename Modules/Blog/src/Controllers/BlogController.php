@@ -5,7 +5,6 @@ namespace Modules\Blog\src\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Modules\Blog\src\Repositories\BlogRepositoryInterface;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
@@ -44,23 +43,7 @@ class BlogController extends Controller
             ['created_at' => 'desc']
         );
 
-        $data = $blogs->getCollection()->map(function ($blog) use ($fields) {
-            $blogArray = [
-                'id' => $blog->id,
-                'title' => $blog->title,
-                'content' => $blog->content,
-                'media' => $blog->media ? $blog->media->map(function ($media) {
-                    return [
-                        'id' => $media->id,
-                        'title' => $media->title,
-                        'url' => $media->path ? Storage::url($media->path) : null,
-                        'thumbnail_url' => $media->thumbnail_path ? Storage::url($media->thumbnail_path) : null,
-                        'status' => $media->status,
-                    ];
-                })->toArray() : [],
-            ];
-            return empty($fields) ? $blogArray : array_intersect_key($blogArray, array_flip($fields));
-        })->all();
+        $data = $blogs->getCollection()->toArray();
 
         return response()->json([
             'data' => $data,
@@ -81,21 +64,17 @@ class BlogController extends Controller
         ]);
 
         $blog = $this->blogRepository->create($validated);
+        $fields = $this->getRequestedFields($request);
+
         $blogArray = [
             'id' => $blog->id,
             'title' => $blog->title,
             'content' => $blog->content,
-            'media' => $blog->media ? $blog->media->map(function ($media) {
-                return [
-                    'id' => $media->id,
-                    'title' => $media->title,
-                    'url' => $media->path ? Storage::url($media->path) : null,
-                    'thumbnail_url' => $media->thumbnail_path ? Storage::url($media->thumbnail_path) : null,
-                    'status' => $media->status,
-                ];
-            })->toArray() : [],
         ];
-        $fields = $this->getRequestedFields($request);
+
+        if (in_array('media', $fields) && $blog->media) {
+            $blogArray['media'] = $blog->media->toArray();
+        }
 
         return response()->json(
             empty($fields) ? $blogArray : array_intersect_key($blogArray, array_flip($fields)),
@@ -112,20 +91,16 @@ class BlogController extends Controller
                 : ['id', 'title', 'content'];
 
             $blog = $this->blogRepository->getById($id, $columns, in_array('media', $fields));
+
             $blogArray = [
                 'id' => $blog->id,
                 'title' => $blog->title,
                 'content' => $blog->content,
-                'media' => $blog->media ? $blog->media->map(function ($media) {
-                    return [
-                        'id' => $media->id,
-                        'title' => $media->title,
-                        'url' => $media->path ? Storage::url($media->path) : null,
-                        'thumbnail_url' => $media->thumbnail_path ? Storage::url($media->thumbnail_path) : null,
-                        'status' => $media->status,
-                    ];
-                })->toArray() : [],
             ];
+
+            if (in_array('media', $fields) && $blog->media) {
+                $blogArray['media'] = $blog->media->toArray();
+            }
 
             return response()->json(
                 empty($fields) ? $blogArray : array_intersect_key($blogArray, array_flip($fields))
@@ -146,21 +121,17 @@ class BlogController extends Controller
             ]);
 
             $blog = $this->blogRepository->update($id, $validated);
+            $fields = $this->getRequestedFields($request);
+
             $blogArray = [
                 'id' => $blog->id,
                 'title' => $blog->title,
                 'content' => $blog->content,
-                'media' => $blog->media ? $blog->media->map(function ($media) {
-                    return [
-                        'id' => $media->id,
-                        'title' => $media->title,
-                        'url' => $media->path ? Storage::url($media->path) : null,
-                        'thumbnail_url' => $media->thumbnail_path ? Storage::url($media->thumbnail_path) : null,
-                        'status' => $media->status,
-                    ];
-                })->toArray() : [],
             ];
-            $fields = $this->getRequestedFields($request);
+
+            if (in_array('media', $fields) && $blog->media) {
+                $blogArray['media'] = $blog->media->toArray();
+            }
 
             return response()->json(
                 empty($fields) ? $blogArray : array_intersect_key($blogArray, array_flip($fields))

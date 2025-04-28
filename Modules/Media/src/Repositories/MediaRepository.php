@@ -32,17 +32,15 @@ class MediaRepository implements MediaRepositoryInterface
     public function getPaginated(int $perPage, int $page, array $columns = ['*'], array $orderBy = []): LengthAwarePaginator
     {
         $query = $this->getModel()->newQuery()->select($columns);
-        // Apply sorting: default to created_at desc if no orderBy provided
         $orderBy = $orderBy ?: ['created_at' => 'desc'];
-        foreach ($orderBy as $column => $direction) {
-            $query->orderBy($column, $direction);
-        }
+        $query->orderBy(key($orderBy), reset($orderBy));
         return $query->paginate($perPage, ['*'], 'page', $page);
     }
 
     public function find($id, array $columns = ['*']): ?Media1
     {
-        $media = $this->getModel()->newQuery()->select($columns)->find($id);
+        $query = $this->getModel()->newQuery()->select($columns);
+        $media = $query->find($id);
         if (!$media) {
             throw new ModelNotFoundException("Media with ID {$id} not found.");
         }

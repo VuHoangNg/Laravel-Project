@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
     Typography,
@@ -21,7 +21,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { setMedia } from "../../../../../../Media/Resources/assets/js/components/reducer/action";
 import VideoPlayer from "../../../../../../Core/Resources/assets/js/components/VideoPlayer";
 
-const { Title, Paragraph } = Typography;
+const { Title } = Typography;
 const { Meta } = Card;
 
 function BlogDetail({ api }) {
@@ -41,6 +41,7 @@ function BlogDetail({ api }) {
         total: 0,
     });
     const [form] = Form.useForm();
+    const loggedErrors = new Set();
 
     const media = useSelector(
         (state) =>
@@ -59,97 +60,92 @@ function BlogDetail({ api }) {
     const { updateBlog } = editingBlogContext;
     const { deleteBlog } = deleteBlogContext;
 
-    useEffect(() => {
-        const abortController = new AbortController(); // Create AbortController
-        let isMounted = true; // Track if component is mounted
+    const isMounted = useRef(false);
 
-        const fetchBlog = async () => {
-            setLoading(true);
-            setError(null);
-            try {
-                const response = await api.get(`/api/blogs/${id}`, {
-                    signal: abortController.signal,
-                });
-                if (isMounted) {
-                    setBlog(response.data);
-                    form.setFieldsValue({
-                        title: response.data.title,
-                        content: response.data.content,
-                    });
-                    setSelectedMediaIds(response.data.media.map((m) => m.id));
-                }
-            } catch (err) {
-                if (err.name === "AbortError") {
-                    console.log("Blog fetch aborted");
-                    return;
-                }
-                if (isMounted) {
-                    setError("Failed to load blog details. Please try again.");
-                }
-            } finally {
-                if (isMounted) {
-                    setLoading(false);
-                }
-            }
-        };
+    useEffect(() => {
+        isMounted.current = true;
         fetchBlog();
 
-        // Cleanup: Abort the fetch request and mark component as unmounted
         return () => {
-            abortController.abort();
-            isMounted = false;
+            isMounted.current = false;
         };
-    }, [api, id, form]);
+    }, []);
+
+    const fetchBlog = async () => {
+        if (!isMounted.current) return;
+        setLoading(true);
+        setError(null);
+
+        try {
+            const response = await api.get(`/api/blogs/${id}`, {
+                params: { fields: "id,title,content,media" },
+            });
+
+            if (isMounted.current) {
+                setBlog(response.data);
+                form.setFieldsValue({
+                    title: response.data.title,
+                    content: response.data.content,
+                });
+                setSelectedMediaIds(
+                    response.data.media && Array.isArray(response.data.media)
+                        ? response.data.media.map((m) => m.id)
+                        : []
+                );
+            }
+        } catch (err) {
+            console.error("Error fetching blog:", err);
+            if (isMounted.current) {
+                setError("Failed to load blog details. Please try again.");
+            }
+        } finally {
+            if (isMounted.current) {
+                setLoading(false);
+            }
+        }
+    };
 
     useEffect(() => {
-        const abortController = new AbortController(); // Create AbortController
-        let isMounted = true; // Track if component is mounted
-
-        const fetchMediaForModal = async () => {
-            if (!isMediaModalOpen) return; // Avoid fetching if modal is closed
-            setLoading(true);
-            setError(null);
-            try {
-                const response = await api.get(
-                    `/api/media?perPage=${mediaPagination.limit}&page=${mediaPagination.currentPage}`,
-                    { signal: abortController.signal }
-                );
-                if (isMounted) {
-                    dispatch(setMedia(response.data));
-                    setMediaPagination((prev) => ({
-                        ...prev,
-                        total: response.data.total,
-                    }));
-                }
-            } catch (error) {
-                if (error.name === "AbortError") {
-                    console.log("Media fetch aborted");
-                    return;
-                }
-                if (isMounted) {
-                    setError("Failed to fetch media. Please try again.");
-                    console.error("Failed to fetch media:", error);
-                }
-            } finally {
-                if (isMounted) {
-                    setLoading(false);
-                }
-            }
-        };
+        if (!isMediaModalOpen) return;
+        isMounted.current = true;
         fetchMediaForModal();
 
-        // Cleanup: Abort the fetch request and mark component as unmounted
         return () => {
-            abortController.abort();
-            isMounted = false;
+            isMounted.current = false;
         };
     }, [
-        api,
-        dispatch,
         mediaPagination.currentPage,
         mediaPagination.limit,
         isMediaModalOpen,
     ]);
+
+    const fetchMediaForModal = async () => {
+        setLoading(true);
+        setError(null);
+
+        try {
+            const response = await api.get(
+                `/api/media?perPage=${mediaPagination.limit}&page=${mediaPagination.currentPage}&fields=id,title,url,thumbnail_url`
+            );
+
+            if (isMounted.current) {
+                dispatch(setMedia(response.data));
+                setMediaPagination((prev) => ({
+                    ...prev,
+                    total: response.data.total,
+                }));
+            }
+        } catch (error) {
+            console.error("Failed to fetch media:", error);
+            if (isMounted.current) {
+                setError("Failed to fetch media. Please try again.");
+            }
+        } finally {
+            if (isMounted.current) {
+                setLoading(false);
+            }
+        }
+    };
 
     const isVideo = (url) => {
         return (
@@ -160,12 +156,18 @@ function BlogDetail({ api }) {
     };
 
     const handleImageError = (e, item) => {
-        console.error(
-            `Failed to load image for ${item?.title || "unknown"}:`,
-            item?.url,
-            item?.thumbnail
-        );
-        e.target.src = "https://via.placeholder.com/150?text=Image+Not+Found";
+        const errorKey = `${item?.title || "unknown"}:${
+            item?.url || "unknown"
+        }`;
+        if (!loggedErrors.has(errorKey)) {
+            console.error(
+                `Failed to load image for ${item?.title || "unknown"}:`,
+                item?.url,
+                item?.thumbnail_url
+            );
+            loggedErrors.add(errorKey);
+        }
+        e.target.src = "/images/placeholder.png";
     };
 
     const handleSubmitEdit = async (values) => {
@@ -177,13 +179,19 @@ function BlogDetail({ api }) {
                 media_ids: selectedMediaIds,
             };
             await updateBlog(id, payload);
-            const response = await api.get(`/api/blogs/${id}`);
+            const response = await api.get(`/api/blogs/${id}`, {
+                params: { fields: "id,title,content,media" },
+            });
             setBlog(response.data);
             form.setFieldsValue({
                 title: response.data.title,
                 content: response.data.content,
             });
-            setSelectedMediaIds(response.data.media.map((m) => m.id));
+            setSelectedMediaIds(
+                response.data.media && Array.isArray(response.data.media)
+                    ? response.data.media.map((m) => m.id)
+                    : []
+            );
         } catch (error) {
             if (error.response?.status === 422) {
                 const errors = error.response.data.errors;
@@ -340,45 +348,50 @@ function BlogDetail({ api }) {
                             </Button>
                         </Space>
                     </Form>
-                    {blog.media && blog.media.length > 0 && (
-                        <>
-                            <Title level={4}>Media</Title>
-                            <Row gutter={[16, 16]}>
-                                {blog.media.map((item) => (
-                                    <Col span={8} key={item.id}>
-                                        {isVideo(item.url) ? (
-                                            <VideoPlayer
-                                                src={item.url}
-                                                style={{
-                                                    height: 200,
-                                                    objectFit: "cover",
-                                                    width: "100%",
-                                                }}
-                                            />
-                                        ) : (
-                                            <img
-                                                alt={item.title}
-                                                src={
-                                                    item.thumbnail_url ||
-                                                    item.url ||
-                                                    "https://via.placeholder.com/150?text=Image+Not+Found"
-                                                }
-                                                style={{
-                                                    height: 200,
-                                                    objectFit: "cover",
-                                                    width: "100%",
-                                                }}
-                                                onError={(e) =>
-                                                    handleImageError(e, item)
-                                                }
-                                            />
-                                        )}
-                                        <p>{item.title}</p>
-                                    </Col>
-                                ))}
-                            </Row>
-                        </>
-                    )}
+                    {blog.media &&
+                        Array.isArray(blog.media) &&
+                        blog.media.length > 0 && (
+                            <>
+                                <Title level={4}>Media</Title>
+                                <Row gutter={[16, 16]}>
+                                    {blog.media.map((item) => (
+                                        <Col span={8} key={item.id}>
+                                            {isVideo(item.url) ? (
+                                                <VideoPlayer
+                                                    src={item.url}
+                                                    style={{
+                                                        height: 200,
+                                                        objectFit: "cover",
+                                                        width: "100%",
+                                                    }}
+                                                />
+                                            ) : (
+                                                <img
+                                                    alt={item.title}
+                                                    src={
+                                                        item.thumbnail_url ||
+                                                        item.url ||
+                                                        "/images/placeholder.png"
+                                                    }
+                                                    style={{
+                                                        height: 200,
+                                                        objectFit: "cover",
+                                                        width: "100%",
+                                                    }}
+                                                    onError={(e) =>
+                                                        handleImageError(
+                                                            e,
+                                                            item
+                                                        )
+                                                    }
+                                                />
+                                            )}
+                                            <p>{item.title}</p>
+                                        </Col>
+                                    ))}
+                                </Row>
+                            </>
+                        )}
                 </div>
             )}
             <Modal
@@ -453,7 +466,7 @@ function BlogDetail({ api }) {
                                                         src={
                                                             item.thumbnail_url ||
                                                             item.url ||
-                                                            "https://via.placeholder.com/150?text=Image+Not+Found"
+                                                            "/images/placeholder.png"
                                                         }
                                                         style={{
                                                             height: 250,

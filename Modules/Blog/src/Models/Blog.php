@@ -3,20 +3,15 @@
 namespace Modules\Blog\src\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Blog extends Model
 {
     protected $fillable = ['title', 'content'];
 
-    public function media(): BelongsToMany
+    public function media(): HasMany
     {
-        return $this->belongsToMany(
-            \Modules\Media\src\Models\Media1::class,
-            'blog_media',
-            'blog_id',
-            'media_id'
-        )->withTimestamps();
+        return $this->hasMany(\Modules\Media\src\Models\Media1::class, 'blog_id');
     }
 
     // Getter for title (Capitalizes the title)

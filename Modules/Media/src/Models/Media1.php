@@ -3,25 +3,20 @@
 namespace Modules\Media\src\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Storage;
 
 class Media1 extends Model
 {
     protected $table = 'media1';
 
-    protected $fillable = ['title', 'type', 'path', 'thumbnail_path', 'status'];
+    protected $fillable = ['title', 'type', 'path', 'thumbnail_path', 'status', 'blog_id'];
 
     protected $appends = ['url', 'thumbnail_url'];
 
-    public function blogs(): BelongsToMany
+    public function blog(): BelongsTo
     {
-        return $this->belongsToMany(
-            \Modules\Blog\src\Models\Blog::class,
-            'blog_media',
-            'media_id',
-            'blog_id'
-        )->withTimestamps();
+        return $this->belongsTo(\Modules\Blog\src\Models\Blog::class, 'blog_id');
     }
 
     // Getter for title (Ensures consistent formatting)

@@ -11,7 +11,6 @@ export function BlogProvider({ children, api }) {
     const [formData, setFormData] = useState({
         title: "",
         content: "",
-        thumbnail_id: null,
         media_ids: [],
     });
 
@@ -22,13 +21,14 @@ export function BlogProvider({ children, api }) {
             setFormData({
                 title: "",
                 content: "",
-                thumbnail_id: null,
                 media_ids: [],
             }),
         createBlog: async (data) => {
             try {
-                const response = await api.post("/api/blogs", data);
-                dispatch(addBlog(response.data)); // Using action creator
+                const response = await api.post("/api/blogs", data, {
+                    params: { fields: "id,title,content,media" },
+                });
+                dispatch(addBlog(response.data));
             } catch (error) {
                 throw error;
             }
@@ -43,8 +43,10 @@ export function BlogProvider({ children, api }) {
         setEditingBlog,
         updateBlog: async (id, data) => {
             try {
-                const response = await api.put(`/api/blogs/${id}`, data);
-                dispatch(updateBlog(response.data)); // Using action creator
+                const response = await api.put(`/api/blogs/${id}`, data, {
+                    params: { fields: "id,title,content,media" },
+                });
+                dispatch(updateBlog(response.data));
             } catch (error) {
                 throw error;
             }
@@ -63,8 +65,7 @@ export function BlogProvider({ children, api }) {
                 setFormData({
                     title: blog.title,
                     content: blog.content,
-                    thumbnail_id: blog.thumbnail_id,
-                    media_ids: blog.media.map((m) => m.id),
+                    media_ids: blog.media ? blog.media.map((m) => m.id) : [],
                 });
             }
         },
@@ -72,10 +73,11 @@ export function BlogProvider({ children, api }) {
             setEditingBlog(null);
             setIsModalOpen(false);
         },
-        fetchBlogs: async (page = 1, perPage = 10) => {
+        fetchBlogs: async (page = 1, perPage = 10, options = {}) => {
             try {
                 const response = await api.get("/api/blogs", {
-                    params: { page, perPage },
+                    params: { page, perPage, fields: "id,title,content,media" },
+                    ...options,
                 });
                 dispatch(setBlogs(response.data));
             } catch (error) {
@@ -102,7 +104,7 @@ export function BlogProvider({ children, api }) {
         deleteBlog: async (id) => {
             try {
                 await api.delete(`/api/blogs/${id}`);
-                dispatch(deleteBlog(id)); // Use action creator
+                dispatch(deleteBlog(id));
             } catch (error) {
                 throw error;
             }

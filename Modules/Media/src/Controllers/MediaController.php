@@ -22,50 +22,22 @@ class MediaController extends Controller
         $this->mediaRepository = $mediaRepository;
     }
 
-    private function getRequestedFields(Request $request): array
-    {
-        $fields = $request->query('fields', '');
-        $allowedFields = ['id', 'title', 'url', 'thumbnail_url', 'status'];
-        $requestedFields = $fields ? array_filter(explode(',', $fields)) : [];
-        return array_intersect($requestedFields, $allowedFields);
-    }
-
     public function index(Request $request): JsonResponse
     {
         $perPage = $request->query('perPage', 10);
         $page = $request->query('page', 1);
-        $fields = $this->getRequestedFields($request);
 
-        $columnMap = [
-            'id' => 'id',
-            'title' => 'title',
-            'url' => 'path',
-            'thumbnail_url' => 'thumbnail_path',
-            'status' => 'status',
-        ];
-        $columns = $fields ? array_values(array_intersect_key($columnMap, array_flip($fields))) : ['id', 'title', 'path', 'thumbnail_path', 'status'];
-
-        // Fetch media sorted by created_at in descending order
         $mediaQuery = $this->mediaRepository->getPaginated(
             (int) $perPage,
             (int) $page,
-            $columns,
+            ['id', 'title', 'path', 'thumbnail_path'],
             ['created_at' => 'desc']
         );
 
-        $data = $mediaQuery->getCollection()->map(function ($item) use ($fields) {
-            $itemArray = [
-                'id' => $item->id,
-                'title' => $item->title,
-                'url' => $item->url,
-                'thumbnail_url' => $item->thumbnail_url,
-                'status' => $item->status,
-            ];
-            return empty($fields) ? $itemArray : array_intersect_key($itemArray, array_flip($fields));
-        })->all();
+        $responseData = $mediaQuery->getCollection()->toArray();
 
         return response()->json([
-            'data' => $data,
+            'data' => $responseData,
             'current_page' => $mediaQuery->currentPage(),
             'per_page' => $mediaQuery->perPage(),
             'total' => $mediaQuery->total(),
@@ -128,44 +100,24 @@ class MediaController extends Controller
             $file->storeAs('public/' . dirname($path), basename($path));
         }
 
-        $mediaArray = [
+        return response()->json([
             'id' => $media->id,
             'title' => $media->title,
             'url' => $media->url,
             'thumbnail_url' => $media->thumbnail_url,
-            'status' => $media->status,
-        ];
-        $fields = $this->getRequestedFields($request);
-        return response()->json(
-            empty($fields) ? $mediaArray : array_intersect_key($mediaArray, array_flip($fields)),
-            201
-        );
+        ], 201);
     }
 
     public function show($id): JsonResponse
     {
         try {
-            $fields = $this->getRequestedFields(request());
-            $columns = $fields ? array_values(array_intersect_key([
-                'id' => 'id',
-                'title' => 'title',
-                'url' => 'path',
-                'thumbnail_url' => 'thumbnail_path',
-                'status' => 'status',
-            ], array_flip($fields))) : ['id', 'title', 'path', 'thumbnail_path', 'status'];
-
-            $media = $this->mediaRepository->find($id, $columns);
-            $mediaArray = [
+            $media = $this->mediaRepository->find($id, ['id', 'title', 'path', 'thumbnail_path']);
+            return response()->json([
                 'id' => $media->id,
                 'title' => $media->title,
                 'url' => $media->url,
-                'thumbnail_url' => $media->thumbnail_url, // Fixed from 'thumbnail_path'
-                'status' => $media->status,
-            ];
-
-            return response()->json(
-                empty($fields) ? $mediaArray : array_intersect_key($mediaArray, array_flip($fields))
-            );
+                'thumbnail_url' => $media->thumbnail_url,
+            ]);
         } catch (ModelNotFoundException $e) {
             return response()->json(['message' => $e->getMessage()], 404);
         }
@@ -188,7 +140,7 @@ class MediaController extends Controller
                 return response()->json(['errors' => $validator->errors()], 422);
             }
 
-            $columns = ['id', 'title', 'path', 'thumbnail_path', 'status'];
+            $columns = ['id', 'title', 'path', 'thumbnail_path'];
             $media = $this->mediaRepository->find($id, $columns);
             $file = $request->file('file');
 
@@ -242,18 +194,12 @@ class MediaController extends Controller
             }
 
             $updatedMedia = $this->mediaRepository->update($id, $updateData);
-            $mediaArray = [
+            return response()->json([
                 'id' => $updatedMedia->id,
                 'title' => $updatedMedia->title,
                 'url' => $updatedMedia->url,
                 'thumbnail_url' => $updatedMedia->thumbnail_url,
-                'status' => $updatedMedia->status,
-            ];
-
-            $fields = $this->getRequestedFields($request);
-            return response()->json(
-                empty($fields) ? $mediaArray : array_intersect_key($mediaArray, array_flip($fields))
-            );
+            ]);
         } catch (ModelNotFoundException $e) {
             return response()->json(['message' => $e->getMessage()], 404);
         }

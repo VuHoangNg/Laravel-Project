@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
     Typography,
@@ -32,68 +32,63 @@ function UserDetail({ api }) {
     const { getUserContext } = useUserContext();
     const { fetchUser } = getUserContext;
 
-    useEffect(() => {
-        const abortController = new AbortController();
-        let isMounted = true; // Track if component is mounted
+    const isMounted = useRef(false);
 
-        const fetchUserData = async () => {
-            setLoading(true);
-            setError(null);
-            try {
-                console.log(`Fetching user with ID: ${id}`);
-                const userData = await fetchUser(id, {
-                    signal: abortController.signal,
-                });
-                console.log("User data received:", userData);
-                if (isMounted) {
-                    setUser(userData);
-                    form.setFieldsValue({
-                        name: userData.name,
-                        email: userData.email,
-                        username: userData.username,
-                        password: "",
-                        password_confirmation: "",
-                    });
-                    setFileList(
-                        userData.avatar_url
-                            ? [
-                                  {
-                                      uid: "-1",
-                                      name: "avatar",
-                                      status: "done",
-                                      url: userData.avatar_url,
-                                  },
-                              ]
-                            : []
-                    );
-                }
-            } catch (err) {
-                if (err.name === "AbortError") {
-                    console.log("User fetch aborted for ID:", id);
-                    return;
-                }
-                console.error("Error fetching user:", err);
-                if (isMounted) {
-                    setError(
-                        err.response?.data?.message ||
-                            err.message ||
-                            "Failed to load user details. Please try again."
-                    );
-                }
-            } finally {
-                if (isMounted) {
-                    setLoading(false);
-                }
-            }
-        };
+    useEffect(() => {
+        isMounted.current = true;
         fetchUserData();
-        // Cleanup: Abort the fetch request and mark component as unmounted
+
         return () => {
             console.log("Cleaning up UserDetail useEffect for ID:", id);
-            abortController.abort();
-            isMounted = false;
+            isMounted.current = false;
         };
-    }, [id, fetchUser, form]);
+    }, []);
+
+    const fetchUserData = async () => {
+        if (!isMounted.current) return;
+        setLoading(true);
+        setError(null);
+
+        try {
+            const userData = await fetchUser(id);
+
+            if (isMounted.current) {
+                setUser(userData);
+                form.setFieldsValue({
+                    name: userData.name,
+                    email: userData.email,
+                    username: userData.username,
+                    password: "",
+                    password_confirmation: "",
+                });
+
+                setFileList(
+                    userData.avatar_url
+                        ? [
+                              {
+                                  uid: "-1",
+                                  name: "avatar",
+                                  status: "done",
+                                  url: userData.avatar_url,
+                              },
+                          ]
+                        : []
+                );
+            }
+        } catch (err) {
+            if (isMounted.current) {
+                setError(
+                    err.response?.data?.message ||
+                        err.message ||
+                        "Failed to load user details. Please try again."
+                );
+            }
+        } finally {
+            if (isMounted.current) {
+                setLoading(false);
+            }
+        }
+    };
 
     const handleSubmitEdit = async (values) => {
         setLoading(true);

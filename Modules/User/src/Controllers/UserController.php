@@ -34,33 +34,14 @@ class UserController extends Controller
         $perPage = min(max((int)$request->query('per_page', 10), 1), 100);
         $fields = $this->getRequestedFields($request);
 
-        $columnMap = [
-            'id' => 'id',
-            'username' => 'username',
-            'name' => 'name',
-            'email' => 'email',
-            'avatar_url' => 'avatar',
-        ];
-        $columns = $fields ? array_values(array_intersect_key($columnMap, array_flip($fields))) : ['id', 'username', 'name', 'email', 'avatar'];
+        // Nếu không có trường nào được yêu cầu, mặc định lấy tất cả các trường
+        $columns = empty($fields) ? ['id', 'username', 'name', 'email', 'avatar'] : $fields;
 
-        // Fetch users sorted by created_at in descending order
+        // Truy vấn danh sách người dùng với các trường được yêu cầu
         $users = $this->userRepository->getAll($perPage, $columns, ['created_at' => 'desc']);
 
-        // Transform paginated collection using foreach
-        $data = [];
-        foreach ($users->getCollection() as $user) {
-            $userArray = [
-                'id' => $user->id,
-                'username' => $user->username,
-                'name' => $user->name,
-                'email' => $user->email,
-                'avatar_url' => $user->avatar ? Storage::url($user->avatar) : null,
-            ];
-            $data[] = empty($fields) ? $userArray : array_intersect_key($userArray, array_flip($fields));
-        }
-
         return response()->json([
-            'data' => $data,
+            'data' => $users->items(),
             'current_page' => $users->currentPage(),
             'last_page' => $users->lastPage(),
             'per_page' => $users->perPage(),

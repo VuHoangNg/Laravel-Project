@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import {
     Typography,
@@ -63,77 +63,77 @@ function BlogContent({ api }) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
+    // Track mounted state
+    const isMounted = useRef(false);
+
     useEffect(() => {
-        const abortController = new AbortController(); // Create AbortController
-        const loadInitialData = async () => {
-            setLoading(true);
-            setError(null);
-            try {
-                const page =
-                    parseInt(searchParams.get("page")) || blogs.current_page;
-                const perPage =
-                    parseInt(searchParams.get("perPage")) || blogs.per_page;
-                await fetchBlogs(page, perPage, {
-                    signal: abortController.signal,
-                });
-            } catch (err) {
-                if (err.name === "AbortError") {
-                    console.log("Fetch aborted");
-                    return;
-                }
-                setError("Failed to load blogs. Please try again.");
-            } finally {
-                setLoading(false);
-            }
-        };
+        isMounted.current = true;
+
         loadInitialData();
 
-        // Cleanup: Abort the fetch request on unmount
         return () => {
-            abortController.abort();
+            isMounted.current = false;
         };
-    }, []); // Empty dependency array since this runs once on mount
+    }, []);
+
+    const loadInitialData = async () => {
+        if (!isMounted.current) return;
+        setLoading(true);
+        setError(null);
+
+        try {
+            const page =
+                parseInt(searchParams.get("page")) || blogs.current_page;
+            const perPage =
+                parseInt(searchParams.get("perPage")) || blogs.per_page;
+            await fetchBlogs(page, perPage);
+        } catch (err) {
+            if (isMounted.current) {
+                setError("Failed to load blogs. Please try again.");
+            }
+        } finally {
+            if (isMounted.current) {
+                setLoading(false);
+            }
+        }
+    };
 
     useEffect(() => {
-        const abortController = new AbortController(); // Create AbortController
-        const fetchMediaForModal = async () => {
-            if (!isMediaModalOpen) return; // Avoid fetching if modal is closed
-            setLoading(true);
-            setError(null);
-            try {
-                const response = await api.get(
-                    `/api/media?perPage=${mediaPagination.limit}&page=${mediaPagination.currentPage}`,
-                    { signal: abortController.signal }
-                );
+        isMounted.current = true;
+
+        fetchMediaForModal();
+
+        return () => {
+            isMounted.current = false;
+        };
+    }, [mediaPagination.currentPage, mediaPagination.limit, isMediaModalOpen]);
+
+    const fetchMediaForModal = async () => {
+        if (!isMounted.current || !isMediaModalOpen) return;
+        setLoading(true);
+        setError(null);
+
+        try {
+            const response = await api.get(
+                `/api/media?perPage=${mediaPagination.limit}&page=${mediaPagination.currentPage}&fields=id,title,url,thumbnail_url`
+            );
+            if (isMounted.current) {
                 dispatch(setMedia(response.data));
                 setMediaPagination((prev) => ({
                     ...prev,
                     total: response.data.total,
                 }));
-            } catch (error) {
-                if (error.name === "AbortError") {
-                    console.log("Media fetch aborted");
-                    return;
-                }
-                setError("Failed to fetch media. Please try again.");
+            }
+        } catch (error) {
+            if (isMounted.current) {
                 console.error("Failed to fetch media:", error);
-            } finally {
+            }
+        } finally {
+            if (isMounted.current) {
                 setLoading(false);
             }
-        };
-        fetchMediaForModal();
-
-        // Cleanup: Abort the fetch request on unmount or when dependencies change
-        return () => {
-            abortController.abort();
-        };
-    }, [
-        api,
-        dispatch,
-        mediaPagination.currentPage,
-        mediaPagination.limit,
-        isMediaModalOpen,
-    ]);
+        }
+    };
 
     const handleTableChange = async (pagination) => {
         setLoading(true);
@@ -226,7 +226,7 @@ function BlogContent({ api }) {
         console.error(
             `Failed to load image for ${item?.title || "unknown"}:`,
             item?.url,
-            item?.thumbnail
+            item?.thumbnail_url
         );
         e.target.src = "https://via.placeholder.com/150?text=Image+Not+Found";
     };
@@ -276,7 +276,7 @@ function BlogContent({ api }) {
             dataIndex: "media",
             key: "media",
             render: (media) =>
-                media.length > 0 ? (
+                media && Array.isArray(media) && media.length > 0 ? (
                     <Space wrap>
                         {media.map((item) => (
                             <Tag key={item.id} color="blue">
