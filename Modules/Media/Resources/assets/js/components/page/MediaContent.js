@@ -90,7 +90,6 @@ function MediaContent() {
         setLoading(true);
         setError(null);
         try {
-            console.log("Creating media:", values);
             await createMedia(values);
             closeModal();
             setSearchParams({

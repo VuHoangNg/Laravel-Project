@@ -39,7 +39,6 @@ function UserDetail({ api }) {
         fetchUserData();
 
         return () => {
-            console.log("Cleaning up UserDetail useEffect for ID:", id);
             isMounted.current = false;
         };
     }, []);
@@ -94,7 +93,6 @@ function UserDetail({ api }) {
         setLoading(true);
         setError(null);
         try {
-            console.log("Submitting user update:", values);
             const formData = new FormData();
             formData.append("name", values.name);
             formData.append("username", values.username);
@@ -115,7 +113,6 @@ function UserDetail({ api }) {
                 headers: { "Content-Type": "multipart/form-data" },
             });
             const userData = await fetchUser(id);
-            console.log("Updated user data:", userData);
             setUser(userData);
             form.setFieldsValue({
                 name: userData.name,
@@ -163,7 +160,6 @@ function UserDetail({ api }) {
         setLoading(true);
         setError(null);
         try {
-            console.log(`Deleting user with ID: ${id}`);
             await api.delete(`/api/user/${id}`);
             setIsDeleteModalOpen(false);
             const page = searchParams.get("page") || "1";
@@ -190,7 +186,6 @@ function UserDetail({ api }) {
 
     const handleBack = () => {
         const page = searchParams.get("page") || "1";
-        console.log(`Navigating back to /users?page=${page}`);
         navigate(`/users?page=${page}`);
     };
 

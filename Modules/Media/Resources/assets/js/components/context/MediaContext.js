@@ -49,12 +49,10 @@ export function MediaProvider({ children, api }) {
         },
         fetchMedia: async (page = 1, perPage = 10, { signal } = {}) => {
             try {
-                console.log(`Fetching media: page=${page}, perPage=${perPage}`);
                 const response = await api.get("/api/media", {
                     params: { page, perPage },
                     signal,
                 });
-                console.log("Media response:", response.data);
                 dispatch(setMedia(response.data));
             } catch (error) {
                 console.error("Error fetching media:", error);

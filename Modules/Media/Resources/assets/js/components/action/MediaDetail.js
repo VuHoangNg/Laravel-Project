@@ -120,7 +120,6 @@ function MediaDetail({ api }) {
         setLoading(true);
         setError(null);
         try {
-            console.log(`Deleting media with ID: ${id}`);
             await api.delete(`/api/media/${id}`);
             setIsDeleteModalOpen(false);
             const page = searchParams.get("page") || "1";
