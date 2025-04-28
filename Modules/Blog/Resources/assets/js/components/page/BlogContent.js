@@ -115,7 +115,7 @@ function BlogContent({ api }) {
 
         try {
             const response = await api.get(
-                `/api/media?perPage=${mediaPagination.limit}&page=${mediaPagination.currentPage}&fields=id,title,url,thumbnail_url`
+                `/api/media?perPage=${mediaPagination.limit}&page=${mediaPagination.currentPage}&fields=id,title,url,thumbnail_url,type`
             );
             if (isMounted.current) {
                 dispatch(setMedia(response.data));
@@ -249,14 +249,6 @@ function BlogContent({ api }) {
         } finally {
             setLoading(false);
         }
-    };
-
-    const isVideo = (url) => {
-        return (
-            typeof url === "string" &&
-            url.includes("/storage/media/videos/") &&
-            url.endsWith(".m3u8")
-        );
     };
 
     const columns = [
@@ -416,7 +408,7 @@ function BlogContent({ api }) {
                     <>
                         <Row gutter={[16, 16]}>
                             {media.data.map((item) => {
-                                const isVideoMedia = isVideo(item.url);
+                                const isVideoMedia = item.type === 'video';
                                 const isSelected = selectedMediaIds.includes(
                                     item.id
                                 );

@@ -16,7 +16,7 @@ class BlogRepository implements BlogRepositoryInterface
 
         if ($withMedia) {
             $query->with(['media' => function ($query) {
-                $query->select(['media1.id', 'media1.title', 'media1.path', 'media1.thumbnail_path', 'media1.blog_id']);
+                $query->select(['media1.id', 'media1.title', 'media1.path', 'media1.thumbnail_path', 'media1.blog_id','media1.type']);
             }]);
         }
 
@@ -35,7 +35,7 @@ class BlogRepository implements BlogRepositoryInterface
 
         if ($withMedia) {
             $query->with(['media' => function ($query) {
-                $query->select(['media1.id', 'media1.title', 'media1.path', 'media1.thumbnail_path', 'media1.blog_id']);
+                $query->select(['media1.id', 'media1.title', 'media1.path', 'media1.thumbnail_path', 'media1.blog_id' , 'media1.type']);
             }]);
         }
 
@@ -61,7 +61,7 @@ class BlogRepository implements BlogRepositoryInterface
         }
 
         // Load media for response
-        $blog->load(['media:id,title,path,thumbnail_path,blog_id']);
+        $blog->load(['media:id,title,path,thumbnail_path,blog_id,type']);
 
         return $blog;
     }

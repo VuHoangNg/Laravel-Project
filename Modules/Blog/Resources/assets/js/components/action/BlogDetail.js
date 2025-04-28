@@ -94,7 +94,6 @@ function BlogDetail({ api }) {
                 );
             }
         } catch (err) {
-            console.error("Error fetching blog:", err);
             if (isMounted.current) {
                 setError("Failed to load blog details. Please try again.");
             }
@@ -125,7 +124,7 @@ function BlogDetail({ api }) {
 
         try {
             const response = await api.get(
-                `/api/media?perPage=${mediaPagination.limit}&page=${mediaPagination.currentPage}&fields=id,title,url,thumbnail_url`
+                `/api/media?perPage=${mediaPagination.limit}&page=${mediaPagination.currentPage}&fields=id,title,url,thumbnail_url,type`
             );
 
             if (isMounted.current) {
@@ -136,7 +135,6 @@ function BlogDetail({ api }) {
                 }));
             }
         } catch (error) {
-            console.error("Failed to fetch media:", error);
             if (isMounted.current) {
                 setError("Failed to fetch media. Please try again.");
             }
@@ -147,24 +145,11 @@ function BlogDetail({ api }) {
         }
     };
 
-    const isVideo = (url) => {
-        return (
-            typeof url === "string" &&
-            url.includes("/storage/media/videos/") &&
-            url.endsWith(".m3u8")
-        );
-    };
-
     const handleImageError = (e, item) => {
         const errorKey = `${item?.title || "unknown"}:${
             item?.url || "unknown"
         }`;
         if (!loggedErrors.has(errorKey)) {
-            console.error(
-                `Failed to load image for ${item?.title || "unknown"}:`,
-                item?.url,
-                item?.thumbnail_url
-            );
             loggedErrors.add(errorKey);
         }
         e.target.src = "/images/placeholder.png";
@@ -356,7 +341,7 @@ function BlogDetail({ api }) {
                                 <Row gutter={[16, 16]}>
                                     {blog.media.map((item) => (
                                         <Col span={8} key={item.id}>
-                                            {isVideo(item.url) ? (
+                                            {item.type === 'video' ? (
                                                 <VideoPlayer
                                                     src={item.url}
                                                     style={{
@@ -437,7 +422,7 @@ function BlogDetail({ api }) {
                     <>
                         <Row gutter={[16, 16]}>
                             {media.data.map((item) => {
-                                const isVideoMedia = isVideo(item.url);
+                                const isVideoMedia = item.type === 'video';
                                 const isSelected = selectedMediaIds.includes(
                                     item.id
                                 );
