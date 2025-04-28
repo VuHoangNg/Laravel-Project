@@ -46,8 +46,9 @@ class UserController extends Controller
         // Fetch users sorted by created_at in descending order
         $users = $this->userRepository->getAll($perPage, $columns, ['created_at' => 'desc']);
 
-        // Directly transform paginated collection using model attributes
-        $data = $users->getCollection()->map(function ($user) use ($fields) {
+        // Transform paginated collection using foreach
+        $data = [];
+        foreach ($users->getCollection() as $user) {
             $userArray = [
                 'id' => $user->id,
                 'username' => $user->username,
@@ -55,8 +56,8 @@ class UserController extends Controller
                 'email' => $user->email,
                 'avatar_url' => $user->avatar ? Storage::url($user->avatar) : null,
             ];
-            return empty($fields) ? $userArray : array_intersect_key($userArray, array_flip($fields));
-        })->all();
+            $data[] = empty($fields) ? $userArray : array_intersect_key($userArray, array_flip($fields));
+        }
 
         return response()->json([
             'data' => $data,
