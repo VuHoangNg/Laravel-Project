@@ -22,7 +22,7 @@ class MediaController extends Controller
         $this->mediaRepository = $mediaRepository;
     }
 
-    public function index(Request $request): JsonResponse
+   public function index(Request $request): JsonResponse
     {
         $perPage = $request->query('perPage', 10);
         $page = $request->query('page', 1);
@@ -30,19 +30,11 @@ class MediaController extends Controller
         $mediaQuery = $this->mediaRepository->getPaginated(
             (int) $perPage,
             (int) $page,
-            ['id', 'title', 'type', 'path', 'thumbnail_path'], // Added 'type'
+            ['id', 'title', 'type' , 'path', 'thumbnail_path'],
             ['created_at' => 'desc']
         );
 
-        $responseData = $mediaQuery->getCollection()->map(function ($media) {
-            return [
-                'id' => $media->id,
-                'title' => $media->title,
-                'type' => $media->type, // Include type in response
-                'url' => $media->url,
-                'thumbnail_url' => $media->thumbnail_url,
-            ];
-        })->toArray();
+        $responseData = $mediaQuery->getCollection()->toArray();
 
         return response()->json([
             'data' => $responseData,
