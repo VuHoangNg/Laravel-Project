@@ -11,6 +11,18 @@ import {
 
 const MediaContext = createContext();
 
+const getCookie = (name) => {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) {
+        const cookieValue = parts.pop().split(';').shift();
+        console.log(`Cookie ${name} retrieved:`, cookieValue);
+        return cookieValue;
+    }
+    console.log(`Cookie ${name} not found`);
+    return null;
+};
+
 export function MediaProvider({ children, api }) {
     const dispatch = useDispatch();
 
@@ -34,9 +46,9 @@ export function MediaProvider({ children, api }) {
                     throw new Error("No file selected for upload");
                 }
                 const response = await api.post("/api/media", formData, {
-                    headers: { 
+                    headers: {
                         "Content-Type": "multipart/form-data",
-                        Authorization: `Bearer ${localStorage.getItem("token")}`,
+                        Authorization: `Bearer ${getCookie("token")}`,
                     },
                 });
                 dispatch(addMedia(response.data));
@@ -63,7 +75,7 @@ export function MediaProvider({ children, api }) {
                 const response = await api.get("/api/media", {
                     params: { page, perPage },
                     headers: {
-                        Authorization: `Bearer ${localStorage.getItem("token")}`,
+                        Authorization: `Bearer ${getCookie("token")}`,
                     },
                     signal,
                 });
@@ -77,7 +89,7 @@ export function MediaProvider({ children, api }) {
             try {
                 const response = await api.get(`/api/media/${id}`, {
                     headers: {
-                        Authorization: `Bearer ${localStorage.getItem("token")}`,
+                        Authorization: `Bearer ${getCookie("token")}`,
                     },
                 });
                 return response.data;
@@ -88,33 +100,80 @@ export function MediaProvider({ children, api }) {
         },
     };
 
+    // Function to build a comment tree from a flat list
+    const buildCommentTree = (comments) => {
+        const commentMap = new Map();
+        const tree = [];
+
+        // First pass: Create a map of comments by ID
+        comments.forEach((comment) => {
+            comment.children = []; // Initialize children array
+            commentMap.set(comment.id, comment);
+        });
+
+        // Second pass: Build the tree by linking children to parents
+        comments.forEach((comment) => {
+            if (comment.parent_id) {
+                const parent = commentMap.get(comment.parent_id);
+                if (parent) {
+                    parent.children.push(comment);
+                } else {
+                    // If parent_id doesn't exist (e.g., parent was deleted), treat as top-level
+                    tree.push(comment);
+                }
+            } else {
+                tree.push(comment);
+            }
+        });
+
+        // Sort comments by creation time (assuming a created_at field)
+        const sortComments = (commentList) => {
+            commentList.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+            commentList.forEach((comment) => {
+                if (comment.children && comment.children.length > 0) {
+                    sortComments(comment.children);
+                }
+            });
+        };
+
+        sortComments(tree);
+        return tree;
+    };
+
     // Comment context
     const commentContext = {
         fetchComments: async (mediaId) => {
             try {
                 const response = await api.get(`/api/auth/comments/${mediaId}`, {
                     headers: {
-                        Authorization: `Bearer ${localStorage.getItem("token")}`,
+                        Authorization: `Bearer ${getCookie("token")}`,
                     },
                 });
-                dispatch(setComments(mediaId, response.data.data));
-                return response.data;
+                console.log("Comments fetched for mediaId", mediaId, ":", response.data);
+                const commentTree = buildCommentTree(response.data.data);
+                dispatch(setComments(mediaId, commentTree));
+                return { data: commentTree };
             } catch (error) {
                 console.error("Error fetching comments:", error);
                 throw error;
             }
         },
-        createComment: async (mediaId, text, timestamp) => {
+        createComment: async (mediaId, text, timestamp, parentId = null) => {
             try {
-                const response = await api.post(
-                    "/api/auth/comments",
-                    { media1_id: mediaId, text, timestamp },
-                    {
-                        headers: {
-                            Authorization: `Bearer ${localStorage.getItem("token")}`,
-                        },
-                    }
-                );
+                const payload = {
+                    media1_id: mediaId,
+                    text,
+                    timestamp,
+                    ...(parentId && { parent_id: parentId }),
+                };
+                console.log("Sending comment payload:", payload);
+                const response = await api.post("/api/auth/comments", payload, {
+                    headers: {
+                        Authorization: `Bearer ${getCookie("token")}`,
+                        "Content-Type": "application/json",
+                    },
+                });
+                console.log("Comment created:", response.data);
                 dispatch(addComment(mediaId, response.data));
                 return response.data;
             } catch (error) {
@@ -129,7 +188,8 @@ export function MediaProvider({ children, api }) {
                     { text, timestamp },
                     {
                         headers: {
-                            Authorization: `Bearer ${localStorage.getItem("token")}`,
+                            Authorization: `Bearer ${getCookie("token")}`,
+                            "Content-Type": "application/json",
                         },
                     }
                 );
@@ -144,7 +204,7 @@ export function MediaProvider({ children, api }) {
             try {
                 await api.delete(`/api/auth/comments/${commentId}`, {
                     headers: {
-                        Authorization: `Bearer ${localStorage.getItem("token")}`,
+                        Authorization: `Bearer ${getCookie("token")}`,
                     },
                 });
                 dispatch(deleteComment(commentId));
@@ -169,5 +229,9 @@ export function MediaProvider({ children, api }) {
 }
 
 export function useMediaContext() {
-    return useContext(MediaContext);
+    const context = useContext(MediaContext);
+    if (!context) {
+        throw new Error("useMediaContext must be used within a MediaProvider");
+    }
+    return context;
 }

@@ -29,7 +29,7 @@ const MediaContent = () => {
     const [contentWidth, setContentWidth] = useState(window.innerWidth);
     const [videoTime, setVideoTime] = useState(0);
     const [editingCommentId, setEditingCommentId] = useState(null);
-    const [currentUserId, setCurrentUserId] = useState(null); // State for current user ID
+    const [currentUserId, setCurrentUserId] = useState(null);
     const videoRef = useRef(null);
     const sidebarRef = useRef(null);
     const commentSidebarRef = useRef(null);
@@ -42,7 +42,6 @@ const MediaContent = () => {
     const MAX_PREVIEW_SIDER_WIDTH = 1200;
     const MAX_COMMENT_SIDER_WIDTH = 600;
 
-    // Utility function to get cookie value by name
     const getCookie = (name) => {
         const value = `; ${document.cookie}`;
         const parts = value.split(`; ${name}=`);
@@ -132,13 +131,12 @@ const MediaContent = () => {
     useEffect(() => {
         isMounted.current = true;
         loadMedia();
-        // Set currentUserId from cookie
         const userId = getCookie('id');
         if (userId) {
             setCurrentUserId(parseInt(userId));
         } else {
             message.warning("Please log in to access all features");
-            navigate('/login'); // Redirect to login if cookie is missing
+            navigate('/login');
         }
         updateContentWidth();
         window.addEventListener("resize", updateContentWidth);
@@ -202,7 +200,12 @@ const MediaContent = () => {
             return;
         }
         try {
-            await commentContext.createComment(selectedMedia.id, values.comment, videoTime);
+            await commentContext.createComment(
+                selectedMedia.id,
+                values.comment,
+                videoTime,
+                values.parent_id || null // Include parent_id
+            );
             commentForm.resetFields();
         } catch (error) {
             let errorMessage = "Failed to post comment";
@@ -218,6 +221,7 @@ const MediaContent = () => {
                         errors.media1_id?.[0] ||
                         errors.text?.[0] ||
                         errors.timestamp?.[0] ||
+                        errors.parent_id?.[0] || // Handle parent_id errors
                         error.response.data.message ||
                         errorMessage;
                 }

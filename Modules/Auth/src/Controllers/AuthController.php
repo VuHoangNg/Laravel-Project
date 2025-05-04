@@ -18,6 +18,7 @@ use Modules\Auth\src\Jobs\SendVerifyEmail;
 use Illuminate\Support\Facades\RateLimiter;
 use App\Models\Comment;
 use Modules\Media\src\Models\Media1;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
@@ -110,10 +111,10 @@ class AuthController extends Controller
             $responseData['message'] = 'Login successful';
 
             return response()->json($responseData)
-                ->withCookie(Cookie::forever('username', $user->username, null, null, false, true)) // HttpOnly true for security
-                ->withCookie(Cookie::forever('email', $user->email, null, null, false, true)) // HttpOnly true for security
-                ->withCookie(Cookie::forever('token', $token, null, null, false, true)) // HttpOnly true for security
-                ->withCookie(Cookie::forever('id', $user->id, null, null, false, false)); // HttpOnly false to allow JS access
+                ->withCookie(Cookie::forever('username', $user->username, null, null, false, true))
+                ->withCookie(Cookie::forever('email', $user->email, null, null, false, true))
+                ->withCookie(Cookie::forever('token', $token, null, null, false, true))
+                ->withCookie(Cookie::forever('id', $user->id, null, null, false, false));
         }
 
         return response()->json(['message' => 'Invalid credentials'], 401);
@@ -223,7 +224,7 @@ class AuthController extends Controller
     public function storeComment(Request $request): JsonResponse
     {
         $user = $request->user();
-        $rateLimitKey = 'comment:'.$user->id;
+        $rateLimitKey = 'comment:' . $user->id;
         if (RateLimiter::tooManyAttempts($rateLimitKey, 10)) {
             return response()->json(['message' => 'Too many comment attempts'], 429);
         }
@@ -233,34 +234,40 @@ class AuthController extends Controller
             'text' => 'required|string|max:1000',
             'media1_id' => 'required|exists:media1,id',
             'timestamp' => 'nullable|numeric|min:0',
+            'parent_id' => 'nullable|exists:comments,id',
         ]);
+
+        $parentId = $validated['parent_id'] ?? null;
+
+        // Check parent_id belongs to same media
+        if ($parentId) {
+            $parent = Comment::find($parentId);
+            if (!$parent || $parent->media1_id != $validated['media1_id']) {
+                return response()->json(['message' => 'Invalid parent comment for this media'], 422);
+            }
+        }
 
         $comment = Comment::create([
             'text' => trim($validated['text']),
             'timestamp' => $validated['timestamp'] ?? null,
             'user_id' => $user->id,
             'media1_id' => $validated['media1_id'],
+            'parent_id' => $parentId,
         ]);
 
         $comment->load('user');
-
-        // Ensure the comment's user is the correct model
-        if (!$comment->user instanceof User) {
-            $comment->user = User::find($comment->user_id);
-            if (!$comment->user) {
-                return response()->json(['message' => 'Comment user not found'], 404);
-            }
-        }
 
         return response()->json([
             'id' => $comment->id,
             'text' => $comment->text,
             'timestamp' => $comment->timestamp,
             'formatted_timestamp' => $comment->timestamp ? gmdate('i:s', (int)$comment->timestamp) : null,
+            'parent_id' => $comment->parent_id,
             'user' => $this->userToArray($comment->user),
             'message' => 'Comment created successfully',
         ], 201);
     }
+
 
     public function getComments(Request $request, $mediaId): JsonResponse
     {
@@ -269,39 +276,46 @@ class AuthController extends Controller
             'media1_id' => 'required|exists:media1,id',
         ]);
 
-        $perPage = $request->query('per_page', 10);
         $comments = Comment::where('media1_id', $validated['media1_id'])
-            ->with(['user' => function ($query) {
-                $query->select('id', 'username', 'name', 'email', 'avatar');
-            }])
+            ->whereNull('parent_id')
+            ->with([
+                'user' => function ($query) {
+                    $query->select('id', 'username', 'name', 'email', 'avatar');
+                },
+                'replies.user',
+                'replies.replies.user', // Optional: For deeper nesting
+            ])
             ->orderBy('timestamp', 'asc')
             ->orderBy('created_at', 'asc')
-            ->paginate($perPage);
+            ->get();
 
-        $data = $comments->map(function ($comment) {
-            // Ensure the comment's user is the correct model
-            $user = $comment->user instanceof User ? $comment->user : User::find($comment->user_id);
-            if (!$user) {
-                return null; // Skip comments with invalid users
-            }
+        $format = function ($comment) use (&$format) {
             return [
                 'id' => $comment->id,
                 'text' => $comment->text,
                 'timestamp' => $comment->timestamp,
-                'formatted_timestamp' => $comment->timestamp ? gmdate('i:s', (int)$comment->timestamp) : null,
-                'user' => $this->userToArray($user),
+                'formatted_timestamp' => $comment->timestamp ? gmdate('i:s', (int) $comment->timestamp) : null,
+                'parent_id' => $comment->parent_id,
+                'user' => [
+                    'id' => $comment->user->id,
+                    'name' => $comment->user->name,
+                    'username' => $comment->user->username,
+                    'email' => $comment->user->email,
+                    'avatar_url' => $comment->user->avatar ? Storage::url($comment->user->avatar) : null,
+                ],
+                'replies' => $comment->replies->map($format)->values(),
             ];
-        })->filter()->values();
+        };
+
+        $data = $comments->map($format)->values();
 
         return response()->json([
             'data' => $data,
-            'current_page' => $comments->currentPage(),
-            'per_page' => $comments->perPage(),
-            'total' => $comments->total(),
-            'last_page' => $comments->lastPage(),
             'message' => 'Comments retrieved successfully',
         ]);
     }
+
+
 
     public function updateComment(Request $request, $id): JsonResponse
     {
@@ -328,7 +342,6 @@ class AuthController extends Controller
 
         $comment->load('user');
 
-        // Ensure the comment's user is the correct model
         if (!$comment->user instanceof User) {
             $comment->user = User::find($comment->user_id);
             if (!$comment->user) {

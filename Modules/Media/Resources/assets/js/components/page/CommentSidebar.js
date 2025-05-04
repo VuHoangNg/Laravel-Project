@@ -1,10 +1,179 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import { useSelector } from "react-redux";
-import { Typography, List, Button, Form, Input, Avatar } from "antd";
-import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
+import { Typography, List, Button, Form, Input, Avatar, Space } from "antd";
+import {
+    EditOutlined,
+    DeleteOutlined,
+    CommentOutlined,
+} from "@ant-design/icons";
 
 const { Title, Text: AntText } = Typography;
 const { TextArea } = Input;
+
+const buildCommentTree = (comments) => {
+    const map = {};
+    const roots = [];
+
+    comments.forEach((comment) => {
+        map[comment.id] = { ...comment, children: [] };
+    });
+
+    comments.forEach((comment) => {
+        if (comment.parent_id) {
+            const parent = map[comment.parent_id];
+            if (parent) {
+                parent.children.push(map[comment.id]);
+            }
+        } else {
+            roots.push(map[comment.id]);
+        }
+    });
+
+    return roots;
+};
+
+const CommentItem = ({
+    comment,
+    currentUserId,
+    onReplyClick,
+    onSubmitReply,
+    activeReplyId,
+    handleEditComment,
+    handleDeleteComment,
+    handleTimestampClick,
+}) => {
+    const [form] = Form.useForm();
+
+    useEffect(() => {
+        if (activeReplyId === comment.id) {
+            form.setFieldsValue({ comment: `@${comment.user.username} ` });
+        }
+    }, [activeReplyId, form, comment.user.username]);
+
+    const isOwner =
+        currentUserId && Number(currentUserId) === Number(comment.user.id);
+
+    return (
+        <div style={{ marginBottom: "12px" }}>
+            <div style={{ display: "flex", alignItems: "flex-start" }}>
+                <Avatar
+                    src={comment.user.avatar_url}
+                    style={{ marginRight: 8 }}
+                >
+                    {comment.user.username?.charAt(0).toUpperCase()}
+                </Avatar>
+                <div style={{ color: "#fff", flex: 1 }}>
+                    <AntText
+                        style={{ fontSize: 12, opacity: 0.7, display: "block" , color:"white"}}
+                    >
+                        {comment.parent_id && (
+                            <span style={{ marginRight: 8 }}>↳</span>
+                        )}
+                        {comment.user.username} at{" "}
+                        {comment.formatted_timestamp ? (
+                            <Button
+                                type="link"
+                                style={{ padding: 0, color: "#1890ff" }}
+                                onClick={() =>
+                                    handleTimestampClick(comment.timestamp)
+                                }
+                            >
+                                {comment.formatted_timestamp}
+                            </Button>
+                        ) : (
+                            "N/A"
+                        )}
+                    </AntText>
+                    <AntText style={{ color: "white" }}>{comment.text}</AntText>
+                    <div style={{ marginTop: 4 }}>
+                        <Space size="small">
+                            {isOwner && (
+                                <>
+                                    <Button
+                                        type="link"
+                                        icon={<EditOutlined />}
+                                        onClick={() =>
+                                            handleEditComment(comment)
+                                        }
+                                        aria-label="Edit comment"
+                                    />
+                                    <Button
+                                        type="link"
+                                        icon={<DeleteOutlined />}
+                                        onClick={() =>
+                                            handleDeleteComment(comment.id)
+                                        }
+                                        aria-label="Delete comment"
+                                    />
+                                </>
+                            )}
+                            <Button
+                                type="link"
+                                icon={<CommentOutlined />}
+                                onClick={() => onReplyClick(comment)}
+                                aria-label="Reply"
+                            >
+                                Reply
+                            </Button>
+                        </Space>
+                    </div>
+
+                    {activeReplyId === comment.id && (
+                        <Form
+                            form={form}
+                            onFinish={(values) =>
+                                onSubmitReply(values.comment, comment.id, form)
+                            }
+                            style={{ marginTop: 8 }}
+                        >
+                            <Form.Item
+                                name="comment"
+                                rules={[
+                                    { required: true, message: "Enter reply" },
+                                ]}
+                            >
+                                <TextArea
+                                    rows={2}
+                                    placeholder={`Reply to ${comment.user.username}...`}
+                                    style={{
+                                        backgroundColor:
+                                            "rgba(255, 255, 255, 0.05)",
+                                        color: "white",
+                                        border: "1px solid rgba(255, 255, 255, 0.1)",
+                                        borderRadius: 8,
+                                    }}
+                                />
+                            </Form.Item>
+                            <Form.Item>
+                                <Button type="primary" htmlType="submit">
+                                    Reply
+                                </Button>
+                            </Form.Item>
+                        </Form>
+                    )}
+                </div>
+            </div>
+
+            {comment.children?.length > 0 && (
+                <div style={{ marginLeft: 40, marginTop: 12 }}>
+                    {comment.children.map((child) => (
+                        <CommentItem
+                            key={child.id}
+                            comment={child}
+                            currentUserId={currentUserId}
+                            onReplyClick={onReplyClick}
+                            onSubmitReply={onSubmitReply}
+                            activeReplyId={activeReplyId}
+                            handleEditComment={handleEditComment}
+                            handleDeleteComment={handleDeleteComment}
+                            handleTimestampClick={handleTimestampClick}
+                        />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
 
 const CommentSidebar = ({
     showCommentSplitter,
@@ -27,6 +196,8 @@ const CommentSidebar = ({
 }) => {
     const comments = useSelector((state) => state.media.comments);
     const commentSplitterRef = useRef(null);
+    const [replyTo, setReplyTo] = useState(null);
+    const [activeReplyId, setActiveReplyId] = useState(null);
 
     useEffect(() => {
         if (isResizingComment) {
@@ -39,6 +210,59 @@ const CommentSidebar = ({
         };
     }, [isResizingComment, debouncedUpdateContentWidth]);
 
+    useEffect(() => {
+        console.log("replyTo changed:", replyTo);
+        if (replyTo) {
+            console.log(
+                "Pre-filling form for reply to:",
+                replyTo.user.username
+            );
+            commentForm.setFieldsValue({
+                comment: `@${replyTo.user.username} `,
+            });
+        } else {
+            commentForm.resetFields();
+        }
+    }, [replyTo, commentForm]);
+
+    const commentList = comments[selectedMedia?.id] || [];
+    const commentTree = buildCommentTree(commentList);
+
+    const handleReplyClick = (comment) => {
+        console.log("Reply clicked for comment:", comment);
+        setReplyTo(comment);
+        setActiveReplyId(null); // Hide inline reply form
+    };
+
+    const handleSubmit = (values) => {
+        console.log(
+            "Submitting comment with values:",
+            values,
+            "replyTo:",
+            replyTo
+        );
+        const payload = {
+            comment: values.comment,
+            ...(replyTo && { parent_id: replyTo.id }),
+        };
+        console.log("Final payload to handleCommentSubmit:", payload);
+        handleCommentSubmit(payload);
+        setReplyTo(null);
+        commentForm.resetFields();
+    };
+
+    const handleInlineReplySubmit = (replyText, parentId, formInstance) => {
+        console.log("Submitting inline reply:", { replyText, parentId });
+        const payload = {
+            comment: replyText,
+            parent_id: parentId,
+        };
+        console.log("Final inline reply payload:", payload);
+        handleCommentSubmit(payload);
+        setActiveReplyId(null);
+        formInstance.resetFields();
+    };
+
     return (
         showCommentSplitter && (
             <div style={{ display: "flex", height: "100vh", flexShrink: 0 }}>
@@ -50,9 +274,7 @@ const CommentSidebar = ({
                         borderRadius: "8px",
                         cursor: "col-resize",
                         height: "100%",
-                        position: "relative",
                         zIndex: 100,
-                        overflow: "hidden",
                         pointerEvents: "auto",
                         transition: "background-color 0.3s",
                     }}
@@ -76,7 +298,6 @@ const CommentSidebar = ({
                         position: "relative",
                         backdropFilter: "blur(10px)",
                         overflowY: "auto",
-                        overflowX: "hidden",
                         height: "100vh",
                         flexShrink: 0,
                     }}
@@ -102,145 +323,27 @@ const CommentSidebar = ({
                                     marginBottom: "16px",
                                 }}
                             >
-                                <List
-                                    dataSource={
-                                        comments[selectedMedia.id] || []
-                                    }
-                                    renderItem={(item) => {
-                                        const isOwner =
-                                            currentUserId &&
-                                            item.user.id &&
-                                            Number(currentUserId) ===
-                                                Number(item.user.id);
-                                        console.log(
-                                            "Debug - currentUserId:",
-                                            currentUserId,
-                                            "item.user:",
-                                            item.user,
-                                            "isOwner:",
-                                            isOwner
-                                        );
-                                        return (
-                                            <List.Item
-                                                style={{
-                                                    borderBottom:
-                                                        "1px solid rgba(255, 255, 255, 0.1)",
-                                                    padding: "8px 0",
-                                                    alignItems: "flex-start",
-                                                }}
-                                                actions={
-                                                    isOwner
-                                                        ? [
-                                                              <Button
-                                                                  key="edit"
-                                                                  type="link"
-                                                                  icon={
-                                                                      <EditOutlined />
-                                                                  }
-                                                                  onClick={() =>
-                                                                      handleEditComment(
-                                                                          item
-                                                                      )
-                                                                  }
-                                                                  aria-label="Edit comment"
-                                                              />,
-                                                              <Button
-                                                                  key="delete"
-                                                                  type="link"
-                                                                  icon={
-                                                                      <DeleteOutlined />
-                                                                  }
-                                                                  onClick={() =>
-                                                                      handleDeleteComment(
-                                                                          item.id
-                                                                      )
-                                                                  }
-                                                                  aria-label="Delete comment"
-                                                              />,
-                                                          ]
-                                                        : []
-                                                }
-                                            >
-                                                <div
-                                                    style={{
-                                                        display: "flex",
-                                                        alignItems:
-                                                            "flex-start",
-                                                        width: "100%",
-                                                    }}
-                                                >
-                                                    <Avatar
-                                                        src={
-                                                            item.user.avatar_url
-                                                        }
-                                                        style={{
-                                                            marginRight: "8px",
-                                                            flexShrink: 0,
-                                                        }}
-                                                    >
-                                                        {item.user.username
-                                                            .charAt(0)
-                                                            .toUpperCase()}
-                                                    </Avatar>
-
-                                                    <div
-                                                        style={{
-                                                            color: "#fff",
-                                                            flex: 1,
-                                                            wordBreak:
-                                                                "break-word",
-                                                        }}
-                                                    >
-                                                        <AntText
-                                                            style={{
-                                                                fontSize:
-                                                                    "12px",
-                                                                opacity: 0.7,
-                                                                display:
-                                                                    "block",
-                                                                color: "white",
-                                                            }}
-                                                        >
-                                                            {item.user.username}{" "}
-                                                            at{" "}
-                                                            {item.formatted_timestamp ? (
-                                                                <Button
-                                                                    type="link"
-                                                                    style={{
-                                                                        padding: 0,
-                                                                        color: "#1890ff",
-                                                                    }}
-                                                                    onClick={() =>
-                                                                        handleTimestampClick(
-                                                                            item.timestamp
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    {
-                                                                        item.formatted_timestamp
-                                                                    }
-                                                                </Button>
-                                                            ) : (
-                                                                "N/A"
-                                                            )}
-                                                        </AntText>
-                                                        <AntText
-                                                            style={{
-                                                                color: "white",
-                                                            }}
-                                                        >
-                                                            {item.text}
-                                                        </AntText>
-                                                    </div>
-                                                </div>
-                                            </List.Item>
-                                        );
-                                    }}
-                                />
+                                {commentTree.map((comment) => (
+                                    <CommentItem
+                                        key={comment.id}
+                                        comment={comment}
+                                        currentUserId={currentUserId}
+                                        onReplyClick={handleReplyClick}
+                                        onSubmitReply={handleInlineReplySubmit}
+                                        activeReplyId={activeReplyId}
+                                        handleEditComment={handleEditComment}
+                                        handleDeleteComment={
+                                            handleDeleteComment
+                                        }
+                                        handleTimestampClick={
+                                            handleTimestampClick
+                                        }
+                                    />
+                                ))}
                             </div>
                             <Form
                                 form={commentForm}
-                                onFinish={handleCommentSubmit}
+                                onFinish={handleSubmit}
                                 style={{ flexShrink: 0 }}
                             >
                                 <Form.Item
@@ -267,11 +370,27 @@ const CommentSidebar = ({
                                 >
                                     <TextArea
                                         rows={3}
-                                        placeholder="Add a comment..."
+                                        placeholder={
+                                            replyTo
+                                                ? `Reply to ${replyTo.user.username}...`
+                                                : `Comment at ${Math.floor(
+                                                      videoTime / 60
+                                                  )
+                                                      .toString()
+                                                      .padStart(
+                                                          2,
+                                                          "0"
+                                                      )}:${Math.floor(
+                                                      videoTime % 60
+                                                  )
+                                                      .toString()
+                                                      .padStart(2, "0")}`
+                                        }
                                         style={{
                                             backgroundColor:
-                                                "rgba(255, 255, 255, 0.05)",
-                                            color: "white",
+                                                "rgba(255, 255, 255, 0.1)",
+                                            color: "#e0e0e0",
+                                            borderRadius: 8,
                                             border: "1px solid rgba(255, 255, 255, 0.1)",
                                         }}
                                     />
@@ -280,7 +399,10 @@ const CommentSidebar = ({
                                     <Button
                                         type="primary"
                                         htmlType="submit"
-                                        style={{ width: "100%" }}
+                                        style={{
+                                            width: "100%",
+                                            borderRadius: 8,
+                                        }}
                                     >
                                         Post
                                     </Button>
