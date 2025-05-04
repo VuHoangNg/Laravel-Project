@@ -3,7 +3,7 @@ import { message } from "antd";
 
 export const login = (userData) => async (dispatch) => {
     try {
-        const response = await api.post("/api/login", userData);
+        const response = await api.post("/api/auth/login", userData);
         dispatch({ type: "login", payload: response.data });
         localStorage.setItem("auth_token", response.data.token);
         message.success(`Welcome, ${response.data.username}!`);
@@ -15,7 +15,7 @@ export const login = (userData) => async (dispatch) => {
 
 export const register = (userData) => async (dispatch) => {
     try {
-        const response = await api.post("/api/register", userData);
+        const response = await api.post("/api/auth/register", userData);
         dispatch({ type: "register", payload: response.data });
         message.success(`Account created successfully, ${response.data.name}!`);
         return response; // Trả về phản hồi từ API
@@ -28,7 +28,7 @@ export const register = (userData) => async (dispatch) => {
 
 export const logout = () => async (dispatch) => {
     try {
-        await api.post("/api/logout");
+        await api.post("/api/auth/logout");
         dispatch({ type: "logout" });
     } catch (error) {
         message.error(error.response?.data?.message || "Logout failed");

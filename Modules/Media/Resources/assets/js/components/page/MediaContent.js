@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Layout, Button, Form } from "antd";
+import { Layout, Button, Form, message } from "antd";
 import { useMediaContext } from "../context/MediaContext";
 import MainContent from "./MainContent";
 import PreviewSidebar from "./PreviewSidebar";
@@ -29,6 +29,7 @@ const MediaContent = () => {
     const [contentWidth, setContentWidth] = useState(window.innerWidth);
     const [videoTime, setVideoTime] = useState(0);
     const [editingCommentId, setEditingCommentId] = useState(null);
+    const [currentUserId, setCurrentUserId] = useState(null); // State for current user ID
     const videoRef = useRef(null);
     const sidebarRef = useRef(null);
     const commentSidebarRef = useRef(null);
@@ -40,6 +41,19 @@ const MediaContent = () => {
     const MIN_WIDTH = 400;
     const MAX_PREVIEW_SIDER_WIDTH = 1200;
     const MAX_COMMENT_SIDER_WIDTH = 600;
+
+    // Utility function to get cookie value by name
+    const getCookie = (name) => {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) {
+            const cookieValue = parts.pop().split(';').shift();
+            console.log(`Cookie ${name} retrieved:`, cookieValue);
+            return cookieValue;
+        }
+        console.log(`Cookie ${name} not found`);
+        return null;
+    };
 
     const debounce = (func, wait) => {
         let timeout;
@@ -118,13 +132,21 @@ const MediaContent = () => {
     useEffect(() => {
         isMounted.current = true;
         loadMedia();
+        // Set currentUserId from cookie
+        const userId = getCookie('id');
+        if (userId) {
+            setCurrentUserId(parseInt(userId));
+        } else {
+            message.warning("Please log in to access all features");
+            navigate('/login'); // Redirect to login if cookie is missing
+        }
         updateContentWidth();
         window.addEventListener("resize", updateContentWidth);
         return () => {
             isMounted.current = false;
             window.removeEventListener("resize", updateContentWidth);
         };
-    }, [page, perPage, showSplitter, showCommentSplitter, updateContentWidth]);
+    }, [page, perPage, showSplitter, showCommentSplitter, updateContentWidth, navigate]);
 
     const loadMedia = async () => {
         if (!isMounted.current) return;
@@ -187,6 +209,7 @@ const MediaContent = () => {
             if (error.response) {
                 if (error.response.status === 401) {
                     errorMessage = "Please log in to post a comment";
+                    navigate('/login');
                 } else if (error.response.status === 429) {
                     errorMessage = "Too many comment attempts. Please try again later.";
                 } else {
@@ -218,6 +241,7 @@ const MediaContent = () => {
             if (error.response) {
                 if (error.response.status === 401) {
                     errorMessage = "Please log in to update a comment";
+                    navigate('/login');
                 } else if (error.response.status === 403) {
                     errorMessage = "You are not authorized to update this comment";
                 } else {
@@ -241,6 +265,7 @@ const MediaContent = () => {
             if (error.response) {
                 if (error.response.status === 401) {
                     errorMessage = "Please log in to delete a comment";
+                    navigate('/login');
                 } else if (error.response.status === 403) {
                     errorMessage = "You are not authorized to delete this comment";
                 } else {
@@ -484,12 +509,10 @@ const MediaContent = () => {
                     style={triggerButtonStyle}
                     onClick={onClick}
                     onMouseEnter={(e) =>
-                        (e.currentTarget.style.backgroundColor =
-                            "rgba(255, 255, 255, 0.2)")
+                        (e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.2)")
                     }
                     onMouseLeave={(e) =>
-                        (e.currentTarget.style.backgroundColor =
-                            "rgba(255, 255, 255, 0.1)")
+                        (e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)")
                     }
                 />
             ))}
@@ -551,6 +574,7 @@ const MediaContent = () => {
                     videoTime={videoTime}
                     updateContentWidth={updateContentWidth}
                     debouncedUpdateContentWidth={debouncedUpdateContentWidth}
+                    currentUserId={currentUserId}
                 />
             </Layout>
             <CreateMediaModal

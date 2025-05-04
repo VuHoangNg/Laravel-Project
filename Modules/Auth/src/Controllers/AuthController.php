@@ -110,9 +110,10 @@ class AuthController extends Controller
             $responseData['message'] = 'Login successful';
 
             return response()->json($responseData)
-                ->withCookie(Cookie::forever('username', $user->username))
-                ->withCookie(Cookie::forever('email', $user->email))
-                ->withCookie(Cookie::forever('token', $token));
+                ->withCookie(Cookie::forever('username', $user->username, null, null, false, true)) // HttpOnly true for security
+                ->withCookie(Cookie::forever('email', $user->email, null, null, false, true)) // HttpOnly true for security
+                ->withCookie(Cookie::forever('token', $token, null, null, false, true)) // HttpOnly true for security
+                ->withCookie(Cookie::forever('id', $user->id, null, null, false, false)); // HttpOnly false to allow JS access
         }
 
         return response()->json(['message' => 'Invalid credentials'], 401);

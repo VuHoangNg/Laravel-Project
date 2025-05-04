@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from "react";
 import { useSelector } from "react-redux";
-import { Typography, Text, List, Button, Form, Input } from "antd";
+import { Typography, List, Button, Form, Input, Avatar } from "antd";
 import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
 
 const { Title, Text: AntText } = Typography;
@@ -23,6 +23,7 @@ const CommentSidebar = ({
     videoTime,
     updateContentWidth,
     debouncedUpdateContentWidth,
+    currentUserId,
 }) => {
     const comments = useSelector((state) => state.media.comments);
     const commentSplitterRef = useRef(null);
@@ -102,72 +103,139 @@ const CommentSidebar = ({
                                 }}
                             >
                                 <List
-                                    dataSource={comments[selectedMedia.id] || []}
-                                    renderItem={(item) => (
-                                        <List.Item
-                                            style={{
-                                                borderBottom:
-                                                    "1px solid rgba(255, 255, 255, 0.1)",
-                                                padding: "8px 0",
-                                            }}
-                                            actions={[
-                                                <Button
-                                                    type="link"
-                                                    icon={<EditOutlined />}
-                                                    onClick={() =>
-                                                        handleEditComment(item)
-                                                    }
-                                                />,
-                                                <Button
-                                                    type="link"
-                                                    icon={<DeleteOutlined />}
-                                                    onClick={() =>
-                                                        handleDeleteComment(item.id)
-                                                    }
-                                                />,
-                                            ]}
-                                        >
-                                            <div
+                                    dataSource={
+                                        comments[selectedMedia.id] || []
+                                    }
+                                    renderItem={(item) => {
+                                        const isOwner =
+                                            currentUserId &&
+                                            item.user.id &&
+                                            Number(currentUserId) ===
+                                                Number(item.user.id);
+                                        console.log(
+                                            "Debug - currentUserId:",
+                                            currentUserId,
+                                            "item.user:",
+                                            item.user,
+                                            "isOwner:",
+                                            isOwner
+                                        );
+                                        return (
+                                            <List.Item
                                                 style={{
-                                                    color: "#fff",
-                                                    width: "100%",
-                                                    wordBreak: "break-word",
+                                                    borderBottom:
+                                                        "1px solid rgba(255, 255, 255, 0.1)",
+                                                    padding: "8px 0",
+                                                    alignItems: "flex-start",
                                                 }}
+                                                actions={
+                                                    isOwner
+                                                        ? [
+                                                              <Button
+                                                                  key="edit"
+                                                                  type="link"
+                                                                  icon={
+                                                                      <EditOutlined />
+                                                                  }
+                                                                  onClick={() =>
+                                                                      handleEditComment(
+                                                                          item
+                                                                      )
+                                                                  }
+                                                                  aria-label="Edit comment"
+                                                              />,
+                                                              <Button
+                                                                  key="delete"
+                                                                  type="link"
+                                                                  icon={
+                                                                      <DeleteOutlined />
+                                                                  }
+                                                                  onClick={() =>
+                                                                      handleDeleteComment(
+                                                                          item.id
+                                                                      )
+                                                                  }
+                                                                  aria-label="Delete comment"
+                                                              />,
+                                                          ]
+                                                        : []
+                                                }
                                             >
-                                                <AntText
+                                                <div
                                                     style={{
-                                                        fontSize: "12px",
-                                                        opacity: 0.7,
-                                                        display: "block",
-                                                        color: "white",
+                                                        display: "flex",
+                                                        alignItems:
+                                                            "flex-start",
+                                                        width: "100%",
                                                     }}
                                                 >
-                                                    {item.user.username} at{" "}
-                                                    {item.formatted_timestamp ? (
-                                                        <Button
-                                                            type="link"
+                                                    <Avatar
+                                                        src={
+                                                            item.user.avatar_url
+                                                        }
+                                                        style={{
+                                                            marginRight: "8px",
+                                                            flexShrink: 0,
+                                                        }}
+                                                    >
+                                                        {item.user.username
+                                                            .charAt(0)
+                                                            .toUpperCase()}
+                                                    </Avatar>
+
+                                                    <div
+                                                        style={{
+                                                            color: "#fff",
+                                                            flex: 1,
+                                                            wordBreak:
+                                                                "break-word",
+                                                        }}
+                                                    >
+                                                        <AntText
                                                             style={{
-                                                                padding: 0,
-                                                                color: "#1890ff",
+                                                                fontSize:
+                                                                    "12px",
+                                                                opacity: 0.7,
+                                                                display:
+                                                                    "block",
+                                                                color: "white",
                                                             }}
-                                                            onClick={() =>
-                                                                handleTimestampClick(
-                                                                    item.timestamp
-                                                                )
-                                                            }
                                                         >
-                                                            {item.formatted_timestamp}
-                                                        </Button>
-                                                    ) : (
-                                                        "N/A"
-                                                    )}
-                                                </AntText>
-                                                <AntText style={{ color: "white" }}>
-                                                    {item.text}
-                                                </AntText>
-                                            </div>
-                                        </List.Item>
-                                    )}
+                                                            {item.user.username}{" "}
+                                                            at{" "}
+                                                            {item.formatted_timestamp ? (
+                                                                <Button
+                                                                    type="link"
+                                                                    style={{
+                                                                        padding: 0,
+                                                                        color: "#1890ff",
+                                                                    }}
+                                                                    onClick={() =>
+                                                                        handleTimestampClick(
+                                                                            item.timestamp
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    {
+                                                                        item.formatted_timestamp
+                                                                    }
+                                                                </Button>
+                                                            ) : (
+                                                                "N/A"
+                                                            )}
+                                                        </AntText>
+                                                        <AntText
+                                                            style={{
+                                                                color: "white",
+                                                            }}
+                                                        >
+                                                            {item.text}
+                                                        </AntText>
+                                                    </div>
+                                                </div>
+                                            </List.Item>
+                                        );
+                                    }}
                                 />
                             </div>
                             <Form
@@ -178,9 +246,13 @@ const CommentSidebar = ({
                                 <Form.Item
                                     label={
                                         <span style={{ color: "white" }}>
-                                            {`Commenting at ${Math.floor(videoTime / 60)
+                                            {`Commenting at ${Math.floor(
+                                                videoTime / 60
+                                            )
                                                 .toString()
-                                                .padStart(2, "0")}${Math.floor(videoTime % 60)
+                                                .padStart(2, "0")}:${Math.floor(
+                                                videoTime % 60
+                                            )
                                                 .toString()
                                                 .padStart(2, "0")}`}
                                         </span>
@@ -224,7 +296,9 @@ const CommentSidebar = ({
                                 height: "100%",
                             }}
                         >
-                            <Typography style={{ color: "#fff", fontSize: "16px" }}>
+                            <Typography
+                                style={{ color: "#fff", fontSize: "16px" }}
+                            >
                                 No media selected
                             </Typography>
                         </div>

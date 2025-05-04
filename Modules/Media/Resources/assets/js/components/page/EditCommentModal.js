@@ -36,7 +36,7 @@ const EditCommentModal = ({
                         placeholder="Edit your comment..."
                         style={{
                             backgroundColor: "rgba(255, 255, 255, 0.05)",
-                            color: "#fff",
+                            color: "black",
                             border: "1px solid rgba(255, 255, 255, 0.1)",
                         }}
                     />
