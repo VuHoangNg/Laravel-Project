@@ -9,14 +9,23 @@ Route::middleware('auth:sanctum')->get('/auth', function (Request $request) {
     return $request->user();
 });
 
-Route::post('/login', [AuthController::class, 'login']);
-Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
-Route::post('/register', [AuthController::class, 'register']);
-Route::middleware('auth:sanctum')->get('/user', [AuthController::class, 'getUser']);
-Route::middleware(['auth:sanctum'])->group(function () {
-    Route::post('/auth/update-avatar', [AuthController::class, 'updateAvatar']);
+
+Route::prefix('auth')->group(function () {
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('comments', [AuthController::class, 'storeComment']);
+        Route::get('media/{mediaId}/comments', [AuthController::class, 'getComments']);
+        Route::put('comments/{id}', [AuthController::class, 'updateComment']);
+        Route::delete('comments/{id}', [AuthController::class, 'destroyComment']);
+    });
+    Route::post('/login', [AuthController::class, 'login']);
+    Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
+    Route::post('/register', [AuthController::class, 'register']);
+    Route::middleware('auth:sanctum')->get('/user', [AuthController::class, 'getUser']);
+    Route::middleware(['auth:sanctum'])->group(function () {
+        Route::post('/auth/update-avatar', [AuthController::class, 'updateAvatar']);
+    });
+    // Email Verification
+    Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
+        ->middleware('signed')
+        ->name('verification.verify');
 });
-// Email Verification
-Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
-    ->middleware('signed')
-    ->name('verification.verify');

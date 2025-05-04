@@ -16,12 +16,22 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Modules\Auth\src\Jobs\SendVerifyEmail;
 use Illuminate\Support\Facades\RateLimiter;
+use App\Models\Comment;
+use Modules\Media\src\Models\Media1;
 
 class AuthController extends Controller
 {
     public function __construct()
     {
-        $this->middleware('auth:sanctum')->only(['logout', 'getUser', 'updateAvatar']);
+        $this->middleware('auth:sanctum')->only([
+            'logout',
+            'getUser',
+            'updateAvatar',
+            'storeComment',
+            'getComments',
+            'updateComment',
+            'destroyComment'
+        ]);
     }
 
     public function index(): Renderable
@@ -120,13 +130,11 @@ class AuthController extends Controller
 
     public function register(Request $request): JsonResponse
     {
-        // Apply rate limiting: 5 attempts per minute per IP
         if (RateLimiter::tooManyAttempts('register:'.$request->ip(), 5)) {
             return response()->json(['message' => 'Too many registration attempts'], 429);
         }
-        RateLimiter::hit('register:'.$request->ip(), 60); // Fixed: increment -> hit
+        RateLimiter::hit('register:'.$request->ip(), 60);
 
-        //ස: // Validate input
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:255|unique:users',
@@ -134,7 +142,6 @@ class AuthController extends Controller
             'password' => 'required|string|min:8',
         ]);
 
-        // Create user
         $user = User::create([
             'name' => ucfirst(trim($validated['name'])),
             'username' => trim($validated['username']),
@@ -142,16 +149,11 @@ class AuthController extends Controller
             'password' => Hash::make(trim($validated['password'])),
         ]);
 
-        // Trigger Laravel's registered event
         event(new Registered($user));
 
-        // Generate verification URL for frontend route
         $verificationUrl = url('/auth/verify-email/' . $user->id . '/' . sha1($user->getEmailForVerification()));
-
-        // Dispatch SendVerifyEmail job asynchronously on 'emails' queue
         SendVerifyEmail::dispatch($user, $verificationUrl)->onQueue('emails');
 
-        // Return response immediately
         return response()->json(array_merge(
             $this->userToArray($user, $this->getRequestedFields($request)),
             ['message' => 'Account created successfully. Please check your email for verification.']
@@ -162,6 +164,12 @@ class AuthController extends Controller
     {
         $user = $request->user();
         if ($user) {
+            if (!$user instanceof User) {
+                $user = User::find($user->id);
+                if (!$user) {
+                    return response()->json(['message' => 'User not found'], 404);
+                }
+            }
             return response()->json($this->userToArray($user, $this->getRequestedFields($request)));
         }
         return response()->json(['message' => 'Unauthorized'], 401);
@@ -183,8 +191,7 @@ class AuthController extends Controller
                 $user->markEmailAsVerified();
             }
 
-            // Redirect to React frontend
-            return redirect('/auth/email-verified'); // Adjust to your frontend URL
+            return redirect('/auth/email-verified');
         } catch (ModelNotFoundException $e) {
             return response()->json(['message' => $e->getMessage()], 404);
         }
@@ -210,5 +217,149 @@ class AuthController extends Controller
             $this->userToArray($user, $this->getRequestedFields($request)),
             ['message' => 'Avatar updated successfully']
         ));
+    }
+
+    public function storeComment(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $rateLimitKey = 'comment:'.$user->id;
+        if (RateLimiter::tooManyAttempts($rateLimitKey, 10)) {
+            return response()->json(['message' => 'Too many comment attempts'], 429);
+        }
+        RateLimiter::hit($rateLimitKey, 60);
+
+        $validated = $request->validate([
+            'text' => 'required|string|max:1000',
+            'media1_id' => 'required|exists:media1,id',
+            'timestamp' => 'nullable|numeric|min:0',
+        ]);
+
+        $comment = Comment::create([
+            'text' => trim($validated['text']),
+            'timestamp' => $validated['timestamp'] ?? null,
+            'user_id' => $user->id,
+            'media1_id' => $validated['media1_id'],
+        ]);
+
+        $comment->load('user');
+
+        // Ensure the comment's user is the correct model
+        if (!$comment->user instanceof User) {
+            $comment->user = User::find($comment->user_id);
+            if (!$comment->user) {
+                return response()->json(['message' => 'Comment user not found'], 404);
+            }
+        }
+
+        return response()->json([
+            'id' => $comment->id,
+            'text' => $comment->text,
+            'timestamp' => $comment->timestamp,
+            'formatted_timestamp' => $comment->timestamp ? gmdate('i:s', (int)$comment->timestamp) : null,
+            'user' => $this->userToArray($comment->user),
+            'message' => 'Comment created successfully',
+        ], 201);
+    }
+
+    public function getComments(Request $request, $mediaId): JsonResponse
+    {
+        $request->merge(['media1_id' => $mediaId]);
+        $validated = $request->validate([
+            'media1_id' => 'required|exists:media1,id',
+        ]);
+
+        $perPage = $request->query('per_page', 10);
+        $comments = Comment::where('media1_id', $validated['media1_id'])
+            ->with(['user' => function ($query) {
+                $query->select('id', 'username', 'name', 'email', 'avatar');
+            }])
+            ->orderBy('timestamp', 'asc')
+            ->orderBy('created_at', 'asc')
+            ->paginate($perPage);
+
+        $data = $comments->map(function ($comment) {
+            // Ensure the comment's user is the correct model
+            $user = $comment->user instanceof User ? $comment->user : User::find($comment->user_id);
+            if (!$user) {
+                return null; // Skip comments with invalid users
+            }
+            return [
+                'id' => $comment->id,
+                'text' => $comment->text,
+                'timestamp' => $comment->timestamp,
+                'formatted_timestamp' => $comment->timestamp ? gmdate('i:s', (int)$comment->timestamp) : null,
+                'user' => $this->userToArray($user),
+            ];
+        })->filter()->values();
+
+        return response()->json([
+            'data' => $data,
+            'current_page' => $comments->currentPage(),
+            'per_page' => $comments->perPage(),
+            'total' => $comments->total(),
+            'last_page' => $comments->lastPage(),
+            'message' => 'Comments retrieved successfully',
+        ]);
+    }
+
+    public function updateComment(Request $request, $id): JsonResponse
+    {
+        try {
+            $comment = Comment::findOrFail($id);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Comment not found'], 404);
+        }
+
+        $user = $request->user();
+        if ($comment->user_id !== $user->id) {
+            return response()->json(['message' => 'Unauthorized to update this comment'], 403);
+        }
+
+        $validated = $request->validate([
+            'text' => 'required|string|max:1000',
+            'timestamp' => 'nullable|numeric|min:0',
+        ]);
+
+        $comment->update([
+            'text' => trim($validated['text']),
+            'timestamp' => $validated['timestamp'] ?? $comment->timestamp,
+        ]);
+
+        $comment->load('user');
+
+        // Ensure the comment's user is the correct model
+        if (!$comment->user instanceof User) {
+            $comment->user = User::find($comment->user_id);
+            if (!$comment->user) {
+                return response()->json(['message' => 'Comment user not found'], 404);
+            }
+        }
+
+        return response()->json([
+            'id' => $comment->id,
+            'text' => $comment->text,
+            'timestamp' => $comment->timestamp,
+            'formatted_timestamp' => $comment->timestamp ? gmdate('i:s', (int)$comment->timestamp) : null,
+            'user' => $this->userToArray($comment->user),
+            'message' => 'Comment updated successfully',
+        ]);
+    }
+
+    public function destroyComment(Request $request, $id): JsonResponse
+    {
+        try {
+            $comment = Comment::findOrFail($id);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Comment not found'], 404);
+        }
+
+        $user = $request->user();
+        if ($comment->user_id !== $user->id) {
+            return response()->json(['message' => 'Unauthorized to delete this comment'], 403);
+        }
+
+        $comment->delete();
+
+        return response()->json(['message' => 'Comment deleted successfully']);
     }
 }

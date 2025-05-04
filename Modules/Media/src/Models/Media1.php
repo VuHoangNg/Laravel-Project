@@ -19,6 +19,11 @@ class Media1 extends Model
         return $this->belongsTo(\Modules\Blog\src\Models\Blog::class, 'blog_id');
     }
 
+    public function comments()
+    {
+        return $this->hasMany(\App\Models\Comment::class, 'media1_id');
+    }
+
     // Getter for title (Ensures consistent formatting)
     public function getTitleAttribute($value): string
     {
