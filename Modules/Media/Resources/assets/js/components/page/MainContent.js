@@ -1,11 +1,31 @@
 import React from "react";
 import { useSelector } from "react-redux";
-import { Typography, Button, Alert, Spin, Row, Col, Card, Pagination, Space } from "antd";
-import VideoPlayer from "../../../../../../Core/Resources/assets/js/components/VideoPlayer";
+import {
+    Typography,
+    Button,
+    Alert,
+    Spin,
+    Row,
+    Col,
+    Card,
+    Pagination,
+    Space,
+} from "antd";
 
 const { Title } = Typography;
 
-const MainContent = ({ loading, error, setError, fetchMedia, handleOpenCreate, handleCardClick, page, perPage, contentWidth, handlePageChange }) => {
+const MainContent = ({
+    loading,
+    error,
+    setError,
+    fetchMedia,
+    handleOpenCreate,
+    handleCardClick,
+    page,
+    perPage,
+    contentWidth,
+    handlePageChange,
+}) => {
     const media = useSelector(
         (state) =>
             state.media.media || {
@@ -164,44 +184,28 @@ const MainContent = ({ loading, error, setError, fetchMedia, handleOpenCreate, h
                                                         padding: 0,
                                                     }}
                                                 >
-                                                    {record.type === "video" ||
-                                                    record.url.includes("video") ? (
-                                                        <VideoPlayer
-                                                            src={record.url}
-                                                            style={{
-                                                                width: "100%",
-                                                                height: "100%",
-                                                                objectFit: "cover",
-                                                                display: "block",
-                                                            }}
-                                                            autoPlay={true}
-                                                            loop
-                                                            playsInline
-                                                        />
-                                                    ) : (
-                                                        <img
-                                                            src={
+                                                    <img
+                                                        src={
+                                                            record.thumbnail_url ||
+                                                            record.url ||
+                                                            "https://placehold.co/150x100?text=No+Preview"
+                                                        }
+                                                        alt={record.title}
+                                                        style={{
+                                                            width: "100%",
+                                                            height: "100%",
+                                                            objectFit: "cover",
+                                                            display: "block",
+                                                        }}
+                                                        loading="lazy"
+                                                        onError={() =>
+                                                            console.log(
+                                                                "Image load error for:",
                                                                 record.thumbnail_url ||
-                                                                record.url ||
-                                                                "https://placehold.co/150x100?text=No+Preview"
-                                                            }
-                                                            alt={record.title}
-                                                            style={{
-                                                                width: "100%",
-                                                                height: "100%",
-                                                                objectFit: "cover",
-                                                                display: "block",
-                                                            }}
-                                                            loading="lazy"
-                                                            onError={() =>
-                                                                console.log(
-                                                                    "Image load error for:",
-                                                                    record.thumbnail_url ||
-                                                                        record.url
-                                                                )
-                                                            }
-                                                        />
-                                                    )}
+                                                                    record.url
+                                                            )
+                                                        }
+                                                    />
                                                 </div>
                                                 <div
                                                     style={{

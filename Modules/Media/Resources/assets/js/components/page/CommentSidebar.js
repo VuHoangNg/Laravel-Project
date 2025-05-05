@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from "react";
 import { useSelector } from "react-redux";
-import { Typography, List, Button, Form, Input, Avatar, Space } from "antd";
+import { Typography, List, Button, Form, Input, Avatar, Space, Spin } from "antd";
 import {
     EditOutlined,
     DeleteOutlined,
@@ -11,45 +11,38 @@ const { Title, Text: AntText } = Typography;
 const { TextArea } = Input;
 
 const buildCommentTree = (comments) => {
-    const map = {};
-    const roots = [];
-
-    comments.forEach((comment) => {
-        map[comment.id] = { ...comment, children: [] };
+    // Recursively map 'replies' to 'children' for all levels
+    const mapRepliesToChildren = (comment) => ({
+        ...comment,
+        children: (comment.replies || []).map((reply) => mapRepliesToChildren(reply)),
     });
 
-    comments.forEach((comment) => {
-        if (comment.parent_id) {
-            const parent = map[comment.parent_id];
-            if (parent) {
-                parent.children.push(map[comment.id]);
+    // Build the tree by mapping each comment and its replies
+    const tree = comments.map((comment) => mapRepliesToChildren(comment));
+
+    // Sort comments by timestamp (since created_at is not available, use timestamp)
+    const sortComments = (commentList) => {
+        commentList.sort((a, b) => a.timestamp - b.timestamp);
+        commentList.forEach((comment) => {
+            if (comment.children && comment.children.length > 0) {
+                sortComments(comment.children);
             }
-        } else {
-            roots.push(map[comment.id]);
-        }
-    });
+        });
+    };
 
-    return roots;
+    sortComments(tree);
+    console.log("Comment Tree:", tree);
+    return tree;
 };
 
 const CommentItem = ({
     comment,
     currentUserId,
     onReplyClick,
-    onSubmitReply,
-    activeReplyId,
     handleEditComment,
     handleDeleteComment,
     handleTimestampClick,
 }) => {
-    const [form] = Form.useForm();
-
-    useEffect(() => {
-        if (activeReplyId === comment.id) {
-            form.setFieldsValue({ comment: `@${comment.user.username} ` });
-        }
-    }, [activeReplyId, form, comment.user.username]);
-
     const isOwner =
         currentUserId && Number(currentUserId) === Number(comment.user.id);
 
@@ -64,7 +57,7 @@ const CommentItem = ({
                 </Avatar>
                 <div style={{ color: "#fff", flex: 1 }}>
                     <AntText
-                        style={{ fontSize: 12, opacity: 0.7, display: "block" , color:"white"}}
+                        style={{ fontSize: 12, opacity: 0.7, display: "block", color: "white" }}
                     >
                         {comment.parent_id && (
                             <span style={{ marginRight: 8 }}>↳</span>
@@ -117,40 +110,6 @@ const CommentItem = ({
                             </Button>
                         </Space>
                     </div>
-
-                    {activeReplyId === comment.id && (
-                        <Form
-                            form={form}
-                            onFinish={(values) =>
-                                onSubmitReply(values.comment, comment.id, form)
-                            }
-                            style={{ marginTop: 8 }}
-                        >
-                            <Form.Item
-                                name="comment"
-                                rules={[
-                                    { required: true, message: "Enter reply" },
-                                ]}
-                            >
-                                <TextArea
-                                    rows={2}
-                                    placeholder={`Reply to ${comment.user.username}...`}
-                                    style={{
-                                        backgroundColor:
-                                            "rgba(255, 255, 255, 0.05)",
-                                        color: "white",
-                                        border: "1px solid rgba(255, 255, 255, 0.1)",
-                                        borderRadius: 8,
-                                    }}
-                                />
-                            </Form.Item>
-                            <Form.Item>
-                                <Button type="primary" htmlType="submit">
-                                    Reply
-                                </Button>
-                            </Form.Item>
-                        </Form>
-                    )}
                 </div>
             </div>
 
@@ -162,8 +121,6 @@ const CommentItem = ({
                             comment={child}
                             currentUserId={currentUserId}
                             onReplyClick={onReplyClick}
-                            onSubmitReply={onSubmitReply}
-                            activeReplyId={activeReplyId}
                             handleEditComment={handleEditComment}
                             handleDeleteComment={handleDeleteComment}
                             handleTimestampClick={handleTimestampClick}
@@ -193,11 +150,11 @@ const CommentSidebar = ({
     updateContentWidth,
     debouncedUpdateContentWidth,
     currentUserId,
+    commentLoading, // Added prop to show loading state
 }) => {
     const comments = useSelector((state) => state.media.comments);
     const commentSplitterRef = useRef(null);
     const [replyTo, setReplyTo] = useState(null);
-    const [activeReplyId, setActiveReplyId] = useState(null);
 
     useEffect(() => {
         if (isResizingComment) {
@@ -211,12 +168,7 @@ const CommentSidebar = ({
     }, [isResizingComment, debouncedUpdateContentWidth]);
 
     useEffect(() => {
-        console.log("replyTo changed:", replyTo);
         if (replyTo) {
-            console.log(
-                "Pre-filling form for reply to:",
-                replyTo.user.username
-            );
             commentForm.setFieldsValue({
                 comment: `@${replyTo.user.username} `,
             });
@@ -229,38 +181,17 @@ const CommentSidebar = ({
     const commentTree = buildCommentTree(commentList);
 
     const handleReplyClick = (comment) => {
-        console.log("Reply clicked for comment:", comment);
         setReplyTo(comment);
-        setActiveReplyId(null); // Hide inline reply form
     };
 
     const handleSubmit = (values) => {
-        console.log(
-            "Submitting comment with values:",
-            values,
-            "replyTo:",
-            replyTo
-        );
         const payload = {
             comment: values.comment,
             ...(replyTo && { parent_id: replyTo.id }),
         };
-        console.log("Final payload to handleCommentSubmit:", payload);
         handleCommentSubmit(payload);
         setReplyTo(null);
         commentForm.resetFields();
-    };
-
-    const handleInlineReplySubmit = (replyText, parentId, formInstance) => {
-        console.log("Submitting inline reply:", { replyText, parentId });
-        const payload = {
-            comment: replyText,
-            parent_id: parentId,
-        };
-        console.log("Final inline reply payload:", payload);
-        handleCommentSubmit(payload);
-        setActiveReplyId(null);
-        formInstance.resetFields();
     };
 
     return (
@@ -323,23 +254,40 @@ const CommentSidebar = ({
                                     marginBottom: "16px",
                                 }}
                             >
-                                {commentTree.map((comment) => (
-                                    <CommentItem
-                                        key={comment.id}
-                                        comment={comment}
-                                        currentUserId={currentUserId}
-                                        onReplyClick={handleReplyClick}
-                                        onSubmitReply={handleInlineReplySubmit}
-                                        activeReplyId={activeReplyId}
-                                        handleEditComment={handleEditComment}
-                                        handleDeleteComment={
-                                            handleDeleteComment
-                                        }
-                                        handleTimestampClick={
-                                            handleTimestampClick
-                                        }
-                                    />
-                                ))}
+                                {commentLoading ? (
+                                    <div
+                                        style={{
+                                            display: "flex",
+                                            justifyContent: "center",
+                                            alignItems: "center",
+                                            height: "100%",
+                                        }}
+                                    >
+                                        <Spin tip="Loading comments..." />
+                                    </div>
+                                ) : commentTree.length > 0 ? (
+                                    commentTree.map((comment) => (
+                                        <CommentItem
+                                            key={comment.id}
+                                            comment={comment}
+                                            currentUserId={currentUserId}
+                                            onReplyClick={handleReplyClick}
+                                            handleEditComment={handleEditComment}
+                                            handleDeleteComment={
+                                                handleDeleteComment
+                                            }
+                                            handleTimestampClick={
+                                                handleTimestampClick
+                                            }
+                                        />
+                                    ))
+                                ) : (
+                                    <Typography
+                                        style={{ color: "#fff", fontSize: "16px" }}
+                                    >
+                                        No comments yet.
+                                    </Typography>
+                                )}
                             </div>
                             <Form
                                 form={commentForm}

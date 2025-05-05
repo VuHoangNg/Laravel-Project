@@ -10,7 +10,8 @@ import EditCommentModal from "./EditCommentModal";
 
 const MediaContent = () => {
     const navigate = useNavigate();
-    const { createMediaContext, getMediaContext, commentContext } = useMediaContext();
+    const { createMediaContext, getMediaContext, commentContext } =
+        useMediaContext();
     const { resetForm, createMedia } = createMediaContext;
     const { isModalOpen, openModal, closeModal, fetchMedia } = getMediaContext;
     const [form] = Form.useForm();
@@ -18,6 +19,7 @@ const MediaContent = () => {
     const [editCommentForm] = Form.useForm();
     const [searchParams, setSearchParams] = useSearchParams();
     const [loading, setLoading] = useState(false);
+    const [commentLoading, setCommentLoading] = useState(false); // New state for comment fetching
     const [error, setError] = useState(null);
     const [selectedMedia, setSelectedMedia] = useState(null);
     const [siderWidth, setSiderWidth] = useState(400);
@@ -46,11 +48,9 @@ const MediaContent = () => {
         const value = `; ${document.cookie}`;
         const parts = value.split(`; ${name}=`);
         if (parts.length === 2) {
-            const cookieValue = parts.pop().split(';').shift();
-            console.log(`Cookie ${name} retrieved:`, cookieValue);
+            const cookieValue = parts.pop().split(";").shift();
             return cookieValue;
         }
-        console.log(`Cookie ${name} not found`);
         return null;
     };
 
@@ -68,10 +68,15 @@ const MediaContent = () => {
             ? Math.min(tempSiderWidthRef.current, MAX_PREVIEW_SIDER_WIDTH)
             : 0;
         let commentWidth = showCommentSplitter
-            ? Math.min(tempCommentSiderWidthRef.current, MAX_COMMENT_SIDER_WIDTH)
+            ? Math.min(
+                  tempCommentSiderWidthRef.current,
+                  MAX_COMMENT_SIDER_WIDTH
+              )
             : 0;
-        let splitterWidth = (showSplitter ? 5 : 0) + (showCommentSplitter ? 5 : 0);
-        let contentWidth = totalWidth - previewWidth - commentWidth - splitterWidth;
+        let splitterWidth =
+            (showSplitter ? 5 : 0) + (showCommentSplitter ? 5 : 0);
+        let contentWidth =
+            totalWidth - previewWidth - commentWidth - splitterWidth;
 
         if (contentWidth < MIN_WIDTH) {
             let excess = MIN_WIDTH - contentWidth;
@@ -96,7 +101,8 @@ const MediaContent = () => {
             contentWidth = MIN_WIDTH;
         }
 
-        const totalUsedWidth = previewWidth + commentWidth + contentWidth + splitterWidth;
+        const totalUsedWidth =
+            previewWidth + commentWidth + contentWidth + splitterWidth;
         if (totalUsedWidth > totalWidth) {
             let overflow = totalUsedWidth - totalWidth;
             if (showCommentSplitter && commentWidth > MIN_WIDTH) {
@@ -115,7 +121,8 @@ const MediaContent = () => {
             if (sidebarRef.current) {
                 sidebarRef.current.style.width = `${previewWidth}px`;
             }
-            contentWidth = totalWidth - previewWidth - commentWidth - splitterWidth;
+            contentWidth =
+                totalWidth - previewWidth - commentWidth - splitterWidth;
         }
 
         setContentWidth(contentWidth);
@@ -131,12 +138,12 @@ const MediaContent = () => {
     useEffect(() => {
         isMounted.current = true;
         loadMedia();
-        const userId = getCookie('id');
+        const userId = getCookie("id");
         if (userId) {
             setCurrentUserId(parseInt(userId));
         } else {
             message.warning("Please log in to access all features");
-            navigate('/login');
+            navigate("/auth/login");
         }
         updateContentWidth();
         window.addEventListener("resize", updateContentWidth);
@@ -144,7 +151,14 @@ const MediaContent = () => {
             isMounted.current = false;
             window.removeEventListener("resize", updateContentWidth);
         };
-    }, [page, perPage, showSplitter, showCommentSplitter, updateContentWidth, navigate]);
+    }, [
+        page,
+        perPage,
+        showSplitter,
+        showCommentSplitter,
+        updateContentWidth,
+        navigate,
+    ]);
 
     const loadMedia = async () => {
         if (!isMounted.current) return;
@@ -154,7 +168,9 @@ const MediaContent = () => {
             await fetchMedia(page, perPage);
         } catch (err) {
             if (isMounted.current) {
-                setError(err.response?.data?.message || "Failed to load media.");
+                setError(
+                    err.response?.data?.message || "Failed to load media."
+                );
             }
         } finally {
             if (isMounted.current) {
@@ -163,8 +179,23 @@ const MediaContent = () => {
         }
     };
 
+    const fetchCommentsForMedia = async (mediaId) => {
+        if (!mediaId) return;
+        setCommentLoading(true);
+        try {
+            await commentContext.fetchComments(mediaId);
+        } catch (err) {
+            setError(err.response?.data?.message || "Failed to load comments.");
+        } finally {
+            setCommentLoading(false);
+        }
+    };
+
     const handlePageChange = (newPage, newPerPage) => {
-        setSearchParams({ page: newPage.toString(), perPage: newPerPage.toString() });
+        setSearchParams({
+            page: newPage.toString(),
+            perPage: newPerPage.toString(),
+        });
         localStorage.setItem("lastMediaPage", newPage);
     };
 
@@ -187,7 +218,9 @@ const MediaContent = () => {
                     form.setFields([{ name: key, errors: errors[key] }]);
                 });
             } else {
-                setError(error.response?.data?.message || "Failed to save media.");
+                setError(
+                    error.response?.data?.message || "Failed to save media."
+                );
             }
         } finally {
             setLoading(false);
@@ -204,7 +237,7 @@ const MediaContent = () => {
                 selectedMedia.id,
                 values.comment,
                 videoTime,
-                values.parent_id || null // Include parent_id
+                values.parent_id || null
             );
             commentForm.resetFields();
         } catch (error) {
@@ -212,16 +245,17 @@ const MediaContent = () => {
             if (error.response) {
                 if (error.response.status === 401) {
                     errorMessage = "Please log in to post a comment";
-                    navigate('/login');
+                    navigate("/login");
                 } else if (error.response.status === 429) {
-                    errorMessage = "Too many comment attempts. Please try again later.";
+                    errorMessage =
+                        "Too many comment attempts. Please try again later.";
                 } else {
                     const errors = error.response.data.errors || {};
                     errorMessage =
                         errors.media1_id?.[0] ||
                         errors.text?.[0] ||
                         errors.timestamp?.[0] ||
-                        errors.parent_id?.[0] || // Handle parent_id errors
+                        errors.parent_id?.[0] ||
                         error.response.data.message ||
                         errorMessage;
                 }
@@ -237,7 +271,11 @@ const MediaContent = () => {
 
     const handleEditCommentSubmit = async (values) => {
         try {
-            await commentContext.updateComment(editingCommentId, values.comment, videoTime);
+            await commentContext.updateComment(
+                editingCommentId,
+                values.comment,
+                videoTime
+            );
             setEditingCommentId(null);
             editCommentForm.resetFields();
         } catch (error) {
@@ -245,9 +283,10 @@ const MediaContent = () => {
             if (error.response) {
                 if (error.response.status === 401) {
                     errorMessage = "Please log in to update a comment";
-                    navigate('/login');
+                    navigate("/auth/login");
                 } else if (error.response.status === 403) {
-                    errorMessage = "You are not authorized to update this comment";
+                    errorMessage =
+                        "You are not authorized to update this comment";
                 } else {
                     const errors = error.response.data.errors || {};
                     errorMessage =
@@ -269,9 +308,10 @@ const MediaContent = () => {
             if (error.response) {
                 if (error.response.status === 401) {
                     errorMessage = "Please log in to delete a comment";
-                    navigate('/login');
+                    navigate("/auth/login");
                 } else if (error.response.status === 403) {
-                    errorMessage = "You are not authorized to delete this comment";
+                    errorMessage =
+                        "You are not authorized to delete this comment";
                 } else {
                     errorMessage = error.response.data.message || errorMessage;
                 }
@@ -304,15 +344,19 @@ const MediaContent = () => {
     const handleCardClick = (record) => {
         setSelectedMedia(record);
         setShowSplitter(true);
-        setShowCommentSplitter(true);
-        commentContext.fetchComments(record.id);
+        fetchCommentsForMedia(record.id);
     };
 
     const normFile = (e) => {
         if (Array.isArray(e)) {
             return e.length > 0 ? e[0].originFileObj : null;
         }
-        return e && e.fileList && e.fileList.length > 0 && e.fileList[0].originFileObj;
+        return (
+            e &&
+            e.fileList &&
+            e.fileList.length > 0 &&
+            e.fileList[0].originFileObj
+        );
     };
 
     const handleMouseDown = () => {
@@ -322,11 +366,18 @@ const MediaContent = () => {
     const handleMouseMove = (e) => {
         if (!isResizing) return;
         const newWidth = window.innerWidth - e.clientX;
-        let commentWidth = showCommentSplitter ? tempCommentSiderWidthRef.current : 0;
-        let splitterWidth = (showSplitter ? 5 : 0) + (showCommentSplitter ? 5 : 0);
-        let contentWidth = window.innerWidth - newWidth - commentWidth - splitterWidth;
+        let commentWidth = showCommentSplitter
+            ? tempCommentSiderWidthRef.current
+            : 0;
+        let splitterWidth =
+            (showSplitter ? 5 : 0) + (showCommentSplitter ? 5 : 0);
+        let contentWidth =
+            window.innerWidth - newWidth - commentWidth - splitterWidth;
 
-        let constrainedWidth = Math.max(MIN_WIDTH, Math.min(newWidth, MAX_PREVIEW_SIDER_WIDTH));
+        let constrainedWidth = Math.max(
+            MIN_WIDTH,
+            Math.min(newWidth, MAX_PREVIEW_SIDER_WIDTH)
+        );
 
         if (contentWidth < MIN_WIDTH) {
             let excess = MIN_WIDTH - contentWidth;
@@ -369,10 +420,15 @@ const MediaContent = () => {
         if (!isResizingComment) return;
         const newWidth = window.innerWidth - e.clientX;
         let previewWidth = showSplitter ? tempSiderWidthRef.current : 0;
-        let splitterWidth = (showSplitter ? 5 : 0) + (showCommentSplitter ? 5 : 0);
-        let contentWidth = window.innerWidth - newWidth - previewWidth - splitterWidth;
+        let splitterWidth =
+            (showSplitter ? 5 : 0) + (showCommentSplitter ? 5 : 0);
+        let contentWidth =
+            window.innerWidth - newWidth - previewWidth - splitterWidth;
 
-        let constrainedWidth = Math.max(MIN_WIDTH, Math.min(newWidth, MAX_COMMENT_SIDER_WIDTH));
+        let constrainedWidth = Math.max(
+            MIN_WIDTH,
+            Math.min(newWidth, MAX_COMMENT_SIDER_WIDTH)
+        );
 
         if (contentWidth < MIN_WIDTH) {
             let excess = MIN_WIDTH - contentWidth;
@@ -412,12 +468,23 @@ const MediaContent = () => {
             const totalWidth = window.innerWidth;
             let previewWidth = showSplitter ? tempSiderWidthRef.current : 0;
             let splitterWidth = (showSplitter ? 5 : 0) + 5;
-            let availableWidth = totalWidth - previewWidth - splitterWidth - MIN_WIDTH;
+            let availableWidth =
+                totalWidth - previewWidth - splitterWidth - MIN_WIDTH;
 
-            let newCommentWidth = Math.min(400, Math.max(MIN_WIDTH, availableWidth));
-            newCommentWidth = Math.min(newCommentWidth, MAX_COMMENT_SIDER_WIDTH);
+            let newCommentWidth = Math.min(
+                400,
+                Math.max(MIN_WIDTH, availableWidth)
+            );
+            newCommentWidth = Math.min(
+                newCommentWidth,
+                MAX_COMMENT_SIDER_WIDTH
+            );
 
-            if (availableWidth < MIN_WIDTH && showSplitter && previewWidth > MIN_WIDTH) {
+            if (
+                availableWidth < MIN_WIDTH &&
+                showSplitter &&
+                previewWidth > MIN_WIDTH
+            ) {
                 const excess = MIN_WIDTH - availableWidth;
                 const reducible = Math.min(excess, previewWidth - MIN_WIDTH);
                 previewWidth -= reducible;
@@ -428,7 +495,10 @@ const MediaContent = () => {
                 availableWidth += reducible;
             }
 
-            newCommentWidth = Math.max(MIN_WIDTH, Math.min(newCommentWidth, availableWidth));
+            newCommentWidth = Math.max(
+                MIN_WIDTH,
+                Math.min(newCommentWidth, availableWidth)
+            );
             tempCommentSiderWidthRef.current = newCommentWidth;
             if (commentSidebarRef.current) {
                 commentSidebarRef.current.style.width = `${newCommentWidth}px`;
@@ -437,6 +507,10 @@ const MediaContent = () => {
             setCommentSiderWidth(newCommentWidth);
             setSiderWidth(previewWidth);
             updateContentWidth();
+
+            if (selectedMedia) {
+                fetchCommentsForMedia(selectedMedia.id);
+            }
         } else {
             tempCommentSiderWidthRef.current = 400;
             setCommentSiderWidth(400);
@@ -445,14 +519,14 @@ const MediaContent = () => {
         setShowCommentSplitter(!showCommentSplitter);
     };
 
-    const handleVideoPause = (currentTime) => {
-        setVideoTime(currentTime);
-    };
-
     const handleTimestampClick = (timestamp) => {
         if (videoRef.current) {
             videoRef.current.seekTo(timestamp);
         }
+    };
+
+    const handleVideoPause = (currentTime) => {
+        setVideoTime(currentTime);
     };
 
     const triggerButtonStyle = {
@@ -476,7 +550,14 @@ const MediaContent = () => {
                 d="M4 6.75A2.75 2.75 0 0 1 6.75 4h10.5A2.75 2.75 0 0 1 20 6.75v10.5A2.75 2.75 0 0 1 17.25 20H6.75A2.75 2.75 0 0 1 4 17.25V6.75ZM6.75 5.5c-.69 0-1.25.56-1.25 1.25v10.5c0 .69.56 1.25 1.25 1.25h10.5c.69 0 1.25-.56 1.25-1.25V6.75c0-.69-.56-1.25-1.25-1.25H6.75Z"
                 fillRule="evenodd"
             />
-            <rect rx="1" height="10" x={xPosition} y="7" opacity="1" width="2" />
+            <rect
+                rx="1"
+                height="10"
+                x={xPosition}
+                y="7"
+                opacity="1"
+                width="2"
+            />
         </svg>
     );
 
@@ -513,10 +594,12 @@ const MediaContent = () => {
                     style={triggerButtonStyle}
                     onClick={onClick}
                     onMouseEnter={(e) =>
-                        (e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.2)")
+                        (e.currentTarget.style.backgroundColor =
+                            "rgba(255, 255, 255, 0.2)")
                     }
                     onMouseLeave={(e) =>
-                        (e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)")
+                        (e.currentTarget.style.backgroundColor =
+                            "rgba(255, 255, 255, 0.1)")
                     }
                 />
             ))}
@@ -579,6 +662,7 @@ const MediaContent = () => {
                     updateContentWidth={updateContentWidth}
                     debouncedUpdateContentWidth={debouncedUpdateContentWidth}
                     currentUserId={currentUserId}
+                    commentLoading={commentLoading}
                 />
             </Layout>
             <CreateMediaModal

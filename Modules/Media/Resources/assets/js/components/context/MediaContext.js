@@ -16,10 +16,8 @@ const getCookie = (name) => {
     const parts = value.split(`; ${name}=`);
     if (parts.length === 2) {
         const cookieValue = parts.pop().split(';').shift();
-        console.log(`Cookie ${name} retrieved:`, cookieValue);
         return cookieValue;
     }
-    console.log(`Cookie ${name} not found`);
     return null;
 };
 
@@ -149,12 +147,10 @@ export function MediaProvider({ children, api }) {
                         Authorization: `Bearer ${getCookie("token")}`,
                     },
                 });
-                console.log("Comments fetched for mediaId", mediaId, ":", response.data);
                 const commentTree = buildCommentTree(response.data.data);
                 dispatch(setComments(mediaId, commentTree));
                 return { data: commentTree };
             } catch (error) {
-                console.error("Error fetching comments:", error);
                 throw error;
             }
         },
@@ -166,14 +162,12 @@ export function MediaProvider({ children, api }) {
                     timestamp,
                     ...(parentId && { parent_id: parentId }),
                 };
-                console.log("Sending comment payload:", payload);
                 const response = await api.post("/api/auth/comments", payload, {
                     headers: {
                         Authorization: `Bearer ${getCookie("token")}`,
                         "Content-Type": "application/json",
                     },
                 });
-                console.log("Comment created:", response.data);
                 dispatch(addComment(mediaId, response.data));
                 return response.data;
             } catch (error) {
