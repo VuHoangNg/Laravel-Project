@@ -7,6 +7,7 @@ import {
     VideoCameraOutlined,
     LogoutOutlined,
     ContainerOutlined,
+    HomeOutlined,
 } from "@ant-design/icons";
 import { Button, Layout, Menu, theme, Modal } from "antd";
 import { Routes, Route, Link } from "react-router-dom";
@@ -51,21 +52,26 @@ function Core() {
     const menuItems = [
         {
             key: "1",
+            icon: <HomeOutlined />,
+            label: <Link to="/">Home</Link>,
+        },
+        {
+            key: "2",
             icon: <ContainerOutlined />,
             label: <Link to="/blog">Blog</Link>,
         },
         {
-            key: "2",
+            key: "3",
             icon: <VideoCameraOutlined />,
             label: <Link to="/media">Media</Link>,
         },
         {
-            key: "3",
+            key: "4",
             icon: <UserOutlined />,
             label: <Link to="/users">Users</Link>,
         },
         {
-            key: "4",
+            key: "5",
             icon: <LogoutOutlined />,
             label: "Logout",
             onClick: handleLogout,

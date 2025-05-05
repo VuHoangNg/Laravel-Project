@@ -31,7 +31,6 @@ const buildCommentTree = (comments) => {
     };
 
     sortComments(tree);
-    console.log("Comment Tree:", tree);
     return tree;
 };
 

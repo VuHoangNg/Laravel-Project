@@ -142,7 +142,7 @@ export function MediaProvider({ children, api }) {
     const commentContext = {
         fetchComments: async (mediaId) => {
             try {
-                const response = await api.get(`/api/auth/comments/${mediaId}`, {
+                const response = await api.get(`/api/auth/media/${mediaId}/comments/`, {
                     headers: {
                         Authorization: `Bearer ${getCookie("token")}`,
                     },
