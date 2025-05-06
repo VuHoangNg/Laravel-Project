@@ -142,7 +142,7 @@ export function MediaProvider({ children, api }) {
     const commentContext = {
         fetchComments: async (mediaId) => {
             try {
-                const response = await api.get(`/api/auth/media/${mediaId}/comments/`, {
+                const response = await api.get(`/api/core/media/${mediaId}/comments/`, {
                     headers: {
                         Authorization: `Bearer ${getCookie("token")}`,
                     },
@@ -162,7 +162,7 @@ export function MediaProvider({ children, api }) {
                     timestamp,
                     ...(parentId && { parent_id: parentId }),
                 };
-                const response = await api.post("/api/auth/comments", payload, {
+                const response = await api.post("/api/core/comments", payload, {
                     headers: {
                         Authorization: `Bearer ${getCookie("token")}`,
                         "Content-Type": "application/json",
@@ -178,7 +178,7 @@ export function MediaProvider({ children, api }) {
         updateComment: async (commentId, text, timestamp) => {
             try {
                 const response = await api.put(
-                    `/api/auth/comments/${commentId}`,
+                    `/api/core/comments/${commentId}`,
                     { text, timestamp },
                     {
                         headers: {
@@ -196,7 +196,7 @@ export function MediaProvider({ children, api }) {
         },
         deleteComment: async (commentId) => {
             try {
-                await api.delete(`/api/auth/comments/${commentId}`, {
+                await api.delete(`/api/core/comments/${commentId}`, {
                     headers: {
                         Authorization: `Bearer ${getCookie("token")}`,
                     },

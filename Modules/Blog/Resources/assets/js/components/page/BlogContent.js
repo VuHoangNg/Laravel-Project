@@ -19,7 +19,7 @@ import {
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useBlogContext } from "../context/BlogContext";
 import { setMedia } from "../../../../../../Media/Resources/assets/js/components/reducer/action";
-import VideoPlayer from "../../../../../../Core/Resources/assets/js/components/VideoPlayer";
+import VideoPlayer from "../../../../../../Core/Resources/assets/js/components/page/VideoPlayer";
 
 const { Title } = Typography;
 const { Meta } = Card;

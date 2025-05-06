@@ -5,7 +5,8 @@ namespace Modules\Media\src\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Storage;
-
+use Modules\Core\src\Models\Comment;
+use Modules\Blog\src\Models\Blog;
 class Media1 extends Model
 {
     protected $table = 'media1';
@@ -16,12 +17,12 @@ class Media1 extends Model
 
     public function blog(): BelongsTo
     {
-        return $this->belongsTo(\Modules\Blog\src\Models\Blog::class, 'blog_id');
+        return $this->belongsTo(Blog::class, 'blog_id');
     }
 
     public function comments()
     {
-        return $this->hasMany(\App\Models\Comment::class, 'media1_id');
+        return $this->hasMany(Comment::class, 'media1_id');
     }
 
     // Getter for title (Ensures consistent formatting)

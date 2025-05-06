@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from "react";
-import { Typography, Text } from "antd";
-import VideoPlayer from "../../../../../../Core/Resources/assets/js/components/VideoPlayer";
+import { Typography, Text, Button } from "antd";
+import VideoPlayer from "../../../../../../Core/Resources/assets/js/components/page/VideoPlayer";
 
 const { Title } = Typography;
 
@@ -70,7 +70,7 @@ const PreviewSidebar = ({
                             <div
                                 style={{
                                     display: "flex",
-                                    justifyContent: "space-between",
+                                    justifyContent: "flex-start",
                                     alignItems: "center",
                                     marginBottom: "16px",
                                     flexShrink: 0,
@@ -82,6 +82,22 @@ const PreviewSidebar = ({
                                 >
                                     Preview
                                 </Title>
+                                <Button
+                                    style={{
+                                        backgroundColor: "#1890ff",
+                                        color: "#fff",
+                                        border: "none",
+                                        borderRadius: "4px",
+                                        padding: "8px 16px",
+                                        cursor: "pointer",
+                                        marginLeft: "20px",
+                                    }}
+                                    onClick={() =>
+                                        window.location.href = `/core/media/${selectedMedia.id}`
+                                    }
+                                >
+                                    Edit
+                                </Button>
                             </div>
                             <div
                                 style={{
@@ -161,7 +177,8 @@ const PreviewSidebar = ({
                                             opacity: 0.7,
                                         }}
                                     >
-                                        Uploaded on {new Date().toLocaleDateString()}
+                                        Uploaded on{" "}
+                                        {new Date().toLocaleDateString()}
                                     </p>
                                 </div>
                             </div>
@@ -175,7 +192,9 @@ const PreviewSidebar = ({
                                 height: "100%",
                             }}
                         >
-                            <Typography style={{ color: "#fff", fontSize: "16px" }}>
+                            <Typography
+                                style={{ color: "#fff", fontSize: "16px" }}
+                            >
                                 No asset selected
                             </Typography>
                         </div>

@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import { Provider } from "react-redux";
 import { BrowserRouter } from "react-router-dom";
 import { store } from "./components/reducer/store";
-import Core from "./components/core";
+import Core from "./components/page/core";
 
 
 const appElement = document.getElementById("core");

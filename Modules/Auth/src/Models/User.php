@@ -61,4 +61,10 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->avatar ? asset('storage/' . $this->avatar) : null;
     }
+
+    public function triggeredNotifications()
+    {
+        return $this->hasMany(Notification::class, 'triggered_by_id');
+    }
+
 }

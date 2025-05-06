@@ -16,9 +16,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Modules\Auth\src\Jobs\SendVerifyEmail;
 use Illuminate\Support\Facades\RateLimiter;
-use App\Models\Comment;
-use Modules\Media\src\Models\Media1;
-use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
@@ -28,10 +25,6 @@ class AuthController extends Controller
             'logout',
             'getUser',
             'updateAvatar',
-            'storeComment',
-            'getComments',
-            'updateComment',
-            'destroyComment'
         ]);
     }
 
@@ -110,11 +103,14 @@ class AuthController extends Controller
             }
             $responseData['message'] = 'Login successful';
 
+            $avatarUrl = $user->avatar ? Storage::url($user->avatar) : null;
+
             return response()->json($responseData)
                 ->withCookie(Cookie::forever('username', $user->username, null, null, false, true))
                 ->withCookie(Cookie::forever('email', $user->email, null, null, false, true))
                 ->withCookie(Cookie::forever('token', $token, null, null, false, true))
-                ->withCookie(Cookie::forever('id', $user->id, null, null, false, false));
+                ->withCookie(Cookie::forever('id', $user->id, null, null, false, false))
+                ->withCookie(Cookie::forever('avatar', $avatarUrl, null, null, false, false));
         }
 
         return response()->json(['message' => 'Invalid credentials'], 401);
@@ -127,7 +123,9 @@ class AuthController extends Controller
         return response()->json(['message' => 'Logout successful'])
             ->withCookie(Cookie::forget('username'))
             ->withCookie(Cookie::forget('email'))
-            ->withCookie(Cookie::forget('token'));
+            ->withCookie(Cookie::forget('token'))
+            ->withCookie(Cookie::forget('id'))
+            ->withCookie(Cookie::forget('avatar'));
     }
 
     public function register(Request $request): JsonResponse
@@ -219,161 +217,5 @@ class AuthController extends Controller
             $this->userToArray($user, $this->getRequestedFields($request)),
             ['message' => 'Avatar updated successfully']
         ));
-    }
-
-    public function storeComment(Request $request): JsonResponse
-    {
-        $user = $request->user();
-        $rateLimitKey = 'comment:' . $user->id;
-        if (RateLimiter::tooManyAttempts($rateLimitKey, 10)) {
-            return response()->json(['message' => 'Too many comment attempts'], 429);
-        }
-        RateLimiter::hit($rateLimitKey, 60);
-
-        $validated = $request->validate([
-            'text' => 'required|string|max:1000',
-            'media1_id' => 'required|exists:media1,id',
-            'timestamp' => 'nullable|numeric|min:0',
-            'parent_id' => 'nullable|exists:comments,id',
-        ]);
-
-        $parentId = $validated['parent_id'] ?? null;
-
-        // Check parent_id belongs to same media
-        if ($parentId) {
-            $parent = Comment::find($parentId);
-            if (!$parent || $parent->media1_id != $validated['media1_id']) {
-                return response()->json(['message' => 'Invalid parent comment for this media'], 422);
-            }
-        }
-
-        $comment = Comment::create([
-            'text' => trim($validated['text']),
-            'timestamp' => $validated['timestamp'] ?? null,
-            'user_id' => $user->id,
-            'media1_id' => $validated['media1_id'],
-            'parent_id' => $parentId,
-        ]);
-
-        $comment->load('user');
-
-        return response()->json([
-            'id' => $comment->id,
-            'text' => $comment->text,
-            'timestamp' => $comment->timestamp,
-            'formatted_timestamp' => $comment->timestamp ? gmdate('i:s', (int)$comment->timestamp) : null,
-            'parent_id' => $comment->parent_id,
-            'user' => $this->userToArray($comment->user),
-            'message' => 'Comment created successfully',
-        ], 201);
-    }
-
-
-    public function getComments(Request $request, $mediaId): JsonResponse
-    {
-        $request->merge(['media1_id' => $mediaId]);
-        $validated = $request->validate([
-            'media1_id' => 'required|exists:media1,id',
-        ]);
-
-        $comments = Comment::where('media1_id', $validated['media1_id'])
-            ->whereNull('parent_id')
-            ->with([
-                'user' => function ($query) {
-                    $query->select('id', 'username', 'name', 'email', 'avatar');
-                },
-                'replies.user',
-                'replies.replies.user', // Optional: For deeper nesting
-            ])
-            ->orderBy('timestamp', 'asc')
-            ->orderBy('created_at', 'asc')
-            ->get();
-
-        $format = function ($comment) use (&$format) {
-            return [
-                'id' => $comment->id,
-                'text' => $comment->text,
-                'timestamp' => $comment->timestamp,
-                'formatted_timestamp' => $comment->timestamp ? gmdate('i:s', (int) $comment->timestamp) : null,
-                'parent_id' => $comment->parent_id,
-                'user' => [
-                    'id' => $comment->user->id,
-                    'name' => $comment->user->name,
-                    'username' => $comment->user->username,
-                    'email' => $comment->user->email,
-                    'avatar_url' => $comment->user->avatar ? Storage::url($comment->user->avatar) : null,
-                ],
-                'replies' => $comment->replies->map($format)->values(),
-            ];
-        };
-
-        $data = $comments->map($format)->values();
-
-        return response()->json([
-            'data' => $data,
-            'message' => 'Comments retrieved successfully',
-        ]);
-    }
-
-
-
-    public function updateComment(Request $request, $id): JsonResponse
-    {
-        try {
-            $comment = Comment::findOrFail($id);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Comment not found'], 404);
-        }
-
-        $user = $request->user();
-        if ($comment->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized to update this comment'], 403);
-        }
-
-        $validated = $request->validate([
-            'text' => 'required|string|max:1000',
-            'timestamp' => 'nullable|numeric|min:0',
-        ]);
-
-        $comment->update([
-            'text' => trim($validated['text']),
-            'timestamp' => $validated['timestamp'] ?? $comment->timestamp,
-        ]);
-
-        $comment->load('user');
-
-        if (!$comment->user instanceof User) {
-            $comment->user = User::find($comment->user_id);
-            if (!$comment->user) {
-                return response()->json(['message' => 'Comment user not found'], 404);
-            }
-        }
-
-        return response()->json([
-            'id' => $comment->id,
-            'text' => $comment->text,
-            'timestamp' => $comment->timestamp,
-            'formatted_timestamp' => $comment->timestamp ? gmdate('i:s', (int)$comment->timestamp) : null,
-            'user' => $this->userToArray($comment->user),
-            'message' => 'Comment updated successfully',
-        ]);
-    }
-
-    public function destroyComment(Request $request, $id): JsonResponse
-    {
-        try {
-            $comment = Comment::findOrFail($id);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => 'Comment not found'], 404);
-        }
-
-        $user = $request->user();
-        if ($comment->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized to delete this comment'], 403);
-        }
-
-        $comment->delete();
-
-        return response()->json(['message' => 'Comment deleted successfully']);
     }
 }
