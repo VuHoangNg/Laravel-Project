@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from "react";
 import { useSelector } from "react-redux";
-import { Typography, List, Button, Form, Input, Avatar, Space, Spin } from "antd";
+import { Typography, Button, Form, Input, Avatar, Space, Spin } from "antd";
 import {
     EditOutlined,
     DeleteOutlined,
@@ -10,27 +10,47 @@ import {
 const { Title, Text: AntText } = Typography;
 const { TextArea } = Input;
 
+// Flatten nested comments (top-level + replies) into a flat array
+const flattenComments = (comments) => {
+    const flatList = [];
+    comments.forEach((comment) => {
+        // Add top-level comment
+        flatList.push({
+            ...comment,
+            children: undefined, // Remove replies to avoid duplication
+        });
+        // Add replies, if any
+        if (comment.replies && comment.replies.length > 0) {
+            comment.replies.forEach((reply) => {
+                flatList.push({
+                    ...reply,
+                    children: undefined, // Ensure no deeper nesting
+                });
+            });
+        }
+    });
+    return flatList;
+};
+
 const buildCommentTree = (comments) => {
-    // Recursively map 'replies' to 'children' for all levels
-    const mapRepliesToChildren = (comment) => ({
-        ...comment,
-        children: (comment.replies || []).map((reply) => mapRepliesToChildren(reply)),
+    const topLevel = comments.filter((c) => !c.parent_id);
+    const replyMap = {};
+
+    comments.forEach((c) => {
+        if (c.parent_id) {
+            if (!replyMap[c.parent_id]) replyMap[c.parent_id] = [];
+            replyMap[c.parent_id].push({ ...c });
+        }
     });
 
-    // Build the tree by mapping each comment and its replies
-    const tree = comments.map((comment) => mapRepliesToChildren(comment));
+    const tree = topLevel.map((comment) => ({
+        ...comment,
+        children: (replyMap[comment.id] || []).sort(
+            (a, b) => new Date(a.created_at) - new Date(b.created_at)
+        ),
+    }));
 
-    // Sort comments by timestamp (since created_at is not available, use timestamp)
-    const sortComments = (commentList) => {
-        commentList.sort((a, b) => a.timestamp - b.timestamp);
-        commentList.forEach((comment) => {
-            if (comment.children && comment.children.length > 0) {
-                sortComments(comment.children);
-            }
-        });
-    };
-
-    sortComments(tree);
+    tree.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
     return tree;
 };
 
@@ -56,7 +76,12 @@ const CommentItem = ({
                 </Avatar>
                 <div style={{ color: "#fff", flex: 1 }}>
                     <AntText
-                        style={{ fontSize: 12, opacity: 0.7, display: "block", color: "white" }}
+                        style={{
+                            fontSize: 12,
+                            opacity: 0.7,
+                            display: "block",
+                            color: "white",
+                        }}
                     >
                         {comment.parent_id && (
                             <span style={{ marginRight: 8 }}>↳</span>
@@ -149,7 +174,7 @@ const CommentSidebar = ({
     updateContentWidth,
     debouncedUpdateContentWidth,
     currentUserId,
-    commentLoading, // Added prop to show loading state
+    commentLoading,
 }) => {
     const comments = useSelector((state) => state.media.comments);
     const commentSplitterRef = useRef(null);
@@ -176,11 +201,16 @@ const CommentSidebar = ({
         }
     }, [replyTo, commentForm]);
 
+    // Flatten the nested comments structure before building the tree
     const commentList = comments[selectedMedia?.id] || [];
-    const commentTree = buildCommentTree(commentList);
+    const flattenedComments = flattenComments(commentList);
+    const commentTree = buildCommentTree(flattenedComments);
 
     const handleReplyClick = (comment) => {
-        setReplyTo(comment);
+        // If comment is level 2 (has parent_id), use its parent_id to reply under the same level 1 comment
+        // If comment is level 1 (no parent_id), use its id as parent_id
+        const parentId = comment.parent_id ? comment.parent_id : comment.id;
+        setReplyTo({ ...comment, id: parentId });
     };
 
     const handleSubmit = (values) => {
@@ -271,7 +301,9 @@ const CommentSidebar = ({
                                             comment={comment}
                                             currentUserId={currentUserId}
                                             onReplyClick={handleReplyClick}
-                                            handleEditComment={handleEditComment}
+                                            handleEditComment={
+                                                handleEditComment
+                                            }
                                             handleDeleteComment={
                                                 handleDeleteComment
                                             }
@@ -282,7 +314,10 @@ const CommentSidebar = ({
                                     ))
                                 ) : (
                                     <Typography
-                                        style={{ color: "#fff", fontSize: "16px" }}
+                                        style={{
+                                            color: "#fff",
+                                            fontSize: "16px",
+                                        }}
                                     >
                                         No comments yet.
                                     </Typography>

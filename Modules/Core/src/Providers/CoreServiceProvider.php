@@ -4,7 +4,10 @@ namespace Modules\Core\src\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Database\Eloquent\Factory;
-
+use Modules\Core\src\Repositories\CommentRepository;
+use Modules\Core\src\Repositories\CommentRepositoryInterface;
+use Modules\Core\src\Repositories\NotificationRepository;
+use Modules\Core\src\Repositories\NotificationRepositoryInterface;
 class CoreServiceProvider extends ServiceProvider
 {
     /**
@@ -39,6 +42,8 @@ class CoreServiceProvider extends ServiceProvider
     public function register()
     {
         $this->app->register(RouteServiceProvider::class);
+        $this->app->bind(CommentRepositoryInterface::class, CommentRepository::class);
+        $this->app->bind(NotificationRepositoryInterface::class, NotificationRepository::class);
     }
 
     /**
