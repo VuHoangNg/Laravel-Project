@@ -22,6 +22,7 @@ import {
     Avatar,
     message,
     Typography,
+    Skeleton,
 } from "antd";
 import { Routes, Route, Link, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
@@ -70,11 +71,14 @@ class CoreErrorBoundary extends Component {
 
 const { Header, Sider, Content } = Layout;
 
+const PAGE_SIZE = 5;
+
 function Core() {
     const [collapsed, setCollapsed] = useState(false);
     const [notifications, setNotifications] = useState([]);
     const [notificationPage, setNotificationPage] = useState(1);
-    const [notificationPageSize] = useState(5);
+    const [initLoading, setInitLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [totalNotifications, setTotalNotifications] = useState(0);
     const { token } = useSelector((state) => state.auth);
     const dispatch = useDispatch();
@@ -89,16 +93,31 @@ function Core() {
         if (parts.length === 2) {
             const cookieValue = parts.pop().split(";").shift();
             const decodedValue = decodeURIComponent(cookieValue);
-            console.log(`Cookie ${name}:`, decodedValue);
             return decodedValue;
         }
-        console.log(`Cookie ${name} not found`);
         return null;
     };
 
     const userId = getCookie("id");
     const username = getCookie("username");
     const avatarUrl = getCookie("avatar");
+
+    const fetchNotifications = async (page) => {
+        try {
+            const response = await api.get("/api/core/notifications", {
+                headers: { Authorization: `Bearer ${token}` },
+                params: { page, per_page: PAGE_SIZE },
+            });
+            return {
+                data: response.data.data || [],
+                total: response.data.total || 0,
+            };
+        } catch (error) {
+            message.error("Failed to load notifications.");
+            console.error("Fetch notifications error:", error);
+            return { data: [], total: 0 };
+        }
+    };
 
     useEffect(() => {
         if (!token || !userId) {
@@ -108,23 +127,11 @@ function Core() {
             return;
         }
 
-        // Fetch notifications
-        const fetchNotifications = async (page = 1) => {
-            try {
-                const response = await api.get("/api/core/notifications", {
-                    headers: { Authorization: `Bearer ${token}` },
-                    params: { page, per_page: notificationPageSize },
-                });
-                console.log("Fetched notifications (page", page, "):", response.data);
-                setNotifications(response.data.data || []);
-                setTotalNotifications(response.data.total || 0);
-            } catch (error) {
-                message.error("Failed to load notifications.");
-                console.error("Fetch notifications error:", error);
-            }
-        };
-
-        fetchNotifications(notificationPage);
+        fetchNotifications(notificationPage).then(({ data, total }) => {
+            setInitLoading(false);
+            setNotifications(data);
+            setTotalNotifications(total);
+        });
 
         // Initialize Pusher
         Pusher.logToConsole = true;
@@ -136,47 +143,18 @@ function Core() {
             enabledTransports: ["ws", "wss"],
         });
 
-        pusher.connection.bind("connected", () => {
-            console.log("Pusher connected");
-        });
-
-        pusher.connection.bind("error", (err) => {
-            console.error("Pusher error:", err);
-            message.error("Real-time notifications are temporarily unavailable.");
-        });
-
-        pusher.connection.bind("state_change", (states) => {
-            console.log("Pusher state change:", states);
-            if (states.current === "disconnected") {
-                message.warning("Pusher disconnected. Attempting to reconnect...");
-            }
-        });
-
         const channel = pusher.subscribe(`notifications.${userId}`);
         channel.bind("App\\Events\\NewCommentNotification", (data) => {
-            console.log("New notification received:", data);
             setNotifications((prev) => {
                 if (!prev.find((n) => n.id === data.id)) {
-                    const newNotifications = [data, ...prev];
-                    return newNotifications.slice(0, 10); // Keep max 10
+                    return [data, ...prev];
                 }
                 return prev;
             });
             setTotalNotifications((prev) => prev + 1);
         });
 
-        channel.bind("pusher:subscription_succeeded", () => {
-            console.log(`Subscribed to notifications.${userId}`);
-        });
-
-        channel.bind("pusher:subscription_error", (err) => {
-            console.error("Pusher subscription error:", err);
-            message.error("Failed to subscribe to notifications.");
-        });
-
-        // Cleanup only when component unmounts or token/userId changes
         return () => {
-            console.log("Cleaning up Pusher for notifications.${userId}");
             try {
                 pusher.unsubscribe(`notifications.${userId}`);
                 pusher.disconnect();
@@ -184,7 +162,7 @@ function Core() {
                 console.warn("Error during Pusher cleanup:", err);
             }
         };
-    }, [token, userId]); // Removed navigate, notificationPageSize from dependencies
+    }, [token, userId]);
 
     const handleLogout = () => {
         Modal.confirm({
@@ -222,27 +200,38 @@ function Core() {
         navigate(`/media/${notification.media1_id}`);
     };
 
-    const handleSeeMore = () => {
+    const onLoadMore = () => {
+        setLoading(true);
+        setNotifications((prev) =>
+            prev.concat(Array.from({ length: PAGE_SIZE }).map(() => ({ loading: true })))
+        );
+
         const newPage = notificationPage + 1;
         setNotificationPage(newPage);
-        api
-            .get("/api/core/notifications", {
-                headers: { Authorization: `Bearer ${token}` },
-                params: { page: newPage, per_page: notificationPageSize },
-            })
-            .then((response) => {
-                console.log("See More notifications (page", newPage, "):", response.data);
-                setNotifications((prev) => {
-                    const newNotifications = [...prev, ...(response.data.data || [])];
-                    return newNotifications.slice(-10); // Keep only the latest 10
-                });
-                setTotalNotifications(response.data.total || 0);
-            })
-            .catch((error) => {
-                message.error("Failed to load more notifications.");
-                console.error("See More error:", error);
-            });
+
+        fetchNotifications(newPage).then(({ data, total }) => {
+            const newNotifications = notifications
+                .filter((n) => !n.loading)
+                .concat(data);
+            setNotifications(newNotifications);
+            setTotalNotifications(total);
+            setLoading(false);
+            window.dispatchEvent(new Event("resize"));
+        });
     };
+
+    const loadMore =
+        !initLoading && !loading && notifications.length < totalNotifications ? (
+            <div
+                style={{
+                    padding: "10px",
+                    textAlign: "center",
+                    borderTop: "1px solid #f0f0f0",
+                }}
+            >
+                <Button onClick={onLoadMore}>Load More</Button>
+            </div>
+        ) : null;
 
     const notificationMenu = (
         <div
@@ -252,7 +241,7 @@ function Core() {
                 boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15)",
             }}
         >
-            {notifications.length === 0 ? (
+            {notifications.length === 0 && !initLoading ? (
                 <div
                     style={{
                         padding: "20px",
@@ -272,66 +261,46 @@ function Core() {
                             maxHeight: 800,
                             overflowY: "auto",
                         }}
+                        itemLayout="horizontal"
+                        loadMore={loadMore}
                         dataSource={notifications}
                         renderItem={(item) => (
                             <List.Item
-                                onClick={() => handleNotificationClick(item)}
+                                onClick={() => !item.loading && handleNotificationClick(item)}
                                 style={{
-                                    cursor: "pointer",
-                                    backgroundColor: item.is_read
-                                        ? "#fff"
-                                        : "#f0f5ff",
+                                    cursor: item.loading ? "default" : "pointer",
+                                    backgroundColor: item.is_read ? "#fff" : "#f0f5ff",
                                     padding: "20px",
                                     transition: "background-color 0.3s",
                                 }}
                                 onMouseEnter={(e) =>
-                                    (e.currentTarget.style.backgroundColor =
-                                        "#e6e6e6")
+                                    !item.loading &&
+                                    (e.currentTarget.style.backgroundColor = "#e6e6e6")
                                 }
                                 onMouseLeave={(e) =>
-                                    (e.currentTarget.style.backgroundColor =
-                                        item.is_read ? "#fff" : "#f0f5ff")
+                                    !item.loading &&
+                                    (e.currentTarget.style.backgroundColor = item.is_read ? "#fff" : "#f0f5ff")
                                 }
                             >
-                                <List.Item.Meta
-                                    avatar={
-                                        <Avatar
-                                            src={
-                                                item.triggered_by?.avatar_url ||
-                                                undefined
-                                            }
-                                            icon={
-                                                !item.triggered_by?.avatar_url && (
-                                                    <UserOutlined />
-                                                )
-                                            }
-                                        />
-                                    }
-                                    title={item.message}
-                                    description={`By ${
-                                        item.triggered_by?.username || "Unknown"
-                                    } on ${
-                                        item.media?.title || "Media"
-                                    } - ${new Date(
-                                        item.created_at
-                                    ).toLocaleString()}`}
-                                />
+                                <Skeleton avatar title={false} loading={item.loading} active>
+                                    <List.Item.Meta
+                                        avatar={
+                                            <Avatar
+                                                src={item.triggered_by?.avatar_url || undefined}
+                                                icon={!item.triggered_by?.avatar_url && <UserOutlined />}
+                                            />
+                                        }
+                                        title={item.message}
+                                        description={`By ${
+                                            item.triggered_by?.username || "Unknown"
+                                        } on ${
+                                            item.media?.title || "Media"
+                                        } - ${item.created_at ? new Date(item.created_at).toLocaleString() : "Unknown time"}`}
+                                    />
+                                </Skeleton>
                             </List.Item>
                         )}
                     />
-                    {notifications.length < totalNotifications && (
-                        <div
-                            style={{
-                                padding: "10px",
-                                textAlign: "center",
-                                borderTop: "1px solid #f0f0f0",
-                            }}
-                        >
-                            <Button type="link" onClick={handleSeeMore}>
-                                See More
-                            </Button>
-                        </div>
-                    )}
                 </>
             )}
         </div>
@@ -394,7 +363,7 @@ function Core() {
                             >
                                 <Badge
                                     count={
-                                        notifications.filter((n) => !n.is_read)
+                                        notifications.filter((n) => !n.is_read && !n.loading)
                                             .length
                                     }
                                     offset={[-5, 5]}

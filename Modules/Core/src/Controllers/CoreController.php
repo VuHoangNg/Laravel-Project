@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Validation\ValidationException;
 use UnauthorizedException;
 use Illuminate\Support\Facades\Storage;
+
 class CoreController extends Controller
 {
     protected $commentRepository;
@@ -36,80 +37,11 @@ class CoreController extends Controller
         ]);
     }
 
-    /**
-     * Display a listing of the resource.
-     * @return Renderable
-     */
     public function index()
     {
         return view('core::index');
     }
 
-    /**
-     * Show the form for creating a new resource.
-     * @return Renderable
-     */
-    public function create()
-    {
-        return view('core::create');
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     * @param Request $request
-     * @return Renderable
-     */
-    public function store(Request $request)
-    {
-        //
-    }
-
-    /**
-     * Show the specified resource.
-     * @param int $id
-     * @return Renderable
-     */
-    public function show($id)
-    {
-        return view('core::show');
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     * @param int $id
-     * @return Renderable
-     */
-    public function edit($id)
-    {
-        return view('core::edit');
-    }
-
-    /**
-     * Update the specified resource in storage.
-     * @param Request $request
-     * @param int $id
-     * @return Renderable
-     */
-    public function update(Request $request, $id)
-    {
-        //
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     * @param int $id
-     * @return Renderable
-     */
-    public function destroy($id)
-    {
-        //
-    }
-
-    /**
-     * Store a new comment.
-     * @param Request $request
-     * @return JsonResponse
-     */
     public function storeComment(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -146,24 +78,26 @@ class CoreController extends Controller
         }
     }
 
-    /**
-     * Get comments for a specific media.
-     * @param Request $request
-     * @param int $mediaId
-     * @return JsonResponse
-     */
     public function getComments(Request $request, $mediaId): JsonResponse
     {
         try {
             $request->merge(['media1_id' => $mediaId]);
-            $request->validate([
+            $validated = $request->validate([
                 'media1_id' => 'required|exists:media1,id',
+                'page' => 'nullable|integer|min:1',
+                'per_page' => 'nullable|integer|min:1|max:100',
             ]);
 
-            $comments = $this->commentRepository->getByMediaId($mediaId);
+            $page = $request->query('page', 1);
+            $perPage = $request->query('per_page', 5);
+            $comments = $this->commentRepository->getByMediaId($mediaId, $page, $perPage);
 
             return response()->json([
-                'data' => CommentResource::collection($comments),
+                'data' => CommentResource::collection($comments->items()),
+                'total' => $comments->total(),
+                'current_page' => $comments->currentPage(),
+                'per_page' => $comments->perPage(),
+                'last_page' => $comments->lastPage(),
                 'message' => 'Comments retrieved successfully',
             ]);
         } catch (ValidationException $e) {
@@ -171,12 +105,6 @@ class CoreController extends Controller
         }
     }
 
-    /**
-     * Update a comment.
-     * @param Request $request
-     * @param int $id
-     * @return JsonResponse
-     */
     public function updateComment(Request $request, $id): JsonResponse
     {
         try {
@@ -208,12 +136,6 @@ class CoreController extends Controller
         }
     }
 
-    /**
-     * Delete a comment.
-     * @param Request $request
-     * @param int $id
-     * @return JsonResponse
-     */
     public function destroyComment(Request $request, $id): JsonResponse
     {
         try {
@@ -229,14 +151,9 @@ class CoreController extends Controller
         }
     }
 
-    /**
-     * Get notifications for the authenticated user.
-     * @param Request $request
-     * @return JsonResponse
-     */
     public function getNotifications(Request $request): JsonResponse
     {
-        $perPage = $request->query('per_page', 20); // Default to 20 per page
+        $perPage = $request->query('per_page', 20);
         $notifications = $this->notificationRepository->getForUser($request->user(), $perPage);
 
         return response()->json([
@@ -248,12 +165,6 @@ class CoreController extends Controller
         ]);
     }
 
-    /**
-     * Mark a notification as read.
-     * @param Request $request
-     * @param int $id
-     * @return JsonResponse
-     */
     public function markNotificationAsRead(Request $request, $id): JsonResponse
     {
         try {
@@ -273,12 +184,6 @@ class CoreController extends Controller
         }
     }
 
-    /**
-     * Convert a user to an array with avatar URL.
-     * @param User $user
-     * @param array $fields
-     * @return array
-     */
     private function userToArray(User $user, array $fields = []): array
     {
         $data = [

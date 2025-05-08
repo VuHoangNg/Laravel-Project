@@ -24,7 +24,6 @@ const getCookie = (name) => {
 export function MediaProvider({ children, api }) {
     const dispatch = useDispatch();
 
-    // State for creating media
     const [formData, setFormData] = useState({
         title: "",
         file: null,
@@ -57,7 +56,6 @@ export function MediaProvider({ children, api }) {
         },
     };
 
-    // State for getting media
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     const getMediaContext = {
@@ -98,33 +96,27 @@ export function MediaProvider({ children, api }) {
         },
     };
 
-    // Function to build a comment tree from a flat list
     const buildCommentTree = (comments) => {
         const commentMap = new Map();
         const tree = [];
 
-        // First pass: Create a map of comments by ID
         comments.forEach((comment) => {
-            comment.children = []; // Initialize children array
+            comment.children = [];
             commentMap.set(comment.id, comment);
         });
 
-        // Second pass: Build the tree by linking children to parents
         comments.forEach((comment) => {
             if (comment.parent_id) {
                 const parent = commentMap.get(comment.parent_id);
                 if (parent) {
                     parent.children.push(comment);
                 } else {
-                    // If parent_id doesn't exist (e.g., parent was deleted), treat as top-level
                     tree.push(comment);
                 }
             } else {
                 tree.push(comment);
             }
         });
-
-        // Sort comments by creation time (assuming a created_at field)
         const sortComments = (commentList) => {
             commentList.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
             commentList.forEach((comment) => {
@@ -138,19 +130,27 @@ export function MediaProvider({ children, api }) {
         return tree;
     };
 
-    // Comment context
     const commentContext = {
-        fetchComments: async (mediaId) => {
+        fetchComments: async (mediaId, { page = 1, per_page = 5 } = {}) => {
+            console.log("Fetching comments for mediaId:", mediaId, "with page:", page, "per_page:", per_page);
             try {
-                const response = await api.get(`/api/core/media/${mediaId}/comments/`, {
+                const response = await api.get(`/api/core/media/${mediaId}/comments`, {
+                    params: { page, per_page },
                     headers: {
                         Authorization: `Bearer ${getCookie("token")}`,
                     },
                 });
+                console.log("API response:", response.data);
                 const commentTree = buildCommentTree(response.data.data);
                 dispatch(setComments(mediaId, commentTree));
-                return { data: commentTree };
+                return {
+                    data: commentTree,
+                    total: response.data.total || response.data.data.length,
+                    current_page: response.data.current_page || page,
+                    per_page: response.data.per_page || per_page,
+                };
             } catch (error) {
+                console.error("Error fetching comments:", error);
                 throw error;
             }
         },

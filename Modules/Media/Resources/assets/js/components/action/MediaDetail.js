@@ -377,7 +377,6 @@ function MediaDetail({ api }) {
 
     const handleEditComment = (comment) => {
         // Placeholder: Implement edit modal or inline editing if needed
-        console.log("Edit comment:", comment);
     };
 
     const handleDeleteComment = async (commentId) => {

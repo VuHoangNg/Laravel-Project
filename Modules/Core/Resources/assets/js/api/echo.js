@@ -3,7 +3,6 @@ import Pusher from 'pusher-js';
 window.Pusher = Pusher;
 
 const token = localStorage.getItem('auth_token');
-console.log("Pusher auth token:", token);
 
 if (!token) {
     console.error("No auth token found in localStorage. Please log in again.");

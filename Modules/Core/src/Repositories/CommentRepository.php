@@ -8,6 +8,7 @@ use Modules\Media\src\Models\Media1;
 use Modules\Auth\src\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class CommentRepository implements CommentRepositoryInterface
 {
@@ -49,7 +50,7 @@ class CommentRepository implements CommentRepositoryInterface
         return $comment;
     }
 
-    public function getByMediaId(int $mediaId): \Illuminate\Database\Eloquent\Collection
+    public function getByMediaId(int $mediaId, int $page, int $perPage): LengthAwarePaginator
     {
         return Comment::where('media1_id', $mediaId)
             ->whereNull('parent_id')
@@ -61,7 +62,7 @@ class CommentRepository implements CommentRepositoryInterface
             ])
             ->orderBy('timestamp', 'asc')
             ->orderBy('created_at', 'asc')
-            ->get();
+            ->paginate($perPage, ['*'], 'page', $page);
     }
 
     public function update(int $id, array $data, User $user): ?Comment

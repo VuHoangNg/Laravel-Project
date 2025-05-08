@@ -1,30 +1,39 @@
 import React, { useRef, useEffect, useState } from "react";
 import { useSelector } from "react-redux";
-import { Typography, Button, Form, Input, Avatar, Space, Spin } from "antd";
+import {
+    Typography,
+    Button,
+    Form,
+    Input,
+    Avatar,
+    Space,
+    Divider,
+    Spin,
+    Skeleton,
+} from "antd";
 import {
     EditOutlined,
     DeleteOutlined,
     CommentOutlined,
 } from "@ant-design/icons";
+import InfiniteScroll from "react-infinite-scroll-component";
+import { useMediaContext } from "../context/MediaContext";
 
 const { Title, Text: AntText } = Typography;
 const { TextArea } = Input;
 
-// Flatten nested comments (top-level + replies) into a flat array
 const flattenComments = (comments) => {
     const flatList = [];
     comments.forEach((comment) => {
-        // Add top-level comment
         flatList.push({
             ...comment,
-            children: undefined, // Remove replies to avoid duplication
+            children: undefined,
         });
-        // Add replies, if any
         if (comment.replies && comment.replies.length > 0) {
             comment.replies.forEach((reply) => {
                 flatList.push({
                     ...reply,
-                    children: undefined, // Ensure no deeper nesting
+                    children: undefined,
                 });
             });
         }
@@ -176,10 +185,14 @@ const CommentSidebar = ({
     currentUserId,
     commentLoading,
 }) => {
-    const comments = useSelector((state) => state.media.comments);
     const commentSplitterRef = useRef(null);
     const [replyTo, setReplyTo] = useState(null);
-
+    const [comments, setComments] = useState([]);
+    const [page, setPage] = useState(1);
+    const [loading, setLoading] = useState(false);
+    const [hasMore, setHasMore] = useState(true);
+    const PAGE_SIZE = 5;
+    const { commentContext } = useMediaContext();
     useEffect(() => {
         if (isResizingComment) {
             window.addEventListener("mousemove", handleCommentMouseMove);
@@ -201,14 +214,48 @@ const CommentSidebar = ({
         }
     }, [replyTo, commentForm]);
 
-    // Flatten the nested comments structure before building the tree
-    const commentList = comments[selectedMedia?.id] || [];
-    const flattenedComments = flattenComments(commentList);
-    const commentTree = buildCommentTree(flattenedComments);
+    useEffect(() => {
+        if (!selectedMedia?.id) return;
+        setComments([]);
+        setPage(1);
+        setHasMore(true);
+        setTimeout(() => {
+            loadMoreComments();
+        }, 0);
+    }, [selectedMedia?.id]);
+
+    const loadMoreComments = async () => {
+        if (loading || !selectedMedia?.id) return;
+        setLoading(true);
+        try {
+            const response = await commentContext.fetchComments(
+                selectedMedia.id,
+                {
+                    page: page,
+                    per_page: PAGE_SIZE,
+                }
+            );
+            const newComments = response.data || [];
+            setComments((prev) => {
+                const flatPrev = flattenComments(prev);
+                const flatNew = flattenComments(newComments);
+                const combined = [...flatPrev, ...flatNew];
+                return buildCommentTree(combined);
+            });
+            setHasMore(newComments.length === PAGE_SIZE);
+            setPage((prev) => {
+                const nextPage = prev + 1;
+                console.log(`Incrementing page to: ${nextPage}`);
+                return nextPage;
+            });
+        } catch (error) {
+            console.error("Error loading comments:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleReplyClick = (comment) => {
-        // If comment is level 2 (has parent_id), use its parent_id to reply under the same level 1 comment
-        // If comment is level 1 (no parent_id), use its id as parent_id
         const parentId = comment.parent_id ? comment.parent_id : comment.id;
         setReplyTo({ ...comment, id: parentId });
     };
@@ -282,6 +329,7 @@ const CommentSidebar = ({
                                     overflowY: "auto",
                                     marginBottom: "16px",
                                 }}
+                                id="scrollableCommentDiv"
                             >
                                 {commentLoading ? (
                                     <div
@@ -294,24 +342,46 @@ const CommentSidebar = ({
                                     >
                                         <Spin tip="Loading comments..." />
                                     </div>
-                                ) : commentTree.length > 0 ? (
-                                    commentTree.map((comment) => (
-                                        <CommentItem
-                                            key={comment.id}
-                                            comment={comment}
-                                            currentUserId={currentUserId}
-                                            onReplyClick={handleReplyClick}
-                                            handleEditComment={
-                                                handleEditComment
-                                            }
-                                            handleDeleteComment={
-                                                handleDeleteComment
-                                            }
-                                            handleTimestampClick={
-                                                handleTimestampClick
-                                            }
-                                        />
-                                    ))
+                                ) : comments.length > 0 ? (
+                                    <InfiniteScroll
+                                        dataLength={comments.length}
+                                        next={loadMoreComments}
+                                        hasMore={hasMore}
+                                        loader={
+                                            <Skeleton
+                                                avatar
+                                                paragraph={{ rows: 1 }}
+                                                active
+                                            />
+                                        }
+                                        endMessage={
+                                            <Divider
+                                                plain
+                                                style={{ color: "white" }}
+                                            >
+                                                No more comments 🤐
+                                            </Divider>
+                                        }
+                                        scrollableTarget="scrollableCommentDiv"
+                                    >
+                                        {comments.map((comment) => (
+                                            <CommentItem
+                                                key={comment.id}
+                                                comment={comment}
+                                                currentUserId={currentUserId}
+                                                onReplyClick={handleReplyClick}
+                                                handleEditComment={
+                                                    handleEditComment
+                                                }
+                                                handleDeleteComment={
+                                                    handleDeleteComment
+                                                }
+                                                handleTimestampClick={
+                                                    handleTimestampClick
+                                                }
+                                            />
+                                        ))}
+                                    </InfiniteScroll>
                                 ) : (
                                     <Typography
                                         style={{

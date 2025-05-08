@@ -19,7 +19,7 @@ const MediaContent = () => {
     const [editCommentForm] = Form.useForm();
     const [searchParams, setSearchParams] = useSearchParams();
     const [loading, setLoading] = useState(false);
-    const [commentLoading, setCommentLoading] = useState(false); // New state for comment fetching
+    const [commentLoading, setCommentLoading] = useState(false);
     const [error, setError] = useState(null);
     const [selectedMedia, setSelectedMedia] = useState(null);
     const [siderWidth, setSiderWidth] = useState(400);
@@ -663,6 +663,7 @@ const MediaContent = () => {
                     debouncedUpdateContentWidth={debouncedUpdateContentWidth}
                     currentUserId={currentUserId}
                     commentLoading={commentLoading}
+                    commentContext={commentContext}
                 />
             </Layout>
             <CreateMediaModal
