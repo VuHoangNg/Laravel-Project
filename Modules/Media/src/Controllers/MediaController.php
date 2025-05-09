@@ -48,7 +48,7 @@ class MediaController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'title' => 'required|string|max:255',
+            'title' => 'nullable|string|max:255|unique:media1,title',
             'file' => 'required|file|mimes:jpg,jpeg,png,mp4,mov,avi|max:20480',
         ], [
             'file.mimes' => 'Only images (jpg, jpeg, png) or videos (mp4, mov, avi) are allowed.',

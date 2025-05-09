@@ -106,13 +106,10 @@ class NotificationRepository implements NotificationRepositoryInterface
             ])
             ->orderBy('created_at', 'desc')
             ->paginate($perPage);
-
-        Log::info('Notifications fetched', [
-            'user_id' => $user->id,
-            'notification_count' => $notifications->total(),
-            'page' => $notifications->currentPage(),
-        ]);
-
+        $unreadCount = Notification::where('user_id', $user->id)
+            ->where('is_read', false)
+            ->count();
+        $notifications->unreadCount = $unreadCount;
         return $notifications;
     }
 

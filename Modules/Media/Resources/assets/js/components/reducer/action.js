@@ -1,13 +1,13 @@
-export const SET_MEDIA = "media/setMedia";
-export const ADD_MEDIA = "media/addMedia";
-export const UPDATE_MEDIA = "media/updateMedia";
-export const DELETE_MEDIA = "media/deleteMedia";
-export const SET_COMMENTS = "comments/setComments";
-export const ADD_COMMENT = "comments/addComment";
-export const UPDATE_COMMENT = "comments/updateComment";
-export const DELETE_COMMENT = "comments/deleteComment";
+export const SET_MEDIA = "SET_MEDIA";
+export const ADD_MEDIA = "ADD_MEDIA";
+export const UPDATE_MEDIA = "UPDATE_MEDIA";
+export const DELETE_MEDIA = "DELETE_MEDIA";
+export const SET_COMMENTS = "SET_COMMENTS";
+export const APPEND_COMMENTS = "APPEND_COMMENTS";
+export const ADD_COMMENT = "ADD_COMMENT";
+export const UPDATE_COMMENT = "UPDATE_COMMENT";
+export const DELETE_COMMENT = "DELETE_COMMENT";
 
-// Media Action Creators
 export const setMedia = (media) => ({
     type: SET_MEDIA,
     payload: media,
@@ -28,9 +28,13 @@ export const deleteMedia = (mediaId) => ({
     payload: mediaId,
 });
 
-// Comment Action Creators
 export const setComments = (mediaId, comments) => ({
     type: SET_COMMENTS,
+    payload: { mediaId, comments },
+});
+
+export const appendComments = (mediaId, comments) => ({
+    type: APPEND_COMMENTS,
     payload: { mediaId, comments },
 });
 

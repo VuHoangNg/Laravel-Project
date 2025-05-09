@@ -13,7 +13,7 @@ function Media({ api }) {
         <MediaProvider api={api}>
             <Content>
                 <Routes>
-                    <Route path="/" element={<MediaContent />} />
+                    <Route path="/" element={<MediaContent api={api}/>} />
                     <Route path="/:id" element={<MediaDetail api={api} />} />
                     <Route path="*" element={<div>404 - Page Not Found</div>} />
                 </Routes>

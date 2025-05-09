@@ -61,7 +61,7 @@ class CommentRepository implements CommentRepositoryInterface
                 'replies.user',
             ])
             ->orderBy('timestamp', 'asc')
-            ->orderBy('created_at', 'asc')
+            ->orderBy('created_at', 'desc')
             ->paginate($perPage, ['*'], 'page', $page);
     }
 

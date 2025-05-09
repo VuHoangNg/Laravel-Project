@@ -9,42 +9,44 @@ import {
     Typography,
 } from "antd";
 import { UserOutlined } from "@ant-design/icons";
-import api from "../../api/api";
+
 
 const PAGE_SIZE = 20;
 
-const NotificationsList = ({ token, onNotificationClick }) => {
+const NotificationsList = ({
+    token,
+    userId,
+    notifications,
+    totalNotifications,
+    unreadCount,
+    onNotificationClick,
+    fetchNotifications,
+    setNotifications,
+    setTotalNotifications,
+    setUnreadCount,
+}) => {
     const [initLoading, setInitLoading] = useState(true);
     const [loading, setLoading] = useState(false);
-    const [data, setData] = useState([]);
-    const [list, setList] = useState([]);
     const [page, setPage] = useState(1);
 
-    const fetchNotifications = async (currentPage) => {
-        try {
-            const response = await api.get("/api/core/notifications", {
-                headers: { Authorization: `Bearer ${token}` },
-                params: { page: currentPage, per_page: PAGE_SIZE },
-            });
-            return response.data.data || [];
-        } catch (error) {
-            message.error("Failed to load notifications.");
-            return [];
-        }
-    };
-
     useEffect(() => {
-        fetchNotifications(page).then((results) => {
+        if (notifications.length > 0 || page > 1) {
             setInitLoading(false);
-            setData(results);
-            setList(results);
+            return;
+        }
+
+        fetchNotifications(page).then(({ data, total, unreadCount }) => {
+            setNotifications(data);
+            setTotalNotifications(total);
+            setUnreadCount(unreadCount);
+            setInitLoading(false);
         });
-    }, [token]);
+    }, [token, userId, page, fetchNotifications, setNotifications, setTotalNotifications, setUnreadCount]);
 
     const onLoadMore = () => {
         setLoading(true);
-        setList(
-            data.concat(
+        setNotifications((prev) =>
+            prev.concat(
                 Array.from({ length: PAGE_SIZE }).map(() => ({ loading: true }))
             )
         );
@@ -52,17 +54,22 @@ const NotificationsList = ({ token, onNotificationClick }) => {
         const nextPage = page + 1;
         setPage(nextPage);
 
-        fetchNotifications(nextPage).then((results) => {
-            const newData = data.concat(results);
-            setData(newData);
-            setList(newData);
+        fetchNotifications(nextPage).then(({ data, total, unreadCount }) => {
+            const newNotifications = notifications
+                .filter((n) => !n.loading)
+                .concat(data);
+            setNotifications(newNotifications);
+            setTotalNotifications(total);
+            setUnreadCount(unreadCount);
             setLoading(false);
             window.dispatchEvent(new Event("resize"));
         });
     };
 
     const loadMore =
-        !initLoading && !loading ? (
+        !initLoading &&
+        !loading &&
+        notifications.length < totalNotifications ? (
             <div
                 style={{
                     textAlign: "center",
@@ -77,8 +84,10 @@ const NotificationsList = ({ token, onNotificationClick }) => {
 
     return (
         <Layout style={{ padding: 24, background: "#fff" }}>
-            <Typography.Title level={2}>Notifications</Typography.Title>
-            {data.length === 0 && !initLoading ? (
+            <Typography.Title level={2}>
+                Notifications ({unreadCount} unread)
+            </Typography.Title>
+            {notifications.length === 0 && !initLoading ? (
                 <div
                     style={{
                         textAlign: "center",
@@ -95,7 +104,7 @@ const NotificationsList = ({ token, onNotificationClick }) => {
                     loading={initLoading}
                     itemLayout="horizontal"
                     loadMore={loadMore}
-                    dataSource={list}
+                    dataSource={notifications}
                     renderItem={(item) => (
                         <List.Item
                             onClick={() =>

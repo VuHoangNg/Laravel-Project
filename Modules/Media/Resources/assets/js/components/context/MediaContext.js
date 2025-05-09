@@ -4,6 +4,7 @@ import {
     addMedia,
     setMedia,
     setComments,
+    appendComments,
     addComment,
     updateComment,
     deleteComment,
@@ -100,11 +101,19 @@ export function MediaProvider({ children, api }) {
         const commentMap = new Map();
         const tree = [];
 
+        // Initialize comments with children array and collect replies
         comments.forEach((comment) => {
-            comment.children = [];
+            comment.children = comment.children || [];
             commentMap.set(comment.id, comment);
+            if (comment.replies && comment.replies.length > 0) {
+                comment.replies.forEach((reply) => {
+                    reply.children = reply.children || [];
+                    commentMap.set(reply.id, reply);
+                });
+            }
         });
 
+        // Build tree based on parent_id and replies
         comments.forEach((comment) => {
             if (comment.parent_id) {
                 const parent = commentMap.get(comment.parent_id);
@@ -116,9 +125,18 @@ export function MediaProvider({ children, api }) {
             } else {
                 tree.push(comment);
             }
+            if (comment.replies && comment.replies.length > 0) {
+                comment.children.push(...comment.replies);
+                comment.replies = [];
+            }
         });
+
         const sortComments = (commentList) => {
-            commentList.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+            commentList.sort(
+                (a, b) =>
+                    new Date(b.created_at || new Date()) -
+                    new Date(a.created_at || new Date())
+            );
             commentList.forEach((comment) => {
                 if (comment.children && comment.children.length > 0) {
                     sortComments(comment.children);
@@ -132,22 +150,28 @@ export function MediaProvider({ children, api }) {
 
     const commentContext = {
         fetchComments: async (mediaId, { page = 1, per_page = 5 } = {}) => {
-            console.log("Fetching comments for mediaId:", mediaId, "with page:", page, "per_page:", per_page);
             try {
-                const response = await api.get(`/api/core/media/${mediaId}/comments`, {
-                    params: { page, per_page },
-                    headers: {
-                        Authorization: `Bearer ${getCookie("token")}`,
-                    },
-                });
-                console.log("API response:", response.data);
+                const response = await api.get(
+                    `/api/core/media/${mediaId}/comments`,
+                    {
+                        params: { page, per_page },
+                        headers: {
+                            Authorization: `Bearer ${getCookie("token")}`,
+                        },
+                    }
+                );
                 const commentTree = buildCommentTree(response.data.data);
-                dispatch(setComments(mediaId, commentTree));
+                dispatch(
+                    page === 1
+                        ? setComments(mediaId, commentTree)
+                        : appendComments(mediaId, commentTree)
+                );
                 return {
                     data: commentTree,
                     total: response.data.total || response.data.data.length,
                     current_page: response.data.current_page || page,
                     per_page: response.data.per_page || per_page,
+                    last_page: response.data.last_page || 1,
                 };
             } catch (error) {
                 console.error("Error fetching comments:", error);
@@ -162,12 +186,16 @@ export function MediaProvider({ children, api }) {
                     timestamp,
                     ...(parentId && { parent_id: parentId }),
                 };
-                const response = await api.post("/api/core/comments", payload, {
-                    headers: {
-                        Authorization: `Bearer ${getCookie("token")}`,
-                        "Content-Type": "application/json",
-                    },
-                });
+                const response = await api.post(
+                    "/api/core/comments",
+                    payload,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${getCookie("token")}`,
+                            "Content-Type": "application/json",
+                        },
+                    }
+                );
                 dispatch(addComment(mediaId, response.data));
                 return response.data;
             } catch (error) {

@@ -1,21 +1,18 @@
-import React, { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import {
     Typography,
     Spin,
     Alert,
     Button,
-    Modal,
     Form,
     Input,
     Space,
-    Upload,
     Avatar,
-    List,
+    Modal,
 } from "antd";
 import { useMediaContext } from "../context/MediaContext";
 import {
-    UploadOutlined,
     CommentOutlined,
     EditOutlined,
     DeleteOutlined,
@@ -27,7 +24,10 @@ import { useSelector } from "react-redux";
 const { Title, Text: AntText } = Typography;
 const { TextArea } = Input;
 
-// Function to build comment tree (reused from CommentSidebar)
+// Toggle debug logs
+const DEBUG = false;
+
+// Function to build comment tree
 const buildCommentTree = (comments) => {
     const mapRepliesToChildren = (comment) => ({
         ...comment,
@@ -51,7 +51,6 @@ const buildCommentTree = (comments) => {
     return tree;
 };
 
-// Reused CommentItem component
 const CommentItem = ({
     comment,
     currentUserId,
@@ -59,12 +58,25 @@ const CommentItem = ({
     handleEditComment,
     handleDeleteComment,
     handleTimestampClick,
+    highlightedCommentId,
 }) => {
     const isOwner =
         currentUserId && Number(currentUserId) === Number(comment.user.id);
 
     return (
-        <div style={{ marginBottom: "12px" }}>
+        <div
+            id={`comment-${comment.id}`}
+            style={{
+                marginBottom: "12px",
+                backgroundColor:
+                    highlightedCommentId === comment.id
+                        ? "rgba(24, 144, 255, 0.2)"
+                        : "transparent",
+                transition: "background-color 0.3s",
+                padding: "8px",
+                borderRadius: "4px",
+            }}
+        >
             <div style={{ display: "flex", alignItems: "flex-start" }}>
                 <Avatar
                     src={comment.user.avatar_url}
@@ -146,6 +158,7 @@ const CommentItem = ({
                             handleEditComment={handleEditComment}
                             handleDeleteComment={handleDeleteComment}
                             handleTimestampClick={handleTimestampClick}
+                            highlightedCommentId={highlightedCommentId}
                         />
                     ))}
                 </div>
@@ -154,68 +167,69 @@ const CommentItem = ({
     );
 };
 
-function MediaDetail({ api }) {
+function MediaDetail() {
     const { id } = useParams();
     const navigate = useNavigate();
-    const [searchParams] = useSearchParams();
     const [media, setMedia] = useState(null);
     const [loading, setLoading] = useState(false);
     const [commentLoading, setCommentLoading] = useState(false);
+    const [fetchMoreLoading, setFetchMoreLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [form] = Form.useForm();
     const [commentForm] = Form.useForm();
+    const [replyForm] = Form.useForm();
     const [videoTime, setVideoTime] = useState(0);
     const [replyTo, setReplyTo] = useState(null);
+    const [isReplyModalOpen, setIsReplyModalOpen] = useState(false);
     const [currentUserId, setCurrentUserId] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalComments, setTotalComments] = useState(0);
+    const [hasMore, setHasMore] = useState(true);
+    const [highlightedCommentId, setHighlightedCommentId] = useState(null);
     const videoRef = useRef(null);
+    const sentinelRef = useRef(null);
+    const lastFetchedPage = useRef(0);
+    const isMounted = useRef(false);
 
     const { getMediaContext, commentContext } = useMediaContext();
     const { fetchMediaById } = getMediaContext;
     const { fetchComments, createComment, updateComment, deleteComment } =
         commentContext;
 
-    const comments = useSelector((state) => state.media.comments[id] || []);
-    const commentTree = buildCommentTree(comments);
-    const isMounted = useRef(false);
+    const mediaId = id.split("&")[0];
+    const commentId = id.includes("&comment=")
+        ? id.split("&comment=")[1]
+        : null;
 
-    // Fetch cookie utility
-    const getCookie = (name) => {
+    const comments = useSelector(
+        (state) => state.media.comments[mediaId] || []
+    );
+    const commentTree = useMemo(() => buildCommentTree(comments), [comments]);
+
+    const getCookie = useCallback((name) => {
         const value = `; ${document.cookie}`;
         const parts = value.split(`; ${name}=`);
         if (parts.length === 2) {
             return parts.pop().split(";").shift();
         }
         return null;
-    };
+    }, []);
 
-    useEffect(() => {
-        isMounted.current = true;
-        fetchMediaData();
-        fetchCommentsForMedia();
-        const userId = getCookie("id");
-        if (userId) {
-            setCurrentUserId(parseInt(userId));
-        } else {
-            setError("Please log in to access all features");
-            navigate("/auth/login");
-        }
-
-        return () => {
-            isMounted.current = false;
+    const debounce = useCallback((func, wait) => {
+        let timeout;
+        return (...args) => {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func(...args), wait);
         };
-    }, [id]);
+    }, []);
 
-    const fetchMediaData = async () => {
+    const fetchMediaData = useCallback(async () => {
         if (!isMounted.current) return;
         setLoading(true);
         setError(null);
-
         try {
-            const mediaData = await fetchMediaById(id);
+            const mediaData = await fetchMediaById(mediaId);
             if (isMounted.current) {
                 setMedia(mediaData);
-                form.setFieldsValue({ title: mediaData.title });
             }
         } catch (err) {
             if (isMounted.current) {
@@ -230,192 +244,309 @@ function MediaDetail({ api }) {
                 setLoading(false);
             }
         }
-    };
+    }, [fetchMediaById, mediaId]);
 
-    const fetchCommentsForMedia = async () => {
-        if (!isMounted.current) return;
-        setCommentLoading(true);
-        try {
-            await fetchComments(id);
-        } catch (err) {
-            if (isMounted.current) {
-                setError(
-                    err.response?.data?.message || "Failed to load comments."
+    const fetchCommentsForMedia = useCallback(
+        async (page = 1) => {
+            if (!isMounted.current || lastFetchedPage.current === page) return;
+            lastFetchedPage.current = page;
+            setCommentLoading(page === 1);
+            setFetchMoreLoading(page > 1);
+            try {
+                if (DEBUG) {
+                    console.log(
+                        `Fetching comments for mediaId: ${mediaId}, page: ${page}, existing comments: ${comments.length}`
+                    );
+                }
+                const { data, total, current_page, per_page } = await fetchComments(
+                    mediaId,
+                    {
+                        page,
+                        per_page: 5,
+                    }
                 );
-            }
-        } finally {
-            if (isMounted.current) {
-                setCommentLoading(false);
-            }
-        }
-    };
-
-    const handleSubmitEdit = async (values) => {
-        if (!api) {
-            setError("API client is not configured. Please contact support.");
-            return;
-        }
-        setLoading(true);
-        setError(null);
-        try {
-            const formData = new FormData();
-            formData.append("title", values.title);
-            if (values.file) {
-                formData.append("file", values.file);
-            }
-            formData.append("_method", "PUT");
-            const response = await api.post(`/api/media/${id}`, formData, {
-                headers: { "Content-Type": "multipart/form-data" },
-            });
-            const mediaData = await fetchMediaById(id);
-            setMedia(mediaData);
-            form.setFieldsValue({
-                title: mediaData.title,
-            });
-        } catch (error) {
-            if (error.response?.status === 422) {
-                const errors = error.response.data.errors;
-                Object.keys(errors).forEach((key) => {
-                    form.setFields([{ name: key, errors: errors[key] }]);
-                });
-            } else {
-                setError(
-                    error.response?.data?.message ||
-                        error.message ||
-                        "Failed to update media. Please try again."
-                );
-            }
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleOpenDelete = () => {
-        setIsDeleteModalOpen(true);
-    };
-
-    const handleConfirmDelete = async () => {
-        if (!api) {
-            setError("API client is not configured. Please contact support.");
-            return;
-        }
-        setLoading(true);
-        setError(null);
-        try {
-            await api.delete(`/api/media/${id}`);
-            setIsDeleteModalOpen(false);
-            const page = searchParams.get("page") || "1";
-            const perPage = searchParams.get("perPage") || "10";
-            navigate(`/media?page=${page}&perPage=${perPage}`);
-        } catch (err) {
-            setError(
-                err.response?.data?.message ||
-                    err.message ||
-                    "Failed to delete media. Please try again."
-            );
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleCancelDelete = () => {
-        setIsDeleteModalOpen(false);
-    };
-
-    const normFile = (e) => {
-        if (Array.isArray(e)) {
-            return e.length > 0 ? e[0].originFileObj : null;
-        }
-        return (
-            e &&
-            e.fileList &&
-            e.fileList.length > 0 &&
-            e.fileList[0].originFileObj
-        );
-    };
-
-    const handleBack = () => {
-        const page = searchParams.get("page") || "1";
-        const perPage = searchParams.get("perPage") || "12";
-        navigate(`/media?page=${page}&perPage=${perPage}`);
-    };
-
-    const handleCommentSubmit = async (values) => {
-        try {
-            await createComment(
-                id,
-                values.comment,
-                videoTime,
-                replyTo ? replyTo.id : null
-            );
-            commentForm.resetFields();
-            setReplyTo(null);
-            await fetchCommentsForMedia();
-        } catch (error) {
-            let errorMessage = "Failed to post comment";
-            if (error.response) {
-                if (error.response.status === 401) {
-                    errorMessage = "Please log in to post a comment";
-                    navigate("/auth/login");
-                } else if (error.response.status === 429) {
-                    errorMessage =
-                        "Too many comment attempts. Please try again later.";
-                } else {
-                    const errors = error.response.data.errors || {};
-                    errorMessage =
-                        errors.media1_id?.[0] ||
-                        errors.text?.[0] ||
-                        errors.timestamp?.[0] ||
-                        errors.parent_id?.[0] ||
-                        error.response.data.message ||
-                        errorMessage;
+                if (isMounted.current) {
+                    const existingIds = new Set(comments.map((c) => c.id));
+                    const uniqueNewComments = data.filter(
+                        (c) => !existingIds.has(c.id)
+                    );
+                    if (DEBUG) {
+                        console.log(
+                            `Fetched ${uniqueNewComments.length} new comments, Total: ${total}, Page: ${current_page}`
+                        );
+                    }
+                    setTotalComments(total);
+                    setCurrentPage(current_page);
+                    setHasMore(
+                        uniqueNewComments.length > 0 &&
+                            current_page * per_page < total
+                    );
+                }
+            } catch (err) {
+                if (isMounted.current) {
+                    setError(
+                        err.response?.data?.message || "Failed to load comments."
+                    );
+                }
+            } finally {
+                if (isMounted.current) {
+                    setCommentLoading(false);
+                    setFetchMoreLoading(false);
                 }
             }
-            setError(errorMessage);
-        }
-    };
+        },
+        [fetchComments, mediaId, comments]
+    );
 
-    const handleEditComment = (comment) => {
-        // Placeholder: Implement edit modal or inline editing if needed
-    };
+    const debouncedFetchComments = useMemo(
+        () => debounce(fetchCommentsForMedia, 300),
+        [fetchCommentsForMedia]
+    );
 
-    const handleDeleteComment = async (commentId) => {
-        try {
-            await deleteComment(commentId);
-            await fetchCommentsForMedia();
-        } catch (error) {
-            let errorMessage = "Failed to delete comment";
-            if (error.response) {
-                if (error.response.status === 401) {
-                    errorMessage = "Please log in to delete a comment";
-                    navigate("/auth/login");
-                } else if (error.response.status === 403) {
-                    errorMessage =
-                        "You are not authorized to delete this comment";
-                } else {
-                    errorMessage = error.response.data.message || errorMessage;
-                }
+    const fetchMoreComments = useCallback(async () => {
+        if (!hasMore || fetchMoreLoading) return;
+        await debouncedFetchComments(currentPage + 1);
+    }, [hasMore, fetchMoreLoading, debouncedFetchComments, currentPage]);
+
+    // Combined initialization effect
+    useEffect(() => {
+        isMounted.current = true;
+        const initialize = async () => {
+            lastFetchedPage.current = 0;
+            const userId = getCookie("id");
+            if (!userId) {
+                setError("Please log in to access all features");
+                navigate("/auth/login");
+                return;
             }
-            setError(errorMessage);
-        }
-    };
+            setCurrentUserId(parseInt(userId));
+            await fetchMediaData();
+            await debouncedFetchComments(1);
+        };
+        initialize();
+        return () => {
+            isMounted.current = false;
+            lastFetchedPage.current = 0;
+        };
+    }, [fetchMediaData, debouncedFetchComments, getCookie, navigate, mediaId]);
 
-    const handleReplyClick = (comment) => {
-        setReplyTo(comment);
-        commentForm.setFieldsValue({
-            comment: `@${comment.user.username} `,
+    // Infinite scroll effect
+    useEffect(() => {
+        if (!sentinelRef.current || !hasMore || commentLoading || fetchMoreLoading)
+            return;
+        const observerCallback = (entries) => {
+            if (entries[0].isIntersecting && isMounted.current) {
+                fetchMoreComments();
+            }
+        };
+        const observer = new IntersectionObserver(observerCallback, {
+            threshold: 0.5,
         });
-    };
+        observer.observe(sentinelRef.current);
+        return () => {
+            if (sentinelRef.current) {
+                observer.unobserve(sentinelRef.current);
+            }
+        };
+    }, [hasMore, commentLoading, fetchMoreLoading, fetchMoreComments]);
 
-    const handleTimestampClick = (timestamp) => {
-        if (videoRef.current) {
-            videoRef.current.seekTo(timestamp);
-        }
-    };
+    // Comment highlighting effect
+    useEffect(() => {
+        if (!commentId || commentLoading) return;
+        const findCommentInTree = (comments, targetId) => {
+            for (const comment of comments) {
+                if (comment.id === parseInt(targetId)) return comment;
+                if (comment.children) {
+                    const found = findCommentInTree(comment.children, targetId);
+                    if (found) return found;
+                }
+            }
+            return null;
+        };
 
-    const handleVideoPause = (currentTime) => {
+        let retryCount = 0;
+        const MAX_RETRIES = 3; // Reduced retries to minimize spam
+
+        const tryHighlightComment = () => {
+            const commentExists = findCommentInTree(commentTree, commentId);
+            if (DEBUG) {
+                console.log(
+                    `Highlighting comment ID: ${commentId}, Exists: ${!!commentExists}, Tree size: ${commentTree.length}`
+                );
+            }
+
+            if (commentExists) {
+                const targetId = parseInt(commentId);
+                setHighlightedCommentId(targetId);
+                setTimeout(() => {
+                    const commentElement = document.querySelector(
+                        `#comment-${commentId}`
+                    );
+                    if (commentElement) {
+                        commentElement.scrollIntoView({
+                            behavior: "smooth",
+                            block: "center",
+                        });
+                        setTimeout(() => {
+                            setHighlightedCommentId(null);
+                        }, 5000);
+                    }
+                }, 100);
+            } else if (
+                hasMore &&
+                !fetchMoreLoading &&
+                retryCount < MAX_RETRIES
+            ) {
+                retryCount++;
+                if (DEBUG) {
+                    console.log(
+                        `Retry ${retryCount}/${MAX_RETRIES}: Fetching more comments for comment ID ${commentId}`
+                    );
+                }
+                fetchMoreComments();
+                setTimeout(tryHighlightComment, 1000);
+            } else if (retryCount >= MAX_RETRIES) {
+                setError(
+                    `Could not find comment with ID ${commentId} after ${MAX_RETRIES} attempts.`
+                );
+            }
+        };
+
+        tryHighlightComment();
+    }, [commentId, commentTree, hasMore, fetchMoreLoading, commentLoading, fetchMoreComments]);
+
+    const handleBack = useCallback(() => {
+        navigate(`/media?page=1&perPage=12`);
+    }, [navigate]);
+
+    const handleCommentSubmit = useCallback(
+        async (values) => {
+            try {
+                await createComment(mediaId, values.comment, videoTime, null);
+                commentForm.resetFields();
+                await debouncedFetchComments(1);
+            } catch (error) {
+                let errorMessage = "Failed to post comment";
+                if (error.response) {
+                    if (error.response.status === 401) {
+                        errorMessage = "Please log in to post a comment";
+                        navigate("/auth/login");
+                    } else if (error.response.status === 429) {
+                        errorMessage =
+                            "Too many comment attempts. Please try again later.";
+                    } else {
+                        const errors = error.response.data.errors || {};
+                        errorMessage =
+                            errors.media1_id?.[0] ||
+                            errors.text?.[0] ||
+                            errors.timestamp?.[0] ||
+                            errors.parent_id?.[0] ||
+                            error.response.data.message ||
+                            errorMessage;
+                    }
+                }
+                setError(errorMessage);
+            }
+        },
+        [createComment, mediaId, videoTime, commentForm, navigate, debouncedFetchComments]
+    );
+
+    const handleReplySubmit = useCallback(
+        async (values) => {
+            try {
+                await createComment(
+                    mediaId,
+                    values.reply,
+                    videoTime,
+                    replyTo?.id
+                );
+                replyForm.resetFields();
+                setIsReplyModalOpen(false);
+                setReplyTo(null);
+                await debouncedFetchComments(1);
+            } catch (error) {
+                let errorMessage = "Failed to post reply";
+                if (error.response) {
+                    if (error.response.status === 401) {
+                        errorMessage = "Please log in to post a reply";
+                        navigate("/auth/login");
+                    } else if (error.response.status === 429) {
+                        errorMessage =
+                            "Too many reply attempts. Please try again later.";
+                    } else {
+                        const errors = error.response.data.errors || {};
+                        errorMessage =
+                            errors.media1_id?.[0] ||
+                            errors.text?.[0] ||
+                            errors.timestamp?.[0] ||
+                            errors.parent_id?.[0] ||
+                            error.response.data.message ||
+                            errorMessage;
+                    }
+                }
+                setError(errorMessage);
+            }
+        },
+        [createComment, mediaId, videoTime, replyTo, replyForm, navigate, debouncedFetchComments]
+    );
+
+    const handleEditComment = useCallback((comment) => {
+        // Placeholder: Implement edit modal or inline editing if needed
+    }, []);
+
+    const handleDeleteComment = useCallback(
+        async (commentId) => {
+            try {
+                await deleteComment(commentId);
+                await debouncedFetchComments(1);
+            } catch (error) {
+                let errorMessage = "Failed to delete comment";
+                if (error.response) {
+                    if (error.response.status === 401) {
+                        errorMessage = "Please log in to delete a comment";
+                        navigate("/auth/login");
+                    } else if (error.response.status === 403) {
+                        errorMessage =
+                            "You are not authorized to delete this comment";
+                    } else {
+                        errorMessage = error.response.data.message || errorMessage;
+                    }
+                }
+                setError(errorMessage);
+            }
+        },
+        [deleteComment, navigate, debouncedFetchComments]
+    );
+
+    const handleReplyClick = useCallback(
+        (comment) => {
+            setReplyTo(comment);
+            setIsReplyModalOpen(true);
+            replyForm.setFieldsValue({
+                reply: `@${comment.user.username} `,
+            });
+        },
+        [replyForm]
+    );
+
+    const handleReplyModalCancel = useCallback(() => {
+        setIsReplyModalOpen(false);
+        setReplyTo(null);
+        replyForm.resetFields();
+    }, [replyForm]);
+
+    const handleTimestampClick = useCallback(
+        (timestamp) => {
+            if (videoRef.current) {
+                videoRef.current.seekTo(timestamp);
+            }
+        },
+        []
+    );
+
+    const handleVideoPause = useCallback((currentTime) => {
         setVideoTime(currentTime);
-    };
+    }, []);
 
     return (
         <div
@@ -426,7 +557,7 @@ function MediaDetail({ api }) {
             }}
         >
             <Title level={2} style={{ color: "#fff" }}>
-                Edit Media
+                Media Detail
             </Title>
             <Button
                 onClick={handleBack}
@@ -457,7 +588,6 @@ function MediaDetail({ api }) {
             )}
             {media && (
                 <>
-                    {/* Media Preview */}
                     <div style={{ marginBottom: 24 }}>
                         <Title level={4} style={{ color: "#fff" }}>
                             Preview
@@ -469,7 +599,7 @@ function MediaDetail({ api }) {
                         ) : media.url && media.url.includes(".m3u8") ? (
                             <VideoPlayer
                                 src={media.url}
-                                style={{ maxWidth: "100%", maxHeight: 300 }}
+                                style={{ width: "100%", maxHeight: 400 }}
                                 ref={videoRef}
                                 onPause={handleVideoPause}
                             />
@@ -481,7 +611,7 @@ function MediaDetail({ api }) {
                                     "https://placehold.co/150x100?text=No+Preview"
                                 }
                                 alt={media.title}
-                                style={{ maxWidth: 400, maxHeight: 250 }}
+                                style={{ width: "100%", maxHeight: 400 }}
                                 onError={() =>
                                     console.log(
                                         "Image load error for:",
@@ -491,60 +621,6 @@ function MediaDetail({ api }) {
                             />
                         )}
                     </div>
-                    {/* Edit Form */}
-                    <Form
-                        form={form}
-                        layout="vertical"
-                        onFinish={handleSubmitEdit}
-                        style={{
-                            background: "#fff",
-                            padding: "16px",
-                            borderRadius: "8px",
-                            boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-                            marginBottom: 24,
-                        }}
-                    >
-                        <Form.Item
-                            name="title"
-                            label="Title"
-                            rules={[
-                                {
-                                    required: true,
-                                    message: "Please enter a title",
-                                },
-                            ]}
-                        >
-                            <Input />
-                        </Form.Item>
-                        <Form.Item
-                            name="file"
-                            label="Replace File"
-                            getValueFromEvent={normFile}
-                        >
-                            <Upload
-                                beforeUpload={() => false}
-                                accept="image/*,video/*"
-                                maxCount={1}
-                            >
-                                <Button icon={<UploadOutlined />}>
-                                    Upload File
-                                </Button>
-                            </Upload>
-                        </Form.Item>
-                        <Space style={{ marginBottom: 16 }}>
-                            <Button
-                                type="primary"
-                                htmlType="submit"
-                                loading={loading}
-                            >
-                                Save
-                            </Button>
-                            <Button danger onClick={handleOpenDelete}>
-                                Delete
-                            </Button>
-                        </Space>
-                    </Form>
-                    {/* Comments Section */}
                     <div style={{ marginBottom: 24 }}>
                         <Title level={4} style={{ color: "#fff" }}>
                             Comments
@@ -579,8 +655,25 @@ function MediaDetail({ api }) {
                                         handleTimestampClick={
                                             handleTimestampClick
                                         }
+                                        highlightedCommentId={
+                                            highlightedCommentId
+                                        }
                                     />
                                 ))}
+                                <div
+                                    ref={sentinelRef}
+                                    style={{ height: "20px" }}
+                                />
+                                {fetchMoreLoading && (
+                                    <div
+                                        style={{
+                                            textAlign: "center",
+                                            margin: "20px 0",
+                                        }}
+                                    >
+                                        <Spin tip="Loading more comments..." />
+                                    </div>
+                                )}
                             </div>
                         ) : (
                             <Typography
@@ -618,22 +711,15 @@ function MediaDetail({ api }) {
                             >
                                 <TextArea
                                     rows={3}
-                                    placeholder={
-                                        replyTo
-                                            ? `Reply to ${replyTo.user.username}...`
-                                            : `Comment at ${Math.floor(
-                                                  videoTime / 60
-                                              )
-                                                  .toString()
-                                                  .padStart(
-                                                      2,
-                                                      "0"
-                                                  )}:${Math.floor(
-                                                  videoTime % 60
-                                              )
-                                                  .toString()
-                                                  .padStart(2, "0")}`
-                                    }
+                                    placeholder={`Comment at ${Math.floor(
+                                        videoTime / 60
+                                    )
+                                        .toString()
+                                        .padStart(2, "0")}:${Math.floor(
+                                        videoTime % 60
+                                    )
+                                        .toString()
+                                        .padStart(2, "0")}`}
                                     style={{
                                         backgroundColor:
                                             "rgba(255, 255, 255, 0.1)",
@@ -657,18 +743,63 @@ function MediaDetail({ api }) {
                             </Form.Item>
                         </Form>
                     </div>
+                    <Modal
+                        title={`Reply to ${replyTo?.user.username || "Comment"}`}
+                        open={isReplyModalOpen}
+                        onCancel={handleReplyModalCancel}
+                        footer={null}
+                        centered
+                        width={400}
+                    >
+                        <Form
+                            form={replyForm}
+                            onFinish={handleReplySubmit}
+                            style={{ marginTop: 16 }}
+                        >
+                            <Form.Item
+                                name="reply"
+                                rules={[
+                                    {
+                                        required: true,
+                                        message: "Please enter your reply",
+                                    },
+                                ]}
+                            >
+                                <TextArea
+                                    rows={3}
+                                    placeholder={`Reply to ${
+                                        replyTo?.user.username || "comment"
+                                    }...`}
+                                    style={{
+                                        backgroundColor:
+                                            "rgba(255, 255, 255, 0.1)",
+                                        color: "#e0e0e0",
+                                        borderRadius: 8,
+                                        border: "1px solid rgba(255, 255, 255, 0.1)",
+                                    }}
+                                />
+                            </Form.Item>
+                            <Form.Item>
+                                <Space>
+                                    <Button
+                                        type="primary"
+                                        htmlType="submit"
+                                        style={{ borderRadius: 8 }}
+                                    >
+                                        Submit
+                                    </Button>
+                                    <Button
+                                        onClick={handleReplyModalCancel}
+                                        style={{ borderRadius: 8 }}
+                                    >
+                                        Cancel
+                                    </Button>
+                                </Space>
+                            </Form.Item>
+                        </Form>
+                    </Modal>
                 </>
             )}
-            <Modal
-                title="Confirm Delete"
-                open={isDeleteModalOpen}
-                onOk={handleConfirmDelete}
-                onCancel={handleCancelDelete}
-                okText="Delete"
-                okType="danger"
-            >
-                <p>Are you sure you want to delete this media?</p>
-            </Modal>
         </div>
     );
 }

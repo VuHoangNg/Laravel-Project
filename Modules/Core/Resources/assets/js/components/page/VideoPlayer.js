@@ -62,7 +62,7 @@ const VideoPlayer = forwardRef(({ src, style, onPause, autoPlay = false, playsIn
                 hls.destroy();
             }
         };
-    }, [src, autoPlay, onPause]);
+    }, []);
 
     return (
         <video

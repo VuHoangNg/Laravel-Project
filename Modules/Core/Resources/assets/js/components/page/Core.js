@@ -80,6 +80,7 @@ function Core() {
     const [initLoading, setInitLoading] = useState(true);
     const [loading, setLoading] = useState(false);
     const [totalNotifications, setTotalNotifications] = useState(0);
+    const [unreadCount, setUnreadCount] = useState(0);
     const { token } = useSelector((state) => state.auth);
     const dispatch = useDispatch();
     const navigate = useNavigate();
@@ -111,29 +112,29 @@ function Core() {
             return {
                 data: response.data.data || [],
                 total: response.data.total || 0,
+                unreadCount: response.data.unread_count || 0,
             };
         } catch (error) {
             message.error("Failed to load notifications.");
-            console.error("Fetch notifications error:", error);
-            return { data: [], total: 0 };
+            return { data: [], total: 0, unreadCount: 0 };
         }
     };
 
     useEffect(() => {
         if (!token || !userId) {
             if (!token) {
-                navigate("/auth/login");
+                window.location.href = "/auth/login";
             }
             return;
         }
 
-        fetchNotifications(notificationPage).then(({ data, total }) => {
+        fetchNotifications(notificationPage).then(({ data, total, unreadCount }) => {
             setInitLoading(false);
             setNotifications(data);
             setTotalNotifications(total);
+            setUnreadCount(unreadCount);
         });
 
-        // Initialize Pusher
         Pusher.logToConsole = true;
         const pusher = new Pusher("f630b112e131865a702e", {
             cluster: "ap1",
@@ -152,6 +153,9 @@ function Core() {
                 return prev;
             });
             setTotalNotifications((prev) => prev + 1);
+            if (!data.is_read) {
+                setUnreadCount((prev) => prev + 1);
+            }
         });
 
         return () => {
@@ -162,7 +166,7 @@ function Core() {
                 console.warn("Error during Pusher cleanup:", err);
             }
         };
-    }, [token, userId]);
+    }, []);
 
     const handleLogout = () => {
         Modal.confirm({
@@ -171,7 +175,7 @@ function Core() {
                 try {
                     await dispatch(logout());
                     dispatch(clearToken());
-                    navigate("/auth/login");
+                    window.location.href = "/auth/login";
                 } catch (error) {
                     message.error("Logout failed. Please try again.");
                 }
@@ -192,36 +196,42 @@ function Core() {
                         n.id === notification.id ? { ...n, is_read: true } : n
                     )
                 );
+                setUnreadCount((prev) => Math.max(0, prev - 1));
             } catch (error) {
                 message.error("Failed to mark notification as read.");
             }
         }
-
-        navigate(`/media/${notification.media1_id}`);
+    
+        navigate(`/media?id=${notification.media1_id}&comment=${notification.comment_id}`);
     };
 
     const onLoadMore = () => {
         setLoading(true);
         setNotifications((prev) =>
-            prev.concat(Array.from({ length: PAGE_SIZE }).map(() => ({ loading: true })))
+            prev.concat(
+                Array.from({ length: PAGE_SIZE }).map(() => ({ loading: true }))
+            )
         );
 
         const newPage = notificationPage + 1;
         setNotificationPage(newPage);
 
-        fetchNotifications(newPage).then(({ data, total }) => {
+        fetchNotifications(newPage).then(({ data, total, unreadCount }) => {
             const newNotifications = notifications
                 .filter((n) => !n.loading)
                 .concat(data);
             setNotifications(newNotifications);
             setTotalNotifications(total);
+            setUnreadCount(unreadCount);
             setLoading(false);
             window.dispatchEvent(new Event("resize"));
         });
     };
 
     const loadMore =
-        !initLoading && !loading && notifications.length < totalNotifications ? (
+        !initLoading &&
+        !loading &&
+        notifications.length < totalNotifications ? (
             <div
                 style={{
                     padding: "10px",
@@ -266,36 +276,66 @@ function Core() {
                         dataSource={notifications}
                         renderItem={(item) => (
                             <List.Item
-                                onClick={() => !item.loading && handleNotificationClick(item)}
+                                onClick={() =>
+                                    !item.loading &&
+                                    handleNotificationClick(item)
+                                }
                                 style={{
-                                    cursor: item.loading ? "default" : "pointer",
-                                    backgroundColor: item.is_read ? "#fff" : "#f0f5ff",
+                                    cursor: item.loading
+                                        ? "default"
+                                        : "pointer",
+                                    backgroundColor: item.is_read
+                                        ? "#fff"
+                                        : "#f0f5ff",
                                     padding: "20px",
                                     transition: "background-color 0.3s",
                                 }}
                                 onMouseEnter={(e) =>
                                     !item.loading &&
-                                    (e.currentTarget.style.backgroundColor = "#e6e6e6")
+                                    (e.currentTarget.style.backgroundColor =
+                                        "#e6e6e6")
                                 }
                                 onMouseLeave={(e) =>
                                     !item.loading &&
-                                    (e.currentTarget.style.backgroundColor = item.is_read ? "#fff" : "#f0f5ff")
+                                    (e.currentTarget.style.backgroundColor =
+                                        item.is_read ? "#fff" : "#f0f5ff")
                                 }
                             >
-                                <Skeleton avatar title={false} loading={item.loading} active>
+                                <Skeleton
+                                    avatar
+                                    title={false}
+                                    loading={item.loading}
+                                    active
+                                >
                                     <List.Item.Meta
                                         avatar={
                                             <Avatar
-                                                src={item.triggered_by?.avatar_url || undefined}
-                                                icon={!item.triggered_by?.avatar_url && <UserOutlined />}
+                                                src={
+                                                    item.triggered_by
+                                                        ?.avatar_url ||
+                                                    undefined
+                                                }
+                                                icon={
+                                                    !item.triggered_by
+                                                        ?.avatar_url && (
+                                                        <UserOutlined />
+                                                    )
+                                                }
                                             />
                                         }
                                         title={item.message}
                                         description={`By ${
-                                            item.triggered_by?.username || "Unknown"
+                                            item.triggered_by?.username ||
+                                            "Unknown"
                                         } on ${
                                             item.media?.title || "Media"
-                                        } - ${item.created_at ? new Date(item.created_at).toLocaleString() : "Unknown time"}`}
+                                        } - ${
+                                            item.created_at
+                                                ? new Date(
+                                                      item.created_at
+                                                  ).toLocaleString()
+                                                : "Unknown time"
+                                        }`}
                                     />
                                 </Skeleton>
                             </List.Item>
@@ -362,10 +402,7 @@ function Core() {
                                 trigger={["click"]}
                             >
                                 <Badge
-                                    count={
-                                        notifications.filter((n) => !n.is_read && !n.loading)
-                                            .length
-                                    }
+                                    count={unreadCount}
                                     offset={[-5, 5]}
                                 >
                                     <Button
@@ -466,16 +503,30 @@ function Core() {
                                     <NotificationsList
                                         token={token}
                                         userId={userId}
+                                        notifications={notifications}
+                                        totalNotifications={totalNotifications}
+                                        unreadCount={unreadCount}
                                         onNotificationClick={
                                             handleNotificationClick
                                         }
+                                        fetchNotifications={fetchNotifications}
+                                        setNotifications={setNotifications}
+                                        setTotalNotifications={
+                                            setTotalNotifications
+                                        }
+                                        setUnreadCount={setUnreadCount}
                                     />
                                 }
                             />
                             <Route
                                 path="*"
                                 element={
-                                    <div style={{ padding: 24, textAlign: "center" }}>
+                                    <div
+                                        style={{
+                                            padding: 24,
+                                            textAlign: "center",
+                                        }}
+                                    >
                                         <Typography.Title level={3}>
                                             Page Not Found
                                         </Typography.Title>

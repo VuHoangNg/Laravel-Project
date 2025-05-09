@@ -155,10 +155,10 @@ class CoreController extends Controller
     {
         $perPage = $request->query('per_page', 20);
         $notifications = $this->notificationRepository->getForUser($request->user(), $perPage);
-
         return response()->json([
             'data' => $notifications->items(),
             'total' => $notifications->total(),
+            'unread_count' => $notifications->unreadCount,
             'current_page' => $notifications->currentPage(),
             'last_page' => $notifications->lastPage(),
             'message' => 'Notifications retrieved successfully',

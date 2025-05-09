@@ -1,15 +1,15 @@
 import React, { useRef, useEffect, useState } from "react";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import {
     Typography,
     Button,
-    Form,
     Input,
     Avatar,
     Space,
     Divider,
     Spin,
     Skeleton,
+    Form,
 } from "antd";
 import {
     EditOutlined,
@@ -17,11 +17,12 @@ import {
     CommentOutlined,
 } from "@ant-design/icons";
 import InfiniteScroll from "react-infinite-scroll-component";
-import { useMediaContext } from "../context/MediaContext";
+import { APPEND_COMMENTS, ADD_COMMENT } from "../reducer/action";
 
 const { Title, Text: AntText } = Typography;
 const { TextArea } = Input;
 
+// Flatten comments to remove nested children
 const flattenComments = (comments) => {
     const flatList = [];
     comments.forEach((comment) => {
@@ -29,18 +30,14 @@ const flattenComments = (comments) => {
             ...comment,
             children: undefined,
         });
-        if (comment.replies && comment.replies.length > 0) {
-            comment.replies.forEach((reply) => {
-                flatList.push({
-                    ...reply,
-                    children: undefined,
-                });
-            });
+        if (comment.children && comment.children.length > 0) {
+            flatList.push(...flattenComments(comment.children));
         }
     });
     return flatList;
 };
 
+// Build comment tree from flat list
 const buildCommentTree = (comments) => {
     const topLevel = comments.filter((c) => !c.parent_id);
     const replyMap = {};
@@ -70,12 +67,51 @@ const CommentItem = ({
     handleEditComment,
     handleDeleteComment,
     handleTimestampClick,
+    handleReplySubmit,
+    replyingTo,
+    setReplyingTo,
+    highlightedCommentId,
 }) => {
     const isOwner =
         currentUserId && Number(currentUserId) === Number(comment.user.id);
+    const [replyText, setReplyText] = useState(`@${comment.user.username} `);
+    const isReplying = replyingTo?.id === comment.id;
+
+    const handleSubmit = () => {
+        if (!replyText.trim()) return;
+        const parentId = comment.parent_id ? comment.parent_id : comment.id;
+        handleReplySubmit({
+            comment: replyText,
+            parent_id: parentId,
+        });
+        setReplyText(`@${comment.user.username} `);
+        setReplyingTo(null);
+    };
+
+    const handleCancel = () => {
+        setReplyText(`@${comment.user.username} `);
+        setReplyingTo(null);
+    };
+
+    const handleKeyDown = (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            handleSubmit();
+        }
+    };
 
     return (
-        <div style={{ marginBottom: "12px" }}>
+        <div
+            id={`comment-${comment.id}`}
+            style={{
+                marginBottom: "12px",
+                backgroundColor:
+                    highlightedCommentId === comment.id
+                        ? "rgba(24, 144, 255, 0.2)"
+                        : "transparent",
+                transition: "background-color 1s",
+            }}
+        >
             <div style={{ display: "flex", alignItems: "flex-start" }}>
                 <Avatar
                     src={comment.user.avatar_url}
@@ -143,6 +179,45 @@ const CommentItem = ({
                             </Button>
                         </Space>
                     </div>
+                    {isReplying && (
+                        <div
+                            style={{
+                                marginTop: 12,
+                                marginLeft: comment.parent_id ? 40 : 0,
+                            }}
+                        >
+                            <TextArea
+                                rows={3}
+                                value={replyText}
+                                onChange={(e) => setReplyText(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                placeholder={`Reply to ${comment.user.username}...`}
+                                style={{
+                                    backgroundColor: "rgba(255, 255, 255, 0.1)",
+                                    color: "#e0e0e0",
+                                    borderRadius: 8,
+                                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                                }}
+                                autoFocus
+                            />
+                            <Space style={{ marginTop: 8 }}>
+                                <Button
+                                    type="primary"
+                                    onClick={handleSubmit}
+                                    style={{ borderRadius: 8 }}
+                                    disabled={!replyText.trim()}
+                                >
+                                    Submit
+                                </Button>
+                                <Button
+                                    onClick={handleCancel}
+                                    style={{ borderRadius: 8 }}
+                                >
+                                    Cancel
+                                </Button>
+                            </Space>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -157,6 +232,10 @@ const CommentItem = ({
                             handleEditComment={handleEditComment}
                             handleDeleteComment={handleDeleteComment}
                             handleTimestampClick={handleTimestampClick}
+                            handleReplySubmit={handleReplySubmit}
+                            replyingTo={replyingTo}
+                            setReplyingTo={setReplyingTo}
+                            highlightedCommentId={highlightedCommentId}
                         />
                     ))}
                 </div>
@@ -180,19 +259,27 @@ const CommentSidebar = ({
     handleDeleteComment,
     handleTimestampClick,
     videoTime,
-    updateContentWidth,
     debouncedUpdateContentWidth,
     currentUserId,
     commentLoading,
+    commentContext,
+    commentId,
 }) => {
+    const dispatch = useDispatch();
     const commentSplitterRef = useRef(null);
-    const [replyTo, setReplyTo] = useState(null);
-    const [comments, setComments] = useState([]);
+    const comments = useSelector(
+        (state) => state.media.comments[selectedMedia?.id] || []
+    );
     const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(false);
     const [hasMore, setHasMore] = useState(true);
+    const [highlightedCommentId, setHighlightedCommentId] = useState(null);
+    const [replyingTo, setReplyingTo] = useState(null);
+    const [lastMediaId, setLastMediaId] = useState(null);
+    const [loadedPages, setLoadedPages] = useState(new Set());
+    const [form] = Form.useForm();
     const PAGE_SIZE = 5;
-    const { commentContext } = useMediaContext();
+
     useEffect(() => {
         if (isResizingComment) {
             window.addEventListener("mousemove", handleCommentMouseMove);
@@ -205,69 +292,197 @@ const CommentSidebar = ({
     }, [isResizingComment, debouncedUpdateContentWidth]);
 
     useEffect(() => {
-        if (replyTo) {
-            commentForm.setFieldsValue({
-                comment: `@${replyTo.user.username} `,
-            });
-        } else {
-            commentForm.resetFields();
-        }
-    }, [replyTo, commentForm]);
-
-    useEffect(() => {
-        if (!selectedMedia?.id) return;
-        setComments([]);
+        if (!selectedMedia?.id || selectedMedia.id === lastMediaId) return;
+        console.log(`useEffect triggered: New mediaId ${selectedMedia.id}, previous: ${lastMediaId}`);
         setPage(1);
         setHasMore(true);
-        setTimeout(() => {
-            loadMoreComments();
-        }, 0);
-    }, [selectedMedia?.id]);
+        setLoadedPages(new Set());
+        setLastMediaId(selectedMedia.id);
+        dispatch({
+            type: APPEND_COMMENTS,
+            payload: {
+                mediaId: selectedMedia.id,
+                comments: [],
+            },
+        }); // Clear comments for new media
+        loadMoreComments(true);
+    }, [selectedMedia?.id, dispatch]);
 
-    const loadMoreComments = async () => {
-        if (loading || !selectedMedia?.id) return;
+    useEffect(() => {
+        if (!commentId || !comments.length || !showCommentSplitter) return;
+
+        const flatComments = flattenComments(comments);
+        const targetComment = flatComments.find(
+            (c) => c.id === parseInt(commentId)
+        );
+
+        if (targetComment) {
+            setHighlightedCommentId(targetComment.id);
+            const commentElement = document.getElementById(
+                `comment-${targetComment.id}`
+            );
+            const scrollableDiv = document.getElementById("scrollableCommentDiv");
+            if (commentElement && scrollableDiv) {
+                const elementRect = commentElement.getBoundingClientRect();
+                const containerRect = scrollableDiv.getBoundingClientRect();
+                const scrollTop =
+                    scrollableDiv.scrollTop +
+                    (elementRect.top - containerRect.top) -
+                    containerRect.height / 2 +
+                    elementRect.height / 2;
+                scrollableDiv.scrollTo({
+                    top: scrollTop,
+                    behavior: "smooth",
+                });
+            }
+
+            const timeout = setTimeout(() => {
+                setHighlightedCommentId(null);
+            }, 3000);
+            return () => clearTimeout(timeout);
+        }
+    }, [commentId, comments, showCommentSplitter]);
+
+    const loadMoreComments = async (reset = false) => {
+        if (loading || !selectedMedia?.id || !hasMore) {
+            console.log("loadMoreComments skipped:", { loading, mediaId: selectedMedia?.id, hasMore });
+            return;
+        }
+        const targetPage = reset ? 1 : page;
+        if (loadedPages.has(targetPage)) {
+            console.log(`Page ${targetPage} already loaded, skipping fetch`);
+            setPage((prev) => prev + 1);
+            return;
+        }
         setLoading(true);
         try {
+            console.log(
+                `Fetching comments for mediaId: ${selectedMedia.id}, page: ${targetPage}, per_page: ${PAGE_SIZE}`
+            );
             const response = await commentContext.fetchComments(
                 selectedMedia.id,
                 {
-                    page: page,
+                    page: targetPage,
                     per_page: PAGE_SIZE,
                 }
             );
-            const newComments = response.data || [];
-            setComments((prev) => {
-                const flatPrev = flattenComments(prev);
-                const flatNew = flattenComments(newComments);
-                const combined = [...flatPrev, ...flatNew];
-                return buildCommentTree(combined);
+            console.log("API response:", response);
+            if (!response || !response.data) {
+                console.warn(`Invalid response for page ${targetPage}`);
+                setHasMore(false);
+                return;
+            }
+            if (response.data.length === 0) {
+                console.warn(`No comments returned for page ${targetPage}`);
+                setHasMore(false);
+                return;
+            }
+
+            // Combine new comments with existing ones
+            const newComments = response.data;
+            const currentComments = reset ? [] : comments;
+            const flatCurrent = flattenComments(currentComments);
+            const flatNew = flattenComments(newComments);
+            const combined = [
+                ...flatCurrent.filter(
+                    (c) => !flatNew.some((n) => n.id === c.id)
+                ),
+                ...flatNew,
+            ];
+            const newTree = buildCommentTree(combined);
+
+            // Dispatch APPEND_COMMENTS
+            dispatch({
+                type: APPEND_COMMENTS,
+                payload: {
+                    mediaId: selectedMedia.id,
+                    comments: newTree,
+                },
             });
-            setHasMore(newComments.length === PAGE_SIZE);
-            setPage((prev) => {
-                const nextPage = prev + 1;
-                console.log(`Incrementing page to: ${nextPage}`);
-                return nextPage;
-            });
+            console.log(
+                `Dispatched APPEND_COMMENTS for mediaId: ${selectedMedia.id}, comments:`,
+                newTree
+            );
+
+            setLoadedPages((prev) => new Set(prev).add(targetPage));
+            setHasMore(response.current_page < (response.last_page || 1));
+            console.log(
+                `hasMore: ${
+                    response.current_page < (response.last_page || 1)
+                }, current_page: ${response.current_page}, last_page: ${
+                    response.last_page || 1
+                }, loadedPages:`,
+                [...loadedPages, targetPage]
+            );
+            if (!reset) {
+                setPage((prev) => {
+                    const nextPage = prev + 1;
+                    console.log(`Incrementing page to: ${nextPage}`);
+                    return nextPage;
+                });
+            } else {
+                setPage(2);
+                console.log("Reset page set to 2");
+            }
         } catch (error) {
-            console.error("Error loading comments:", error);
+            console.error(
+                "Error loading comments:",
+                error.response || error.message
+            );
+            setHasMore(false);
         } finally {
             setLoading(false);
         }
     };
 
     const handleReplyClick = (comment) => {
-        const parentId = comment.parent_id ? comment.parent_id : comment.id;
-        setReplyTo({ ...comment, id: parentId });
+        setReplyingTo(comment);
     };
 
-    const handleSubmit = (values) => {
-        const payload = {
-            comment: values.comment,
-            ...(replyTo && { parent_id: replyTo.id }),
-        };
-        handleCommentSubmit(payload);
-        setReplyTo(null);
-        commentForm.resetFields();
+    const handleReplySubmit = async (payload) => {
+        try {
+            console.log("Submitting comment:", payload);
+            const response = await commentContext.createComment(
+                selectedMedia.id,
+                payload.comment,
+                videoTime,
+                payload.parent_id || null
+            );
+            console.log("createComment response:", response);
+            if (response && response.data) {
+                // Manually dispatch ADD_COMMENT with the new comment data
+                dispatch({
+                    type: ADD_COMMENT,
+                    payload: {
+                        mediaId: selectedMedia.id,
+                        comment: {
+                            id: response.data.id,
+                            text: payload.comment,
+                            parent_id: payload.parent_id || null,
+                            user: {
+                                id: currentUserId,
+                                username: response.data.user?.username || "Current User",
+                                avatar_url: response.data.user?.avatar_url || null,
+                            },
+                            timestamp: videoTime,
+                            formatted_timestamp:
+                                response.data.formatted_timestamp || new Date().toISOstring(),
+                            created_at: response.data.created_at || new Date().toISOString(),
+                            children: [],
+                        },
+                    },
+                });
+                console.log("Dispatched ADD_COMMENT:", {
+                    mediaId: selectedMedia.id,
+                    comment: response.data,
+                });
+            } else {
+                console.warn("No comment data in response, cannot dispatch ADD_COMMENT");
+            }
+            form.resetFields();
+        } catch (error) {
+            console.error("Error submitting comment:", error.response || error.message);
+        }
     };
 
     return (
@@ -345,7 +560,10 @@ const CommentSidebar = ({
                                 ) : comments.length > 0 ? (
                                     <InfiniteScroll
                                         dataLength={comments.length}
-                                        next={loadMoreComments}
+                                        next={() => {
+                                            console.log("InfiniteScroll triggered");
+                                            loadMoreComments();
+                                        }}
                                         hasMore={hasMore}
                                         loader={
                                             <Skeleton
@@ -379,6 +597,14 @@ const CommentSidebar = ({
                                                 handleTimestampClick={
                                                     handleTimestampClick
                                                 }
+                                                handleReplySubmit={
+                                                    handleReplySubmit
+                                                }
+                                                replyingTo={replyingTo}
+                                                setReplyingTo={setReplyingTo}
+                                                highlightedCommentId={
+                                                    highlightedCommentId
+                                                }
                                             />
                                         ))}
                                     </InfiniteScroll>
@@ -394,8 +620,12 @@ const CommentSidebar = ({
                                 )}
                             </div>
                             <Form
-                                form={commentForm}
-                                onFinish={handleSubmit}
+                                form={form}
+                                onFinish={(values) => {
+                                    handleReplySubmit({
+                                        comment: values.comment,
+                                    });
+                                }}
                                 style={{ flexShrink: 0 }}
                             >
                                 <Form.Item
@@ -422,22 +652,15 @@ const CommentSidebar = ({
                                 >
                                     <TextArea
                                         rows={3}
-                                        placeholder={
-                                            replyTo
-                                                ? `Reply to ${replyTo.user.username}...`
-                                                : `Comment at ${Math.floor(
-                                                      videoTime / 60
-                                                  )
-                                                      .toString()
-                                                      .padStart(
-                                                          2,
-                                                          "0"
-                                                      )}:${Math.floor(
-                                                      videoTime % 60
-                                                  )
-                                                      .toString()
-                                                      .padStart(2, "0")}`
-                                        }
+                                        placeholder={`Comment at ${Math.floor(
+                                            videoTime / 60
+                                        )
+                                            .toString()
+                                            .padStart(2, "0")}:${Math.floor(
+                                            videoTime % 60
+                                        )
+                                            .toString()
+                                            .padStart(2, "0")}`}
                                         style={{
                                             backgroundColor:
                                                 "rgba(255, 255, 255, 0.1)",

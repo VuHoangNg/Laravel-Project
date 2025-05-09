@@ -2,18 +2,17 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Layout, Button, Form, message } from "antd";
 import { useMediaContext } from "../context/MediaContext";
-import MainContent from "./MainContent";
-import PreviewSidebar from "./PreviewSidebar";
-import CommentSidebar from "./CommentSidebar";
-import CreateMediaModal from "./CreateMediaModal";
-import EditCommentModal from "./EditCommentModal";
+import MainContent from "../page/MainContent";
+import PreviewSidebar from "../page/PreviewSidebar";
+import CommentSidebar from "../page/CommentSidebar";
+import CreateMediaModal from "../page/CreateMediaModal";
+import EditCommentModal from "../page/EditCommentModal";
 
 const MediaContent = () => {
     const navigate = useNavigate();
-    const { createMediaContext, getMediaContext, commentContext } =
-        useMediaContext();
+    const { createMediaContext, getMediaContext, commentContext } = useMediaContext();
     const { resetForm, createMedia } = createMediaContext;
-    const { isModalOpen, openModal, closeModal, fetchMedia } = getMediaContext;
+    const { isModalOpen, openModal, closeModal, fetchMedia, fetchMediaById } = getMediaContext;
     const [form] = Form.useForm();
     const [commentForm] = Form.useForm();
     const [editCommentForm] = Form.useForm();
@@ -37,6 +36,8 @@ const MediaContent = () => {
     const commentSidebarRef = useRef(null);
     const page = parseInt(searchParams.get("page") || "1");
     const perPage = parseInt(searchParams.get("perPage") || "12");
+    const commentId = searchParams.get("comment");
+    const mediaId = searchParams.get("id");
     const isMounted = useRef(false);
     const tempSiderWidthRef = useRef(400);
     const tempCommentSiderWidthRef = useRef(400);
@@ -64,19 +65,10 @@ const MediaContent = () => {
 
     const updateContentWidth = useCallback(() => {
         const totalWidth = window.innerWidth;
-        let previewWidth = showSplitter
-            ? Math.min(tempSiderWidthRef.current, MAX_PREVIEW_SIDER_WIDTH)
-            : 0;
-        let commentWidth = showCommentSplitter
-            ? Math.min(
-                  tempCommentSiderWidthRef.current,
-                  MAX_COMMENT_SIDER_WIDTH
-              )
-            : 0;
-        let splitterWidth =
-            (showSplitter ? 5 : 0) + (showCommentSplitter ? 5 : 0);
-        let contentWidth =
-            totalWidth - previewWidth - commentWidth - splitterWidth;
+        let previewWidth = showSplitter ? Math.min(tempSiderWidthRef.current, MAX_PREVIEW_SIDER_WIDTH) : 0;
+        let commentWidth = showCommentSplitter ? Math.min(tempCommentSiderWidthRef.current, MAX_COMMENT_SIDER_WIDTH) : 0;
+        let splitterWidth = (showSplitter ? 5 : 0) + (showCommentSplitter ? 5 : 0);
+        let contentWidth = totalWidth - previewWidth - commentWidth - splitterWidth;
 
         if (contentWidth < MIN_WIDTH) {
             let excess = MIN_WIDTH - contentWidth;
@@ -101,8 +93,7 @@ const MediaContent = () => {
             contentWidth = MIN_WIDTH;
         }
 
-        const totalUsedWidth =
-            previewWidth + commentWidth + contentWidth + splitterWidth;
+        const totalUsedWidth = previewWidth + commentWidth + contentWidth + splitterWidth;
         if (totalUsedWidth > totalWidth) {
             let overflow = totalUsedWidth - totalWidth;
             if (showCommentSplitter && commentWidth > MIN_WIDTH) {
@@ -121,8 +112,7 @@ const MediaContent = () => {
             if (sidebarRef.current) {
                 sidebarRef.current.style.width = `${previewWidth}px`;
             }
-            contentWidth =
-                totalWidth - previewWidth - commentWidth - splitterWidth;
+            contentWidth = totalWidth - previewWidth - commentWidth - splitterWidth;
         }
 
         setContentWidth(contentWidth);
@@ -130,35 +120,7 @@ const MediaContent = () => {
         setCommentSiderWidth(commentWidth);
     }, [showSplitter, showCommentSplitter]);
 
-    const debouncedUpdateContentWidth = useCallback(
-        debounce(updateContentWidth, 100),
-        [updateContentWidth]
-    );
-
-    useEffect(() => {
-        isMounted.current = true;
-        loadMedia();
-        const userId = getCookie("id");
-        if (userId) {
-            setCurrentUserId(parseInt(userId));
-        } else {
-            message.warning("Please log in to access all features");
-            navigate("/auth/login");
-        }
-        updateContentWidth();
-        window.addEventListener("resize", updateContentWidth);
-        return () => {
-            isMounted.current = false;
-            window.removeEventListener("resize", updateContentWidth);
-        };
-    }, [
-        page,
-        perPage,
-        showSplitter,
-        showCommentSplitter,
-        updateContentWidth,
-        navigate,
-    ]);
+    const debouncedUpdateContentWidth = useCallback(debounce(updateContentWidth, 100), [updateContentWidth]);
 
     const loadMedia = async () => {
         if (!isMounted.current) return;
@@ -168,9 +130,7 @@ const MediaContent = () => {
             await fetchMedia(page, perPage);
         } catch (err) {
             if (isMounted.current) {
-                setError(
-                    err.response?.data?.message || "Failed to load media."
-                );
+                setError(err.response?.data?.message || "Failed to load media.");
             }
         } finally {
             if (isMounted.current) {
@@ -178,6 +138,57 @@ const MediaContent = () => {
             }
         }
     };
+
+    const fetchMediaByIdForPreview = async (mediaId) => {
+        if (!mediaId || !isMounted.current) return;
+        setLoading(true);
+        setError(null);
+        try {
+            const mediaData = await fetchMediaById(mediaId);
+            if (mediaData) {
+                setSelectedMedia(mediaData);
+                setShowSplitter(true);
+            } else {
+                setError("Media not found.");
+            }
+        } catch (err) {
+            if (isMounted.current) {
+                setError(err.response?.data?.message || "Failed to load media.");
+            }
+        } finally {
+            if (isMounted.current) {
+                setLoading(false);
+            }
+        }
+    };
+
+    useEffect(() => {
+        isMounted.current = true;
+        loadMedia();
+        const userId = getCookie("id");
+        if (userId) {
+            setCurrentUserId(parseInt(userId));
+        } else {
+            message.warning("Please log in to access all features");
+            window.location.href="/auth/login";
+        }
+        updateContentWidth();
+        window.addEventListener("resize", updateContentWidth);
+        return () => {
+            isMounted.current = false;
+            window.removeEventListener("resize", updateContentWidth);
+        };
+    }, [updateContentWidth]);
+
+    useEffect(() => {
+        if (mediaId) {
+            fetchMediaByIdForPreview(mediaId);
+        }
+        if (commentId || selectedMedia) {
+            setShowCommentSplitter(true);
+            fetchCommentsForMedia(mediaId || selectedMedia.id || "");
+        }
+    }, []);
 
     const fetchCommentsForMedia = async (mediaId) => {
         if (!mediaId) return;
@@ -218,9 +229,7 @@ const MediaContent = () => {
                     form.setFields([{ name: key, errors: errors[key] }]);
                 });
             } else {
-                setError(
-                    error.response?.data?.message || "Failed to save media."
-                );
+                setError(error.response?.data?.message || "Failed to save media.");
             }
         } finally {
             setLoading(false);
@@ -233,12 +242,7 @@ const MediaContent = () => {
             return;
         }
         try {
-            await commentContext.createComment(
-                selectedMedia.id,
-                values.comment,
-                videoTime,
-                values.parent_id || null
-            );
+            await commentContext.createComment(selectedMedia.id, values.comment, videoTime, values.parent_id || null);
             commentForm.resetFields();
         } catch (error) {
             let errorMessage = "Failed to post comment";
@@ -247,8 +251,7 @@ const MediaContent = () => {
                     errorMessage = "Please log in to post a comment";
                     navigate("/login");
                 } else if (error.response.status === 429) {
-                    errorMessage =
-                        "Too many comment attempts. Please try again later.";
+                    errorMessage = "Too many comment attempts. Please try again later.";
                 } else {
                     const errors = error.response.data.errors || {};
                     errorMessage =
@@ -271,11 +274,7 @@ const MediaContent = () => {
 
     const handleEditCommentSubmit = async (values) => {
         try {
-            await commentContext.updateComment(
-                editingCommentId,
-                values.comment,
-                videoTime
-            );
+            await commentContext.updateComment(editingCommentId, values.comment, videoTime);
             setEditingCommentId(null);
             editCommentForm.resetFields();
         } catch (error) {
@@ -283,10 +282,9 @@ const MediaContent = () => {
             if (error.response) {
                 if (error.response.status === 401) {
                     errorMessage = "Please log in to update a comment";
-                    navigate("/auth/login");
+                    window.location.href = "/auth/login";
                 } else if (error.response.status === 403) {
-                    errorMessage =
-                        "You are not authorized to update this comment";
+                    errorMessage = "You are not authorized to update this comment";
                 } else {
                     const errors = error.response.data.errors || {};
                     errorMessage =
@@ -308,10 +306,9 @@ const MediaContent = () => {
             if (error.response) {
                 if (error.response.status === 401) {
                     errorMessage = "Please log in to delete a comment";
-                    navigate("/auth/login");
+                    window.location.href = "/auth/login";
                 } else if (error.response.status === 403) {
-                    errorMessage =
-                        "You are not authorized to delete this comment";
+                    errorMessage = "You are not authorized to delete this comment";
                 } else {
                     errorMessage = error.response.data.message || errorMessage;
                 }
@@ -351,12 +348,7 @@ const MediaContent = () => {
         if (Array.isArray(e)) {
             return e.length > 0 ? e[0].originFileObj : null;
         }
-        return (
-            e &&
-            e.fileList &&
-            e.fileList.length > 0 &&
-            e.fileList[0].originFileObj
-        );
+        return e && e.fileList && e.fileList.length > 0 && e.fileList[0].originFileObj;
     };
 
     const handleMouseDown = () => {
@@ -366,18 +358,11 @@ const MediaContent = () => {
     const handleMouseMove = (e) => {
         if (!isResizing) return;
         const newWidth = window.innerWidth - e.clientX;
-        let commentWidth = showCommentSplitter
-            ? tempCommentSiderWidthRef.current
-            : 0;
-        let splitterWidth =
-            (showSplitter ? 5 : 0) + (showCommentSplitter ? 5 : 0);
-        let contentWidth =
-            window.innerWidth - newWidth - commentWidth - splitterWidth;
+        let commentWidth = showCommentSplitter ? tempCommentSiderWidthRef.current : 0;
+        let splitterWidth = (showSplitter ? 5 : 0) + (showCommentSplitter ? 5 : 0);
+        let contentWidth = window.innerWidth - newWidth - commentWidth - splitterWidth;
 
-        let constrainedWidth = Math.max(
-            MIN_WIDTH,
-            Math.min(newWidth, MAX_PREVIEW_SIDER_WIDTH)
-        );
+        let constrainedWidth = Math.max(MIN_WIDTH, Math.min(newWidth, MAX_PREVIEW_SIDER_WIDTH));
 
         if (contentWidth < MIN_WIDTH) {
             let excess = MIN_WIDTH - contentWidth;
@@ -391,10 +376,7 @@ const MediaContent = () => {
                 contentWidth += reducible;
             }
             if (contentWidth < MIN_WIDTH && constrainedWidth > MIN_WIDTH) {
-                constrainedWidth = Math.max(
-                    MIN_WIDTH,
-                    constrainedWidth - (MIN_WIDTH - contentWidth)
-                );
+                constrainedWidth = Math.max(MIN_WIDTH, constrainedWidth - (MIN_WIDTH - contentWidth));
             }
         }
 
@@ -420,15 +402,10 @@ const MediaContent = () => {
         if (!isResizingComment) return;
         const newWidth = window.innerWidth - e.clientX;
         let previewWidth = showSplitter ? tempSiderWidthRef.current : 0;
-        let splitterWidth =
-            (showSplitter ? 5 : 0) + (showCommentSplitter ? 5 : 0);
-        let contentWidth =
-            window.innerWidth - newWidth - previewWidth - splitterWidth;
+        let splitterWidth = (showSplitter ? 5 : 0) + (showCommentSplitter ? 5 : 0);
+        let contentWidth = window.innerWidth - newWidth - previewWidth - splitterWidth;
 
-        let constrainedWidth = Math.max(
-            MIN_WIDTH,
-            Math.min(newWidth, MAX_COMMENT_SIDER_WIDTH)
-        );
+        let constrainedWidth = Math.max(MIN_WIDTH, Math.min(newWidth, MAX_COMMENT_SIDER_WIDTH));
 
         if (contentWidth < MIN_WIDTH) {
             let excess = MIN_WIDTH - contentWidth;
@@ -442,10 +419,7 @@ const MediaContent = () => {
                 contentWidth += reducible;
             }
             if (contentWidth < MIN_WIDTH && constrainedWidth > MIN_WIDTH) {
-                constrainedWidth = Math.max(
-                    MIN_WIDTH,
-                    constrainedWidth - (MIN_WIDTH - contentWidth)
-                );
+                constrainedWidth = Math.max(MIN_WIDTH, constrainedWidth - (MIN_WIDTH - contentWidth));
             }
         }
 
@@ -468,23 +442,12 @@ const MediaContent = () => {
             const totalWidth = window.innerWidth;
             let previewWidth = showSplitter ? tempSiderWidthRef.current : 0;
             let splitterWidth = (showSplitter ? 5 : 0) + 5;
-            let availableWidth =
-                totalWidth - previewWidth - splitterWidth - MIN_WIDTH;
+            let availableWidth = totalWidth - previewWidth - splitterWidth - MIN_WIDTH;
 
-            let newCommentWidth = Math.min(
-                400,
-                Math.max(MIN_WIDTH, availableWidth)
-            );
-            newCommentWidth = Math.min(
-                newCommentWidth,
-                MAX_COMMENT_SIDER_WIDTH
-            );
+            let newCommentWidth = Math.min(400, Math.max(MIN_WIDTH, availableWidth));
+            newCommentWidth = Math.min(newCommentWidth, MAX_COMMENT_SIDER_WIDTH);
 
-            if (
-                availableWidth < MIN_WIDTH &&
-                showSplitter &&
-                previewWidth > MIN_WIDTH
-            ) {
+            if (availableWidth < MIN_WIDTH && showSplitter && previewWidth > MIN_WIDTH) {
                 const excess = MIN_WIDTH - availableWidth;
                 const reducible = Math.min(excess, previewWidth - MIN_WIDTH);
                 previewWidth -= reducible;
@@ -495,10 +458,7 @@ const MediaContent = () => {
                 availableWidth += reducible;
             }
 
-            newCommentWidth = Math.max(
-                MIN_WIDTH,
-                Math.min(newCommentWidth, availableWidth)
-            );
+            newCommentWidth = Math.max(MIN_WIDTH, Math.min(newCommentWidth, availableWidth));
             tempCommentSiderWidthRef.current = newCommentWidth;
             if (commentSidebarRef.current) {
                 commentSidebarRef.current.style.width = `${newCommentWidth}px`;
@@ -509,7 +469,7 @@ const MediaContent = () => {
             updateContentWidth();
 
             if (selectedMedia) {
-                fetchCommentsForMedia(selectedMedia.id);
+                fetchCommentsForMedia(mediaId ? mediaId : selectedMedia.id);
             }
         } else {
             tempCommentSiderWidthRef.current = 400;
@@ -550,14 +510,7 @@ const MediaContent = () => {
                 d="M4 6.75A2.75 2.75 0 0 1 6.75 4h10.5A2.75 2.75 0 0 1 20 6.75v10.5A2.75 2.75 0 0 1 17.25 20H6.75A2.75 2.75 0 0 1 4 17.25V6.75ZM6.75 5.5c-.69 0-1.25.56-1.25 1.25v10.5c0 .69.56 1.25 1.25 1.25h10.5c.69 0 1.25-.56 1.25-1.25V6.75c0-.69-.56-1.25-1.25-1.25H6.75Z"
                 fillRule="evenodd"
             />
-            <rect
-                rx="1"
-                height="10"
-                x={xPosition}
-                y="7"
-                opacity="1"
-                width="2"
-            />
+            <rect rx="1" height="10" x={xPosition} y="7" opacity="1" width="2" />
         </svg>
     );
 
@@ -593,14 +546,8 @@ const MediaContent = () => {
                     icon={icon}
                     style={triggerButtonStyle}
                     onClick={onClick}
-                    onMouseEnter={(e) =>
-                        (e.currentTarget.style.backgroundColor =
-                            "rgba(255, 255, 255, 0.2)")
-                    }
-                    onMouseLeave={(e) =>
-                        (e.currentTarget.style.backgroundColor =
-                            "rgba(255, 255, 255, 0.1)")
-                    }
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.2)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)")}
                 />
             ))}
         </div>
@@ -664,6 +611,7 @@ const MediaContent = () => {
                     currentUserId={currentUserId}
                     commentLoading={commentLoading}
                     commentContext={commentContext}
+                    commentId={commentId}
                 />
             </Layout>
             <CreateMediaModal
