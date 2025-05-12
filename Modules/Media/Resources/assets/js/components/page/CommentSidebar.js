@@ -474,7 +474,6 @@ const CommentSidebar = ({
                                                 }
                                             />
                                         ))}
-                                   unterladen
                                     </InfiniteScroll>
                                 ) : (
                                     <Typography
