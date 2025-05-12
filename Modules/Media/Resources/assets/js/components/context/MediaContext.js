@@ -8,6 +8,8 @@ import {
     addComment,
     updateComment,
     deleteComment,
+    updateMedia,
+    deleteMedia,
 } from "../reducer/action";
 
 const MediaContext = createContext();
@@ -95,13 +97,39 @@ export function MediaProvider({ children, api }) {
                 throw error;
             }
         },
+        editMedia: async (id, data) => {
+            try {
+                const response = await api.post(`/api/media/${id}`, data, {
+                    headers: {
+                        "Content-Type": "multipart/form-data",
+                    },
+                });
+                dispatch(updateMedia(id, response.data));
+                return response.data;
+            } catch (error) {
+                console.error("Error updating media:", error);
+                throw error;
+            }
+        },
+        deleteMedia: async (id) => {
+            try {
+                await api.delete(`/api/media/${id}`, {
+                    headers: {
+                        Authorization: `Bearer ${getCookie("token")}`,
+                    },
+                });
+                dispatch(deleteMedia(id));
+            } catch (error) {
+                console.error("Error deleting media:", error);
+                throw error;
+            }
+        },
     };
 
     const buildCommentTree = (comments) => {
         const commentMap = new Map();
         const tree = [];
 
-        // Initialize comments with children array and collect replies
         comments.forEach((comment) => {
             comment.children = comment.children || [];
             commentMap.set(comment.id, comment);
@@ -113,7 +141,6 @@ export function MediaProvider({ children, api }) {
             }
         });
 
-        // Build tree based on parent_id and replies
         comments.forEach((comment) => {
             if (comment.parent_id) {
                 const parent = commentMap.get(comment.parent_id);
@@ -175,6 +202,19 @@ export function MediaProvider({ children, api }) {
                 };
             } catch (error) {
                 console.error("Error fetching comments:", error);
+                throw error;
+            }
+        },
+        fetchCommentById: async (commentId) => {
+            try {
+                const response = await api.get(`/api/core/comments/${commentId}`, {
+                    headers: {
+                        Authorization: `Bearer ${getCookie("token")}`,
+                    },
+                });
+                return response.data.data;
+            } catch (error) {
+                console.error("Error fetching comment by ID:", error);
                 throw error;
             }
         },

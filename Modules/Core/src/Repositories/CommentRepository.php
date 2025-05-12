@@ -106,4 +106,16 @@ class CommentRepository implements CommentRepositoryInterface
 
         return $comment->delete();
     }
+
+    public function findById(int $id): ?Comment
+    {
+        return Comment::with([
+            'user' => function ($query) {
+                $query->select('id', 'username', 'name', 'email', 'avatar');
+            },
+            'parent.user' => function ($query) {
+                $query->select('id', 'username', 'name', 'email', 'avatar');
+            }
+        ])->find($id);
+    }
 }

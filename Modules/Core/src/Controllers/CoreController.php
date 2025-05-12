@@ -34,6 +34,7 @@ class CoreController extends Controller
             'destroyComment',
             'getNotifications',
             'markNotificationAsRead',
+            'getCommentById',
         ]);
     }
 
@@ -102,6 +103,44 @@ class CoreController extends Controller
             ]);
         } catch (ValidationException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
+    public function getCommentById(Request $request, $id): JsonResponse
+    {
+        try {
+            $comment = $this->commentRepository->findById($id);
+
+            if (!$comment) {
+                return response()->json(['message' => 'Comment not found'], 404);
+            }
+
+            $response = [
+                'id' => $comment->id,
+                'text' => $comment->text,
+                'timestamp' => $comment->timestamp,
+                'formatted_timestamp' => $comment->timestamp ? gmdate('i:s', (int)$comment->timestamp) : null,
+                'parent_id' => $comment->parent_id,
+                'user' => $this->userToArray($comment->user),
+            ];
+
+            if ($comment->parent) {
+                $response['parent'] = [
+                    'id' => $comment->parent->id,
+                    'text' => $comment->parent->text,
+                    'timestamp' => $comment->parent->timestamp,
+                    'formatted_timestamp' => $comment->parent->timestamp ? gmdate('i:s', (int)$comment->parent->timestamp) : null,
+                    'parent_id' => $comment->parent->parent_id,
+                    'user' => $this->userToArray($comment->parent->user),
+                ];
+            }
+
+            return response()->json([
+                'data' => $response,
+                'message' => 'Comment retrieved successfully',
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 500);
         }
     }
 

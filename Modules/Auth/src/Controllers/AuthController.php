@@ -106,9 +106,9 @@ class AuthController extends Controller
             $avatarUrl = $user->avatar ? Storage::url($user->avatar) : null;
 
             return response()->json($responseData)
-                ->withCookie(Cookie::forever('username', $user->username, null, null, false, true))
-                ->withCookie(Cookie::forever('email', $user->email, null, null, false, true))
-                ->withCookie(Cookie::forever('token', $token, null, null, false, true))
+                ->withCookie(Cookie::forever('username', $user->username, null, null, false, false))
+                ->withCookie(Cookie::forever('email', $user->email, null, null, false, false))
+                ->withCookie(Cookie::forever('token', $token, null, null, false, false))
                 ->withCookie(Cookie::forever('id', $user->id, null, null, false, false))
                 ->withCookie(Cookie::forever('avatar', $avatarUrl, null, null, false, false));
         }

@@ -8,6 +8,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use FFMpeg\FFMpeg;
+use FFMpeg\FFProbe;
 use FFMpeg\Format\Video\X264;
 use Illuminate\Support\Facades\Log;
 use Modules\Media\src\Repositories\MediaRepositoryInterface;
@@ -22,43 +23,18 @@ class ProcessVideoToHls implements ShouldQueue
     protected $mediaId;
     protected $thumbnailPath;
 
-    /**
-     * The number of times the job may be attempted.
-     *
-     * @var int
-     */
     public $tries = 3;
-
-    /**
-     * The number of seconds to wait before retrying the job.
-     *
-     * @var int
-     */
     public $backoff = 60;
 
-    /**
-     * Create a new job instance.
-     *
-     * @param string $inputPath
-     * @param string $outputDir
-     * @param int $mediaId
-     * @param string $thumbnailPath
-     */
     public function __construct(string $inputPath, string $outputDir, int $mediaId, string $thumbnailPath)
     {
         $this->inputPath = $inputPath;
         $this->outputDir = $outputDir;
         $this->mediaId = $mediaId;
         $this->thumbnailPath = $thumbnailPath;
-        $this->onQueue('video-processing'); // Dedicated queue for video processing
+        $this->onQueue('video-processing');
     }
 
-    /**
-     * Execute the job.
-     *
-     * @param MediaRepositoryInterface $mediaRepository
-     * @return void
-     */
     public function handle(MediaRepositoryInterface $mediaRepository)
     {
         Log::info("Starting HLS conversion and thumbnail generation for Media ID: {$this->mediaId}", [
@@ -75,6 +51,15 @@ class ProcessVideoToHls implements ShouldQueue
                 'ffmpeg.binaries' => config('media.ffmpeg_path', 'C:\FFMPEG\bin\ffmpeg.exe'),
                 'ffprobe.binaries' => config('media.ffprobe_path', 'C:\FFMPEG\bin\ffprobe.exe'),
             ]);
+
+            // Get video duration using FFProbe
+            $ffprobe = FFProbe::create([
+                'ffprobe.binaries' => config('media.ffprobe_path', 'C:\FFMPEG\bin\ffprobe.exe'),
+            ]);
+            $duration = $ffprobe
+                ->format($this->inputPath)
+                ->get('duration'); // Duration in seconds
+            Log::info("Video duration for Media ID: {$this->mediaId}: {$duration} seconds");
 
             // Ensure thumbnail directory exists
             $thumbnailDir = dirname($this->thumbnailPath);
@@ -106,8 +91,11 @@ class ProcessVideoToHls implements ShouldQueue
             $video->save($format, $this->outputDir . '/playlist.m3u8');
             Log::info("HLS conversion completed for Media ID: {$this->mediaId}");
 
-            // Update status to "success"
-            Media1::find($this->mediaId)->update(['status' => 1]);
+            // Update status to "success" and save duration
+            Media1::find($this->mediaId)->update([
+                'status' => 1,
+                'duration' => $duration,
+            ]);
 
             // Clean up temporary file
             if (file_exists($this->inputPath)) {
@@ -115,7 +103,7 @@ class ProcessVideoToHls implements ShouldQueue
                 unlink($this->inputPath);
             }
 
-            Log::info("HLS conversion and thumbnail generation completed for Media ID: {$this->mediaId}");
+            Log::info("HLS conversion, thumbnail generation, and duration saved for Media ID: {$this->mediaId}");
         } catch (\Exception $e) {
             // Update status to "failed"
             Media1::find($this->mediaId)->update(['status' => -1]);
@@ -129,12 +117,6 @@ class ProcessVideoToHls implements ShouldQueue
         }
     }
 
-    /**
-     * Handle a job failure.
-     *
-     * @param \Throwable $exception
-     * @return void
-     */
     public function failed(\Throwable $exception): void
     {
         Log::error('ProcessVideoToHls job failed after all retries', [

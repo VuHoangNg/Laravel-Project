@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useSelector } from "react-redux";
 import {
     Typography,
@@ -10,9 +10,25 @@ import {
     Card,
     Pagination,
     Space,
+    Skeleton,
 } from "antd";
 
 const { Title } = Typography;
+
+const formatDuration = (seconds) => {
+    if (!seconds || isNaN(seconds)) return null;
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    if (hours > 0) {
+        return `${hours}:${minutes.toString().padStart(2, "0")}:${secs
+            .toString()
+            .padStart(2, "0")}`;
+    }
+    return `${minutes.toString().padStart(2, "0")}:${secs
+        .toString()
+        .padStart(2, "0")}`;
+};
 
 const MainContent = ({
     loading,
@@ -36,6 +52,10 @@ const MainContent = ({
                 last_page: 1,
             }
     );
+
+    useEffect(() => {
+        console.log("Media state updated in MainContent:", media.data);
+    }, [media]);
 
     const getColSpan = () => {
         if (contentWidth >= 1400) return 6;
@@ -184,28 +204,69 @@ const MainContent = ({
                                                         padding: 0,
                                                     }}
                                                 >
-                                                    <img
-                                                        src={
-                                                            record.thumbnail_url ||
-                                                            record.url ||
-                                                            "https://placehold.co/150x100?text=No+Preview"
-                                                        }
-                                                        alt={record.title}
-                                                        style={{
-                                                            width: "100%",
-                                                            height: "100%",
-                                                            objectFit: "cover",
-                                                            display: "block",
-                                                        }}
-                                                        loading="lazy"
-                                                        onError={() =>
-                                                            console.log(
-                                                                "Image load error for:",
+                                                    {record.status === 0 ? (
+                                                        <Skeleton.Image
+                                                            style={{
+                                                                width: "100%",
+                                                                height: "100%",
+                                                                objectFit:
+                                                                    "cover",
+                                                                display:
+                                                                    "block",
+                                                            }}
+                                                            loading={true}
+                                                            active={true}
+                                                        />
+                                                    ) : (
+                                                        <img
+                                                            src={
                                                                 record.thumbnail_url ||
-                                                                    record.url
-                                                            )
-                                                        }
-                                                    />
+                                                                record.url ||
+                                                                "https://placehold.co/150x100?text=No+Preview"
+                                                            }
+                                                            alt={record.title}
+                                                            style={{
+                                                                width: "100%",
+                                                                height: "100%",
+                                                                objectFit:
+                                                                    "cover",
+                                                                display:
+                                                                    "block",
+                                                            }}
+                                                            loading="lazy"
+                                                            onError={() =>
+                                                                console.log(
+                                                                    "Image load error for:",
+                                                                    record.thumbnail_url ||
+                                                                        record.url
+                                                                )
+                                                            }
+                                                        />
+                                                    )}
+                                                    {record.type === "video" &&
+                                                        record.duration &&
+                                                        record.status === 1 && (
+                                                            <div
+                                                                style={{
+                                                                    position:
+                                                                        "absolute",
+                                                                    bottom: 8,
+                                                                    right: 8,
+                                                                    backgroundColor:
+                                                                        "rgba(0, 0, 0, 0.7)",
+                                                                    color: "#fff",
+                                                                    padding:
+                                                                        "2px 6px",
+                                                                    borderRadius: 4,
+                                                                    fontSize: 12,
+                                                                    fontWeight: 500,
+                                                                }}
+                                                            >
+                                                                {formatDuration(
+                                                                    record.duration
+                                                                )}
+                                                            </div>
+                                                        )}
                                                 </div>
                                                 <div
                                                     style={{

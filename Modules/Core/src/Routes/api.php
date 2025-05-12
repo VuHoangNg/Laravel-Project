@@ -17,5 +17,6 @@ Route::prefix('core')->group(function () {
         Route::delete('comments/{id}', [CoreController::class, 'destroyComment']);
         Route::get('notifications', [CoreController::class, 'getNotifications']);
         Route::put('notifications/{id}/read', [CoreController::class, 'markNotificationAsRead']);
+        Route::get('comments/{id}', [CoreController::class, 'getCommentById']);
     });
 });

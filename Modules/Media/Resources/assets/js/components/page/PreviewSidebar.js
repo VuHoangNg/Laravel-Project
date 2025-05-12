@@ -1,6 +1,23 @@
 import React, { useRef, useEffect, useState } from "react";
-import { Typography, Button, Upload, message, Form, Input, Space, Modal } from "antd";
-import { InboxOutlined, UploadOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import {
+    Typography,
+    Button,
+    Upload,
+    message,
+    Form,
+    Input,
+    Space,
+    Modal,
+    Alert,
+    Spin,
+} from "antd";
+import {
+    InboxOutlined,
+    UploadOutlined,
+    EditOutlined,
+    DeleteOutlined,
+} from "@ant-design/icons";
 import VideoPlayer from "../../../../../../Core/Resources/assets/js/components/page/VideoPlayer";
 import { useMediaContext } from "../context/MediaContext";
 
@@ -20,6 +37,7 @@ const PreviewSidebar = ({
     handleVideoPause,
     updateContentWidth,
     debouncedUpdateContentWidth,
+    onMediaUpdate,
 }) => {
     const splitterRef = useRef(null);
     const { createMediaContext, getMediaContext } = useMediaContext();
@@ -29,6 +47,17 @@ const PreviewSidebar = ({
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const isMounted = useRef(false);
+
+    useEffect(() => {
+        isMounted.current = true;
+        return () => {
+            isMounted.current = false;
+        };
+    }, []);
 
     useEffect(() => {
         if (isResizing) {
@@ -39,18 +68,21 @@ const PreviewSidebar = ({
             window.removeEventListener("mousemove", handleMouseMove);
             window.removeEventListener("mouseup", handleMouseUp);
         };
-    }, [isResizing, debouncedUpdateContentWidth]);
+    }, [isResizing, handleMouseMove, handleMouseUp]);
 
     useEffect(() => {
         if (selectedMedia && isEditModalOpen) {
             form.setFieldsValue({ title: selectedMedia.title });
         }
-    }, []);
+        if (!isEditModalOpen) {
+            form.resetFields();
+        }
+    }, [selectedMedia, isEditModalOpen, form]);
 
     const customRequest = async ({ file, onSuccess, onError }) => {
         try {
             setFormData({ title: file.name, file });
-            await createMedia({ title: file.name, file });
+            await createMediaContext.createMedia({ title: file.name, file });
             message.success(`${file.name} file uploaded successfully.`);
             resetForm();
             onSuccess("ok");
@@ -62,27 +94,69 @@ const PreviewSidebar = ({
 
     const normFile = (e) => {
         if (Array.isArray(e)) {
-            return e;
+            return e.length > 0 ? e[0].originFileObj : null;
         }
-        return e && e.fileList;
+        return e && e.fileList && e.fileList.length > 0
+            ? e.fileList[0].originFileObj
+            : null;
     };
 
     const handleSubmitEdit = async (values) => {
+        if (!selectedMedia?.id) {
+            setError("No media selected for editing.");
+            return;
+        }
+        setLoading(true);
+        setError(null);
         try {
-            setLoading(true);
+            console.log("Form values:", values);
             const formData = new FormData();
-            formData.append("title", values.title);
-            if (values.file && values.file[0]) {
-                formData.append("file", values.file[0].originFileObj);
+            const title = values.title?.trim() || selectedMedia.title;
+            formData.append("title", title);
+            if (values.file) {
+                formData.append("file", values.file);
             }
-            await editMedia(selectedMedia.id, formData);
-            message.success("Media updated successfully");
-            setIsEditModalOpen(false);
-            form.resetFields();
+            formData.append("_method", "PUT");
+
+            for (let [key, value] of formData.entries()) {
+                console.log(
+                    `${key}:`,
+                    value instanceof File ? value.name : value
+                );
+            }
+
+            const updatedMedia = await editMedia(selectedMedia.id, formData);
+            if (isMounted.current) {
+                form.setFieldsValue({ title: updatedMedia.title });
+                message.success("Media updated successfully");
+                setIsEditModalOpen(false);
+                onMediaUpdate?.(updatedMedia);
+
+                const page = searchParams.get("page") || "1";
+                const perPage = searchParams.get("perPage") || "12";
+                await getMediaContext.fetchMedia(page, perPage);
+            }
         } catch (error) {
-            message.error("Failed to update media");
+            console.error(
+                "Edit media error:",
+                error.response?.data || error.message
+            );
+            if (error.response?.status === 422) {
+                const errors = error.response.data.errors;
+                Object.keys(errors).forEach((key) => {
+                    form.setFields([{ name: key, errors: errors[key] }]);
+                });
+            } else {
+                setError(
+                    error.response?.data?.message ||
+                        error.message ||
+                        "Failed to update media. Please try again."
+                );
+            }
         } finally {
-            setLoading(false);
+            if (isMounted.current) {
+                setLoading(false);
+            }
         }
     };
 
@@ -91,12 +165,32 @@ const PreviewSidebar = ({
     };
 
     const handleConfirmDelete = async () => {
+        if (!selectedMedia?.id) {
+            setError("No media selected for deletion.");
+            return;
+        }
+        setLoading(true);
+        setError(null);
         try {
             await deleteMedia(selectedMedia.id);
-            message.success("Media deleted successfully");
-            setIsDeleteModalOpen(false);
+            if (isMounted.current) {
+                message.success("Media deleted successfully");
+                setIsDeleteModalOpen(false);
+                const page = searchParams.get("page") || "1";
+                const perPage = searchParams.get("perPage") || "12";
+                navigate(`/media?page=${page}&perPage=${perPage}`);
+                onMediaUpdate?.(null);
+            }
         } catch (error) {
-            message.error("Failed to delete media");
+            setError(
+                error.response?.data?.message ||
+                    error.message ||
+                    "Failed to delete media. Please try again."
+            );
+        } finally {
+            if (isMounted.current) {
+                setLoading(false);
+            }
         }
     };
 
@@ -153,6 +247,22 @@ const PreviewSidebar = ({
                         flexShrink: 0,
                     }}
                 >
+                    {loading && (
+                        <div style={{ textAlign: "center", margin: "20px 0" }}>
+                            <Spin size="large" />
+                        </div>
+                    )}
+                    {error && (
+                        <Alert
+                            message="Error"
+                            description={error}
+                            type="error"
+                            showIcon
+                            closable
+                            onClose={() => setError(null)}
+                            style={{ marginBottom: 16 }}
+                        />
+                    )}
                     {selectedMedia ? (
                         <div
                             style={{
@@ -220,8 +330,17 @@ const PreviewSidebar = ({
                                         overflow: "hidden",
                                     }}
                                 >
-                                    {selectedMedia.type === "video" ||
-                                    selectedMedia.url.includes("video") ? (
+                                    {selectedMedia.status === 0 ? (
+                                        <div
+                                            style={{
+                                                color: "#fff",
+                                                padding: "16px",
+                                            }}
+                                        >
+                                            Media is processing...
+                                        </div>
+                                    ) : selectedMedia.type === "video" ||
+                                      selectedMedia.url.includes(".m3u8") ? (
                                         <VideoPlayer
                                             ref={videoRef}
                                             src={selectedMedia.url}
@@ -278,7 +397,10 @@ const PreviewSidebar = ({
                                         }}
                                     >
                                         Uploaded on{" "}
-                                        {new Date().toLocaleDateString()}
+                                        {new Date(
+                                            selectedMedia.created_at ||
+                                                new Date()
+                                        ).toLocaleDateString()}
                                     </p>
                                 </div>
                             </div>
@@ -300,13 +422,13 @@ const PreviewSidebar = ({
                                     Click or drag file to this area to upload
                                 </p>
                                 <p className="ant-upload-hint">
-                                    Support for a single upload. Strictly prohibited from
-                                    uploading company data or other banned files.
+                                    Support for a single upload. Strictly
+                                    prohibited from uploading company data or
+                                    other banned files.
                                 </p>
                             </Dragger>
                         </div>
                     )}
-                    {/* Edit Form */}
                     <Modal
                         title="Edit Media"
                         open={isEditModalOpen}
@@ -332,6 +454,15 @@ const PreviewSidebar = ({
                                     {
                                         required: true,
                                         message: "Please enter a title",
+                                    },
+                                    {
+                                        min: 1,
+                                        message: "Title cannot be empty",
+                                    },
+                                    {
+                                        whitespace: true,
+                                        message:
+                                            "Title cannot be only whitespace",
                                     },
                                 ]}
                             >
@@ -366,7 +497,6 @@ const PreviewSidebar = ({
                             </Space>
                         </Form>
                     </Modal>
-                    {/* Delete Confirmation Modal */}
                     <Modal
                         title="Confirm Delete"
                         open={isDeleteModalOpen}

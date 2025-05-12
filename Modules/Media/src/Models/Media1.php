@@ -11,7 +11,7 @@ class Media1 extends Model
 {
     protected $table = 'media1';
 
-    protected $fillable = ['title', 'type', 'path', 'thumbnail_path', 'status', 'blog_id'];
+    protected $fillable = ['title', 'type', 'path', 'thumbnail_path', 'status', 'blog_id' , 'duration',];
 
     protected $appends = ['url', 'thumbnail_url'];
 

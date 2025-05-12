@@ -22,7 +22,7 @@ class MediaController extends Controller
         $this->mediaRepository = $mediaRepository;
     }
 
-   public function index(Request $request): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         $perPage = $request->query('perPage', 10);
         $page = $request->query('page', 1);
@@ -30,11 +30,23 @@ class MediaController extends Controller
         $mediaQuery = $this->mediaRepository->getPaginated(
             (int) $perPage,
             (int) $page,
-            ['id', 'title', 'type' , 'path', 'thumbnail_path'],
+            ['id', 'title', 'type', 'path', 'thumbnail_path', 'duration', 'status'], // Added 'status'
             ['created_at' => 'desc']
         );
 
-        $responseData = $mediaQuery->getCollection()->toArray();
+        $responseData = $mediaQuery->getCollection()->map(function ($media) {
+            return [
+                'id' => $media->id,
+                'title' => $media->title,
+                'type' => $media->type,
+                'path' => $media->path,
+                'thumbnail_path' => $media->thumbnail_path,
+                'url' => $media->url,
+                'thumbnail_url' => $media->thumbnail_url,
+                'duration' => $media->duration,
+                'status' => $media->status, // Include status
+            ];
+        })->toArray();
 
         return response()->json([
             'data' => $responseData,
@@ -68,7 +80,6 @@ class MediaController extends Controller
             return response()->json(['error' => 'Only images (jpg, jpeg, png) or videos (mp4, mov, avi) are allowed.'], 422);
         }
 
-        // Determine the type based on MIME
         $type = $isVideo ? 'video' : 'image';
 
         $datePath = date('Y/m/d');
@@ -81,10 +92,11 @@ class MediaController extends Controller
 
         $media = $this->mediaRepository->create([
             'title' => $request->input('title'),
-            'type' => $type, // Add type to the create data
+            'type' => $type,
             'path' => $path,
             'thumbnail_path' => $thumbnailPath,
             'status' => $status,
+            'duration' => null,
         ]);
 
         if ($isVideo) {
@@ -107,22 +119,26 @@ class MediaController extends Controller
         return response()->json([
             'id' => $media->id,
             'title' => $media->title,
-            'type' => $media->type, // Include type in response
+            'type' => $media->type,
             'url' => $media->url,
             'thumbnail_url' => $media->thumbnail_url,
+            'duration' => $media->duration,
+            'status' => $media->status, // Include status
         ], 201);
     }
 
     public function show($id): JsonResponse
     {
         try {
-            $media = $this->mediaRepository->find($id, ['id', 'title', 'type', 'path', 'thumbnail_path']); // Added 'type'
+            $media = $this->mediaRepository->find($id, ['id', 'title', 'type', 'path', 'thumbnail_path', 'duration', 'status']); // Added 'status'
             return response()->json([
                 'id' => $media->id,
                 'title' => $media->title,
-                'type' => $media->type, // Include type in response
+                'type' => $media->type,
                 'url' => $media->url,
                 'thumbnail_url' => $media->thumbnail_url,
+                'duration' => $media->duration,
+                'status' => $media->status, // Include status
             ]);
         } catch (ModelNotFoundException $e) {
             return response()->json(['message' => $e->getMessage()], 404);
@@ -146,7 +162,7 @@ class MediaController extends Controller
                 return response()->json(['errors' => $validator->errors()], 422);
             }
 
-            $columns = ['id', 'title', 'type', 'path', 'thumbnail_path']; // Include type in selected columns
+            $columns = ['id', 'title', 'type', 'path', 'thumbnail_path', 'duration', 'status']; // Include status
             $media = $this->mediaRepository->find($id, $columns);
             $file = $request->file('file');
 
@@ -163,10 +179,8 @@ class MediaController extends Controller
                     return response()->json(['error' => 'Only images (jpg, jpeg, png) or videos (mp4, mov, avi) are allowed.'], 422);
                 }
 
-                // Determine the type based on MIME
                 $type = $isVideo ? 'video' : 'image';
 
-                // Delete old files
                 Storage::disk('public')->delete($media->path);
                 if ($media->thumbnail_path) {
                     Storage::disk('public')->delete($media->thumbnail_path);
@@ -181,10 +195,11 @@ class MediaController extends Controller
                 $thumbnailPath = $isVideo ? "media/thumbnails/{$datePath}/" . Str::random(40) . '.jpg' : null;
                 $status = $isVideo ? 0 : 1;
 
-                $updateData['type'] = $type; // Update type
+                $updateData['type'] = $type;
                 $updateData['path'] = $path;
                 $updateData['thumbnail_path'] = $thumbnailPath;
                 $updateData['status'] = $status;
+                $updateData['duration'] = null;
 
                 if ($isVideo) {
                     $tempPath = $file->storeAs('temp', $filename, 'local');
@@ -208,9 +223,11 @@ class MediaController extends Controller
             return response()->json([
                 'id' => $updatedMedia->id,
                 'title' => $updatedMedia->title,
-                'type' => $updatedMedia->type, // Include type in response
+                'type' => $updatedMedia->type,
                 'url' => $updatedMedia->url,
                 'thumbnail_url' => $updatedMedia->thumbnail_url,
+                'duration' => $updatedMedia->duration,
+                'status' => $updatedMedia->status, // Include status
             ]);
         } catch (ModelNotFoundException $e) {
             return response()->json(['message' => $e->getMessage()], 404);
