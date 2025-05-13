@@ -256,7 +256,7 @@ To ensure the VProject community is welcoming to all, please review and abide by
 
 ## 🔒 Security Vulnerabilities
 
-If you discover a security vulnerability within VProject, please send an email to `your-email@example.com`. All security vulnerabilities will be promptly addressed.
+If you discover a security vulnerability within VProject, please send an email to `swiftnaizer0108@gmail.com`. All security vulnerabilities will be promptly addressed.
 
 ---
 
