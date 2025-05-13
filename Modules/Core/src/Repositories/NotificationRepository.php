@@ -3,7 +3,7 @@
 namespace Modules\Core\src\Repositories;
 
 use Illuminate\Support\Facades\Log;
-use Modules\Core\src\Models\Comment;
+use Modules\Media\src\Models\Comment;
 use Modules\Media\src\Models\Media1;
 use Modules\Auth\src\Models\User;
 use Modules\Core\src\Models\Notification;

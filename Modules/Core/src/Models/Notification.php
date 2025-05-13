@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Auth\src\Models\User;
 use Modules\Media\src\Models\Media1;
-use Modules\Core\src\Models\Comment;
+use Modules\Media\src\Models\Comment;
 
 class Notification extends Model
 {

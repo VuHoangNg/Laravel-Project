@@ -26,7 +26,7 @@ class BlogController extends Controller
         return array_intersect($requestedFields, $allowedFields);
     }
 
-    public function index(Request $request): JsonResponse
+    public function get_all_blogs(Request $request): JsonResponse
     {
         $perPage = min(max((int)$request->query('perPage', 10), 1), 100);
         $fields = $this->getRequestedFields($request);
@@ -54,7 +54,7 @@ class BlogController extends Controller
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store_blog(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'title' => 'required|string|max:255',
@@ -82,7 +82,7 @@ class BlogController extends Controller
         );
     }
 
-    public function show($id): JsonResponse
+    public function get_blog_by_id($id): JsonResponse
     {
         try {
             $fields = $this->getRequestedFields(request());
@@ -110,7 +110,7 @@ class BlogController extends Controller
         }
     }
 
-    public function update(Request $request, $id): JsonResponse
+    public function update_blog(Request $request, $id): JsonResponse
     {
         try {
             $validated = $request->validate([
@@ -141,7 +141,7 @@ class BlogController extends Controller
         }
     }
 
-    public function destroy($id): JsonResponse
+    public function destroy_blog($id): JsonResponse
     {
         try {
             $this->blogRepository->delete($id);

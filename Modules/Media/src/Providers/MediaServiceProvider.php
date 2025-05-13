@@ -6,6 +6,8 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Database\Eloquent\Factory;
 use Modules\Media\src\Repositories\MediaRepository;
 use Modules\Media\src\Repositories\MediaRepositoryInterface;
+use Modules\Media\src\Repositories\CommentRepository;
+use Modules\Media\src\Repositories\CommentRepositoryInterface;
 class MediaServiceProvider extends ServiceProvider
 {
     /**
@@ -41,6 +43,7 @@ class MediaServiceProvider extends ServiceProvider
     {
         $this->app->register(RouteServiceProvider::class);
         $this->app->bind(MediaRepositoryInterface::class, MediaRepository::class);
+        $this->app->bind(CommentRepositoryInterface::class, CommentRepository::class);
     }
 
     /**

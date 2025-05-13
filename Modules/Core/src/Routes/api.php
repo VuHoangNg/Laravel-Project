@@ -1,8 +1,10 @@
 <?php
 
-use Modules\Core\src\Controllers\CoreController;
+use Illuminate\Http\Request;
 
-Route::middleware('sanctum')->get('/core', function (Request $request) {
+use Modules\Core\src\Controllers\NotificationController;
+
+Route::middleware('auth:sanctum')->get('/core', function (Request $request) {
     return $request->user();
 });
 
@@ -11,12 +13,7 @@ Route::prefix('core')->group(function () {
         return $request->user();
     });
     Route::middleware('auth:sanctum')->group(function () {
-        Route::post('comments', [CoreController::class, 'storeComment']);
-        Route::get('media/{mediaId}/comments', [CoreController::class, 'getComments']);
-        Route::put('comments/{id}', [CoreController::class, 'updateComment']);
-        Route::delete('comments/{id}', [CoreController::class, 'destroyComment']);
-        Route::get('notifications', [CoreController::class, 'getNotifications']);
-        Route::put('notifications/{id}/read', [CoreController::class, 'markNotificationAsRead']);
-        Route::get('comments/{id}', [CoreController::class, 'getCommentById']);
+        Route::get('notifications', [NotificationController::class, 'get_notifications']);
+        Route::put('notifications/{id}/read', [NotificationController::class, 'update_notification_as_read']);
     });
 });

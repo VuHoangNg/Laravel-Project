@@ -11,6 +11,8 @@ use Illuminate\Http\JsonResponse;
 use Modules\Media\src\Jobs\ProcessVideoToHls;
 use Modules\Media\src\Repositories\MediaRepositoryInterface;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\Eloquent\select;
+use Modules\Media\src\Resources\MediaResource;
 
 class MediaController extends Controller
 {
@@ -22,7 +24,8 @@ class MediaController extends Controller
         $this->mediaRepository = $mediaRepository;
     }
 
-    public function index(Request $request): JsonResponse
+
+    public function get_all_media(Request $request): JsonResponse
     {
         $perPage = $request->query('perPage', 10);
         $page = $request->query('page', 1);
@@ -30,26 +33,12 @@ class MediaController extends Controller
         $mediaQuery = $this->mediaRepository->getPaginated(
             (int) $perPage,
             (int) $page,
-            ['id', 'title', 'type', 'path', 'thumbnail_path', 'duration', 'status'], // Added 'status'
+            ['id', 'title', 'type', 'path', 'thumbnail_path', 'duration', 'status'],
             ['created_at' => 'desc']
         );
 
-        $responseData = $mediaQuery->getCollection()->map(function ($media) {
-            return [
-                'id' => $media->id,
-                'title' => $media->title,
-                'type' => $media->type,
-                'path' => $media->path,
-                'thumbnail_path' => $media->thumbnail_path,
-                'url' => $media->url,
-                'thumbnail_url' => $media->thumbnail_url,
-                'duration' => $media->duration,
-                'status' => $media->status, // Include status
-            ];
-        })->toArray();
-
         return response()->json([
-            'data' => $responseData,
+            'data' => MediaResource::collection($mediaQuery->getCollection()),
             'current_page' => $mediaQuery->currentPage(),
             'per_page' => $mediaQuery->perPage(),
             'total' => $mediaQuery->total(),
@@ -57,7 +46,7 @@ class MediaController extends Controller
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store_media(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'title' => 'nullable|string|max:255|unique:media1,title',
@@ -123,14 +112,14 @@ class MediaController extends Controller
             'url' => $media->url,
             'thumbnail_url' => $media->thumbnail_url,
             'duration' => $media->duration,
-            'status' => $media->status, // Include status
+            'status' => $media->status,
         ], 201);
     }
 
-    public function show($id): JsonResponse
+    public function get_media_by_id($id): JsonResponse
     {
         try {
-            $media = $this->mediaRepository->find($id, ['id', 'title', 'type', 'path', 'thumbnail_path', 'duration', 'status']); // Added 'status'
+            $media = $this->mediaRepository->find($id, ['id', 'title', 'type', 'path', 'thumbnail_path', 'duration', 'status']);
             return response()->json([
                 'id' => $media->id,
                 'title' => $media->title,
@@ -138,20 +127,20 @@ class MediaController extends Controller
                 'url' => $media->url,
                 'thumbnail_url' => $media->thumbnail_url,
                 'duration' => $media->duration,
-                'status' => $media->status, // Include status
+                'status' => $media->status,
             ]);
         } catch (ModelNotFoundException $e) {
             return response()->json(['message' => $e->getMessage()], 404);
         }
     }
 
-    public function update(Request $request, $id): JsonResponse
+    public function update_media(Request $request, $id): JsonResponse
     {
         try {
             \Log::info('Update request data for Media ID: ' . $id, $request->all());
 
             $validator = Validator::make($request->all(), [
-                'title' => 'required|string|max:255',
+                'title' => 'nullable|string|max:255',
                 'file' => 'nullable|file|mimes:jpg,jpeg,png,mp4,mov,avi|max:20480',
             ], [
                 'file.mimes' => 'Only images (jpg, jpeg, png) or videos (mp4, mov, avi) are allowed.',
@@ -162,7 +151,7 @@ class MediaController extends Controller
                 return response()->json(['errors' => $validator->errors()], 422);
             }
 
-            $columns = ['id', 'title', 'type', 'path', 'thumbnail_path', 'duration', 'status']; // Include status
+            $columns = ['id', 'title', 'type', 'path', 'thumbnail_path', 'duration', 'status'];
             $media = $this->mediaRepository->find($id, $columns);
             $file = $request->file('file');
 
@@ -227,14 +216,14 @@ class MediaController extends Controller
                 'url' => $updatedMedia->url,
                 'thumbnail_url' => $updatedMedia->thumbnail_url,
                 'duration' => $updatedMedia->duration,
-                'status' => $updatedMedia->status, // Include status
+                'status' => $updatedMedia->status,
             ]);
         } catch (ModelNotFoundException $e) {
             return response()->json(['message' => $e->getMessage()], 404);
         }
     }
 
-    public function destroy($id): JsonResponse
+    public function destroy_media($id): JsonResponse
     {
         try {
             $columns = ['id', 'path', 'thumbnail_path'];

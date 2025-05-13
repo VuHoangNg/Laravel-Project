@@ -179,7 +179,7 @@ export function MediaProvider({ children, api }) {
         fetchComments: async (mediaId, { page = 1, per_page = 5 } = {}) => {
             try {
                 const response = await api.get(
-                    `/api/core/media/${mediaId}/comments`,
+                    `/api/media/${mediaId}/comments`,
                     {
                         params: { page, per_page },
                         headers: {
@@ -207,7 +207,7 @@ export function MediaProvider({ children, api }) {
         },
         fetchCommentById: async (commentId) => {
             try {
-                const response = await api.get(`/api/core/comments/${commentId}`, {
+                const response = await api.get(`/api/media/comments/${commentId}`, {
                     headers: {
                         Authorization: `Bearer ${getCookie("token")}`,
                     },
@@ -227,7 +227,7 @@ export function MediaProvider({ children, api }) {
                     ...(parentId && { parent_id: parentId }),
                 };
                 const response = await api.post(
-                    "/api/core/comments",
+                    "/api/media/comments",
                     payload,
                     {
                         headers: {
@@ -246,7 +246,7 @@ export function MediaProvider({ children, api }) {
         updateComment: async (commentId, text, timestamp) => {
             try {
                 const response = await api.put(
-                    `/api/core/comments/${commentId}`,
+                    `/api/media/comments/${commentId}`,
                     { text, timestamp },
                     {
                         headers: {
@@ -264,7 +264,7 @@ export function MediaProvider({ children, api }) {
         },
         deleteComment: async (commentId) => {
             try {
-                await api.delete(`/api/core/comments/${commentId}`, {
+                await api.delete(`/api/media/comments/${commentId}`, {
                     headers: {
                         Authorization: `Bearer ${getCookie("token")}`,
                     },

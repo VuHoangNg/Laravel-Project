@@ -1,18 +1,17 @@
 const path = require("path");
 
 module.exports = {
-    mode: "development", // Change to "production" for production builds
+    mode: "development",
     entry: {
-        auth: "./Modules/Auth/Resources/assets/js/app.js", // Auth entry
-        blog: "./Modules/Blog/Resources/assets/js/app.js", // Blog entry
-        core: "./Modules/Core/Resources/assets/js/index.js", // Core entry
-        media: "./Modules/Media/Resources/assets/js/index.js", // Media entry
-        user: "./Modules/User/Resources/assets/js/index.js",// User entry
+        auth: "./Modules/Auth/Resources/assets/js/app.js",
+        blog: "./Modules/Blog/Resources/assets/js/app.js",
+        core: "./Modules/Core/Resources/assets/js/index.js",
+        media: "./Modules/Media/Resources/assets/js/index.js",
+        user: "./Modules/User/Resources/assets/js/index.js",
     },
     output: {
-        // Correct the output directory to an absolute path
         path: path.resolve(__dirname, "public/modules"),
-        filename: "[name]/[name].js", // Dynamic output: auth.js -> Auth folder, blog.js -> Blog folder
+        filename: "[name]/[name].js",
     },
     module: {
         rules: [

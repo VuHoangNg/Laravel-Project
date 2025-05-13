@@ -17,7 +17,7 @@ class UserController extends Controller
 
     public function __construct(UserRepositoryInterface $userRepository)
     {
-        $this->middleware('auth:sanctum')->except(['index', 'show']);
+        $this->middleware('auth:sanctum')->except(['show_all_users', 'show']);
         $this->userRepository = $userRepository;
     }
 
@@ -29,15 +29,13 @@ class UserController extends Controller
         return array_intersect($requestedFields, $allowedFields);
     }
 
-    public function index(Request $request): JsonResponse
+    public function get_all_users(Request $request): JsonResponse
     {
         $perPage = min(max((int)$request->query('per_page', 10), 1), 100);
         $fields = $this->getRequestedFields($request);
 
-        // Nếu không có trường nào được yêu cầu, mặc định lấy tất cả các trường
         $columns = empty($fields) ? ['id', 'username', 'name', 'email', 'avatar'] : $fields;
 
-        // Truy vấn danh sách người dùng với các trường được yêu cầu
         $users = $this->userRepository->getAll($perPage, $columns, ['created_at' => 'desc']);
 
         return response()->json([
@@ -49,7 +47,7 @@ class UserController extends Controller
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store_user(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -75,7 +73,7 @@ class UserController extends Controller
         ], 201);
     }
 
-    public function show($id): JsonResponse
+    public function get_user_by_id($id): JsonResponse
     {
         try {
             $fields = $this->getRequestedFields(request());
@@ -104,7 +102,7 @@ class UserController extends Controller
         }
     }
 
-    public function update(Request $request, $id): JsonResponse
+    public function update_user(Request $request, $id): JsonResponse
     {
         try {
             $validated = $request->validate([
@@ -134,7 +132,7 @@ class UserController extends Controller
         }
     }
 
-    public function destroy($id): JsonResponse
+    public function destroy_user($id): JsonResponse
     {
         try {
             $deleted = $this->userRepository->delete($id);

@@ -3,7 +3,7 @@
 namespace Modules\Core\src\Repositories;
 
 use Illuminate\Pagination\LengthAwarePaginator;
-use Modules\Core\src\Models\Comment;
+use Modules\Media\src\Models\Comment;
 use Modules\Auth\src\Models\User;
 use Modules\Core\src\Models\Notification;
 

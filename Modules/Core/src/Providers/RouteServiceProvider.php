@@ -12,7 +12,7 @@ class RouteServiceProvider extends ServiceProvider
      *
      * @var string
      */
-    protected $moduleNamespace = 'Modules\Core\src\Controllers';
+    protected $moduleNamespace = 'Modules\Core\src\Controllers\NotificationController.php';
 
     /**
      * Called before routes are registered.

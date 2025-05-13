@@ -1,66 +1,168 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+VProject
+VProject is a modular Laravel application with a React frontend, designed for managing media, comments, blogs, authentication, and user functionalities. It uses Laravel 9 with the nwidart/laravel-modules package for modular architecture, integrates with Pusher for real-time features, and leverages FFmpeg for video processing.
+Table of Contents
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Features
+Prerequisites
+Installation
+Project Structure
+Environment Configuration
+Running the Application
+Frontend Development
+Available Scripts
+API Endpoints
+Contributing
+License
 
-## About Laravel
+Features
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Modular Architecture: Organized into modules (Auth, Blog, Core, Media, User) using nwidart/laravel-modules.
+Media Management: Upload, update, and delete media (images and videos) with HLS video processing using FFmpeg.
+Comment System: Create, read, update, and delete comments on media, with nested comment support.
+Real-Time Notifications: Integrated with Pusher for real-time updates.
+Frontend: React-based frontend with Redux for state management, using Webpack for module bundling.
+Authentication: Laravel Sanctum for API authentication.
+Rate Limiting: Applied to comment creation to prevent abuse.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+Prerequisites
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+PHP >= 8.0.2
+Composer
+Node.js >= 14.x
+npm or Yarn
+MySQL
+FFmpeg (for video processing)
+Windows: Ensure FFmpeg is installed at C:\FFMPEG\bin\ffmpeg.exe and ffprobe.exe as specified in .env.
 
-## Learning Laravel
+Pusher account (for real-time features)
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+Installation
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+Clone the Repository:
+git clone <repository-url>
+cd VProject
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains over 2000 video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Install PHP Dependencies:
+composer install
 
-## Laravel Sponsors
+Install Frontend Dependencies:
+npm install
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the Laravel [Patreon page](https://patreon.com/taylorotwell).
+Copy Environment File:
+cp .env.example .env
 
-### Premium Partners
+Generate Application Key:
+php artisan key:generate
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Cubet Techno Labs](https://cubettech.com)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[Many](https://www.many.co.uk)**
-- **[Webdock, Fast VPS Hosting](https://www.webdock.io/en)**
-- **[DevSquad](https://devsquad.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[OP.GG](https://op.gg)**
-- **[WebReinvent](https://webreinvent.com/?utm_source=laravel&utm_medium=github&utm_campaign=patreon-sponsors)**
-- **[Lendio](https://lendio.com)**
+Configure Database:
 
-## Contributing
+Update .env with your MySQL database credentials:DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=vproject
+DB_USERNAME=root
+DB_PASSWORD=
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Run Migrations:
+php artisan migrate
 
-## Code of Conduct
+Set Up Pusher:
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Add your Pusher credentials to .env:PUSHER_APP_ID=1986406
+PUSHER_APP_KEY=f630b112e131865a702e
+PUSHER_APP_SECRET=58cbb467f819efccd698
+PUSHER_APP_CLUSTER=ap1
 
-## Security Vulnerabilities
+Set Up FFmpeg (for video processing):
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Ensure FFmpeg is installed and the paths are correct in .env:FFMPEG_BINARIES=C:\FFMPEG\bin\ffmpeg.exe
+FFPROBE_BINARIES=C:\FFMPEG\bin\ffprobe.exe
 
-## License
+Project Structure
+VProject/
+├── app/ # Core Laravel application files
+├── Modules/ # Modular structure using nwidart/laravel-modules
+│ ├── Auth/ # Authentication module
+│ ├── Blog/ # Blog module
+│ ├── Core/ # Core functionality (e.g., notifications)
+│ ├── Media/ # Media and comment management
+│ └── User/ # User management
+├── public/ # Public assets and compiled frontend files
+│ └── modules/ # Compiled JavaScript for each module
+├── database/ # Migrations, factories, and seeders
+├── resources/ # Laravel views and assets
+├── routes/ # Route definitions (e.g., api.php)
+├── .env # Environment configuration
+├── composer.json # PHP dependencies
+├── package.json # Frontend dependencies
+└── webpack.config.js # Webpack configuration for frontend
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Environment Configuration
+The .env file contains key configurations:
+
+Database: MySQL connection settings (DB*\*).
+Queue: Uses database driver (QUEUE_CONNECTION=database).
+Sanctum: Configured for SPA authentication (SANCTUM_STATEFUL_DOMAINS).
+Pusher: Real-time broadcasting (PUSHER*_).
+FFmpeg: Paths for video processing (FFMPEG*BINARIES, FFPROBE_BINARIES).
+Mail: Mailtrap for email testing (MAIL*_).
+
+Running the Application
+
+Start Laravel Server:
+php artisan serve
+
+The backend will run at http://127.0.0.1:8000.
+
+Run Queue Worker (for video processing):
+php artisan queue:work --queue=video-processing
+
+Compile Frontend Assets:
+
+For development (watch mode):npm run dev
+
+Or for a specific module (e.g., Media):npm run media
+
+Frontend Development
+
+The frontend is built with React, using Redux for state management.
+Each module has its own entry point (e.g., Modules/Media/Resources/assets/js/index.js).
+Webpack compiles assets to public/modules/<module>/<module>.js.
+
+Available Scripts
+
+npm run build: Build all modules for production.
+npm run dev: Build and watch all modules for development.
+npm run auth: Watch the Auth module.
+npm run core: Watch the Core module.
+npm run blog: Watch the Blog module.
+npm run media: Watch the Media module.
+npm run user: Watch the User module.
+
+API Endpoints
+Media
+
+GET /api/media: List all media (paginated).
+POST /api/media: Upload new media (requires authentication).
+GET /api/media/{id}: Get media by ID.
+PUT/POST /api/media/{id}: Update media (requires authentication).
+DELETE /api/media/{id}: Delete media (requires authentication).
+
+Comments
+
+POST /api/media/comments: Create a comment (requires authentication).
+GET /api/media/{mediaId}/comments: Get comments for a media item.
+GET /api/media/comments/{id}: Get a comment by ID (requires authentication).
+PUT /api/media/comments/{id}: Update a comment (requires authentication).
+DELETE /api/media/comments/{id}: Delete a comment (requires authentication).
+
+Contributing
+
+Fork the repository.
+Create a feature branch (git checkout -b feature/your-feature).
+Commit your changes (git commit -m "Add your feature").
+Push to the branch (git push origin feature/your-feature).
+Open a pull request.
+
+License
+This project is licensed under the MIT License - see the LICENSE file for details.
