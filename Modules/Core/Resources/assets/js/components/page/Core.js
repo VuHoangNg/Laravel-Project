@@ -201,9 +201,21 @@ function Core() {
                 message.error("Failed to mark notification as read.");
             }
         }
-    
-        navigate(`/media?id=${notification.media1_id}&comment=${notification.comment_id}`);
+
+        if (
+            notification.type === "feedback_reply" ||
+            notification.type === "script_feedback"
+        ) {
+            navigate(
+                `/media?id=${notification.media1_id}&script_id=${notification.script_id}&feedback=${notification.feedback_id}`
+            );
+        } else {
+            navigate(
+                `/media?id=${notification.media1_id}&comment=${notification.comment_id}`
+            );
+        }
     };
+
 
     const onLoadMore = () => {
         setLoading(true);
@@ -328,7 +340,14 @@ function Core() {
                                             item.triggered_by?.username ||
                                             "Unknown"
                                         } on ${
-                                            item.media?.title || "Media"
+                                            item.type === "feedback_reply" ||
+                                            item.type === "script_feedback"
+                                                ? item.script?.title ||
+                                                  `Media ID ${
+                                                      item.script?.media1_id ||
+                                                      "Unknown"
+                                                  }`
+                                                : item.media?.title || "Media"
                                         } - ${
                                             item.created_at
                                                 ? new Date(
@@ -336,6 +355,7 @@ function Core() {
                                                   ).toLocaleString()
                                                 : "Unknown time"
                                         }`}
+
                                     />
                                 </Skeleton>
                             </List.Item>

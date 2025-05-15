@@ -1,0 +1,10 @@
+// Action Types
+export const SET_SCRIPTS = "SET_SCRIPTS";
+export const ADD_SCRIPT = "ADD_SCRIPT";
+export const UPDATE_SCRIPT = "UPDATE_SCRIPT";
+export const DELETE_SCRIPT = "DELETE_SCRIPT";
+export const SET_FEEDBACKS = "SET_FEEDBACKS";
+export const APPEND_FEEDBACKS = "APPEND_FEEDBACKS";
+export const ADD_FEEDBACK = "ADD_FEEDBACK";
+export const UPDATE_FEEDBACK = "UPDATE_FEEDBACK";
+export const DELETE_FEEDBACK = "DELETE_FEEDBACK";

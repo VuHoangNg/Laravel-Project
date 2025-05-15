@@ -3,5 +3,6 @@
     "Blog": true,
     "Core": true,
     "Media": true,
-    "User": true
+    "User": true,
+    "Script": true
 }

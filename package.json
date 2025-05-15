@@ -7,7 +7,8 @@
         "core": "webpack --config Modules/Core/webpack.core.config.js --watch",
         "blog": "webpack --config Modules/Blog/webpack.blog.config.js --watch",
         "media": "webpack --config Modules/Media/webpack.media.config.js --watch",
-        "user": "webpack --config Modules/User/webpack.user.config.js --watch"
+        "user": "webpack --config Modules/User/webpack.user.config.js --watch",
+        "script": "webpack --config Modules/Script/webpack.script.config.js --watch"
     },
     "devDependencies": {
         "@babel/core": "^7.26.10",
@@ -44,6 +45,7 @@
         "react-router-dom": "^6.30.0",
         "redux": "^5.0.1",
         "redux-logger": "^3.0.6",
-        "redux-thunk": "^3.1.0"
+        "redux-thunk": "^3.1.0",
+        "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.1/xlsx-0.20.1.tgz"
     }
 }

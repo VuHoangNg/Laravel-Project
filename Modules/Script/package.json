@@ -1,0 +1,8 @@
+{
+    "private": true,
+    "scripts": {
+        "script": "webpack --config webpack.script.config.js --mode development",
+        "script:build": "webpack --config webpack.script.config.js --mode production"
+    },
+    "devDependencies": {}
+}

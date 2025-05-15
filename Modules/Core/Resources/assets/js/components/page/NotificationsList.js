@@ -152,16 +152,24 @@ const NotificationsList = ({
                                             }
                                         />
                                     }
-                                    title={item.message}
-                                    description={`By ${
-                                        item.triggered_by?.username || "Unknown"
-                                    } on ${item.media?.title || "Media"} - ${
-                                        item.created_at
-                                            ? new Date(
-                                                  item.created_at
-                                              ).toLocaleString()
-                                            : "Unknown time"
-                                    }`}
+                                    title={
+                                        <>
+                                            {item.type === 'feedback_reply' ? '🗣️ ' : item.type === 'script_feedback' ? '📝 ' : '💬 '}
+                                            {item.message}
+                                        </>
+                                    }
+                                    description={
+                                        <>
+                                            By {item.triggered_by?.username || "Unknown"} on{" "}
+                                            {item.type === 'feedback_reply' || item.type === 'script_feedback'
+                                                ? item.script?.title || `Media ID ${item.script?.media1_id || "Unknown"}`
+                                                : item.media?.title || "Media"}{" "}
+                                            -{" "}
+                                            {item.created_at
+                                                ? new Date(item.created_at).toLocaleString()
+                                                : "Unknown time"}
+                                        </>
+                                    }
                                 />
                             </Skeleton>
                         </List.Item>

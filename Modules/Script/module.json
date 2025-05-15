@@ -1,0 +1,11 @@
+{
+    "name": "Script",
+    "alias": "script",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Script\\src\\Providers\\ScriptServiceProvider"
+    ],
+    "files": []
+}

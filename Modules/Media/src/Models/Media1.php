@@ -7,11 +7,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Storage;
 use Modules\Core\src\Models\Comment;
 use Modules\Blog\src\Models\Blog;
+use Modules\Script\src\Models\Script;
+
 class Media1 extends Model
 {
     protected $table = 'media1';
 
-    protected $fillable = ['title', 'type', 'path', 'thumbnail_path', 'status', 'blog_id' , 'duration',];
+    protected $fillable = ['title', 'type', 'path', 'thumbnail_path', 'status', 'blog_id', 'duration'];
 
     protected $appends = ['url', 'thumbnail_url'];
 
@@ -23,6 +25,11 @@ class Media1 extends Model
     public function comments()
     {
         return $this->hasMany(Comment::class, 'media1_id');
+    }
+
+    public function scripts()
+    {
+        return $this->hasMany(Script::class, 'media1_id');
     }
 
     // Getter for title (Ensures consistent formatting)

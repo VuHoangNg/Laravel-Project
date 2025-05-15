@@ -57,25 +57,19 @@ const CommentSidebar = ({
     showCommentSplitter,
     commentSiderWidth,
     selectedMedia,
-    handleCommentMouseDown,
-    handleCommentMouseMove,
-    handleCommentMouseUp,
-    isResizingComment,
-    commentSidebarRef,
     commentForm,
     handleCommentSubmit,
     handleEditComment,
     handleDeleteComment,
     handleTimestampClick,
     videoTime,
-    debouncedUpdateContentWidth,
     currentUserId,
     commentLoading,
     commentContext,
     commentId,
+    contentHeight,
 }) => {
     const dispatch = useDispatch();
-    const commentSplitterRef = useRef(null);
     const scrollableDivRef = useRef(null);
     const isMounted = useRef(false);
     const comments = useSelector(
@@ -93,6 +87,12 @@ const CommentSidebar = ({
     const [form] = Form.useForm();
     const PAGE_SIZE = 10;
     const scrollPositionRef = useRef(0);
+
+    // Calculate heights for comment section
+    const titleHeight = 40; // Height of "Comments" title
+    const formHeight = 150; // Increased to ensure form is fully visible
+    const padding = 16; // Adjusted padding for balance
+    const commentsHeight = contentHeight - titleHeight - formHeight - padding * 2;
 
     useEffect(() => {
         isMounted.current = true;
@@ -132,16 +132,6 @@ const CommentSidebar = ({
             return newSet;
         });
     };
-
-    useEffect(() => {
-        if (!isMounted.current || !isResizingComment) return;
-        window.addEventListener("mousemove", handleCommentMouseMove);
-        window.addEventListener("mouseup", handleCommentMouseUp);
-        return () => {
-            window.removeEventListener("mousemove", handleCommentMouseMove);
-            window.removeEventListener("mouseup", handleCommentMouseUp);
-        };
-    }, [isResizingComment, handleCommentMouseMove, handleCommentMouseUp]);
 
     const fetchSingleComment = async () => {
         setLoading(true);
@@ -318,79 +308,113 @@ const CommentSidebar = ({
 
     return (
         showCommentSplitter && (
-            <div style={{ display: "flex", height: "100vh", flexShrink: 0 }}>
-                <div
-                    ref={commentSplitterRef}
-                    style={{
-                        width: "5px",
-                        backgroundColor: "rgba(255, 255, 255, 0.1)",
-                        borderRadius: "8px",
-                        cursor: "col-resize",
-                        height: "100%",
-                        zIndex: 100,
-                        pointerEvents: "auto",
-                        transition: "background-color 0.3s",
-                    }}
-                    onMouseDown={handleCommentMouseDown}
-                    onMouseEnter={(e) =>
-                        (e.currentTarget.style.backgroundColor =
-                            "rgba(255, 255, 255, 0.2)")
-                    }
-                    onMouseLeave={(e) =>
-                        (e.currentTarget.style.backgroundColor =
-                            "rgba(255, 255, 255, 0.1)")
-                    }
-                />
-                <div
-                    ref={commentSidebarRef}
-                    style={{
-                        width: `${commentSiderWidth}px`,
-                        backgroundColor: "rgba(28, 37, 38, 0.95)",
-                        borderLeft: "1px solid rgba(255, 255, 255, 0.1)",
-                        padding: "16px",
-                        position: "relative",
-                        backdropFilter: "blur(10px)",
-                        overflowY: "auto",
-                        height: "100vh",
-                        flexShrink: 0,
-                    }}
-                >
-                    {selectedMedia ? (
-                        <div
-                            style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                height: "100%",
-                            }}
+            <div
+                style={{
+                    width: `${commentSiderWidth}px`,
+                    backgroundColor: "rgba(28, 37, 38, 0.95)",
+                    borderLeft: "1px solid rgba(255, 255, 255, 0.1)",
+                    padding: `${padding}px`, // Added padding for balance
+                    position: "relative",
+                    backdropFilter: "blur(10px)",
+                    overflowX: "hidden",
+                    overflowY: "auto",
+                    height: contentHeight,
+                    flexShrink: 0,
+                    boxSizing: "border-box", // Ensure padding is included in width
+                }}
+            >
+                {selectedMedia ? (
+                    <div
+                        style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            height: "100%",
+                            width: "100%", // Ensure the container takes full width
+                        }}
+                    >
+                        <Title
+                            level={4}
+                            style={{ color: "#fff", marginBottom: `${padding}px`, height: titleHeight }}
                         >
-                            <Title
-                                level={4}
-                                style={{ color: "#fff", marginBottom: "16px" }}
-                            >
-                                Comments
-                            </Title>
-                            <div
-                                ref={scrollableDivRef}
-                                style={{
-                                    flex: 1,
-                                    overflowY: "auto",
-                                    marginBottom: "16px",
-                                }}
-                                id="scrollableCommentDiv"
-                            >
-                                {commentLoading || (commentId && loading) ? (
-                                    <div
-                                        style={{
-                                            display: "flex",
-                                            justifyContent: "center",
-                                            alignItems: "center",
-                                            height: "100%",
-                                        }}
-                                    >
-                                        <Spin tip="Loading comments..." />
-                                    </div>
-                                ) : commentId && singleComment ? (
-                                    singleComment.map((comment) => (
+                            Comments
+                        </Title>
+                        <div
+                            ref={scrollableDivRef}
+                            style={{
+                                flex: 1,
+                                overflowY: "auto",
+                                marginBottom: `${padding}px`,
+                                minHeight: commentsHeight,
+                                width: "100%",
+                            }}
+                            id="scrollableCommentDiv"
+                        >
+                            {commentLoading || (commentId && loading) ? (
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        justifyContent: "center",
+                                        alignItems: "center",
+                                        height: "100%",
+                                    }}
+                                >
+                                    <Spin tip="Loading comments..." />
+                                </div>
+                            ) : commentId && singleComment ? (
+                                singleComment.map((comment) => (
+                                    <CommentItem
+                                        key={comment.id}
+                                        comment={comment}
+                                        currentUserId={currentUserId}
+                                        onReplyClick={handleReplyClick}
+                                        handleEditComment={
+                                            handleEditComment
+                                        }
+                                        handleDeleteComment={
+                                            handleDeleteComment
+                                        }
+                                        handleTimestampClick={
+                                            handleTimestampClick
+                                        }
+                                        handleReplySubmit={
+                                            handleReplySubmit
+                                        }
+                                        replyingTo={replyingTo}
+                                        setReplyingTo={setReplyingTo}
+                                        highlightedCommentId={
+                                            highlightedCommentId
+                                        }
+                                        expandedComments={expandedComments}
+                                        toggleExpandComment={
+                                            toggleExpandComment
+                                        }
+                                    />
+                                ))
+                            ) : comments.length > 0 ? (
+                                <InfiniteScroll
+                                    dataLength={comments.length}
+                                    next={() => {
+                                        loadMoreComments();
+                                    }}
+                                    hasMore={hasMore}
+                                    loader={
+                                        <Skeleton
+                                            avatar
+                                            paragraph={{ rows: 1 }}
+                                            active
+                                        />
+                                    }
+                                    endMessage={
+                                        <Divider
+                                            plain
+                                            style={{ color: "white" }}
+                                        >
+                                            No more comments 🤐
+                                        </Divider>
+                                    }
+                                    scrollableTarget="scrollableCommentDiv"
+                                >
+                                    {comments.map((comment) => (
                                         <CommentItem
                                             key={comment.id}
                                             comment={comment}
@@ -413,113 +437,39 @@ const CommentSidebar = ({
                                             highlightedCommentId={
                                                 highlightedCommentId
                                             }
-                                            expandedComments={expandedComments}
+                                            expandedComments={
+                                                expandedComments
+                                            }
                                             toggleExpandComment={
                                                 toggleExpandComment
                                             }
                                         />
-                                    ))
-                                ) : comments.length > 0 ? (
-                                    <InfiniteScroll
-                                        dataLength={comments.length}
-                                        next={() => {
-                                            loadMoreComments();
-                                        }}
-                                        hasMore={hasMore}
-                                        loader={
-                                            <Skeleton
-                                                avatar
-                                                paragraph={{ rows: 1 }}
-                                                active
-                                            />
-                                        }
-                                        endMessage={
-                                            <Divider
-                                                plain
-                                                style={{ color: "white" }}
-                                            >
-                                                No more comments 🤐
-                                            </Divider>
-                                        }
-                                        scrollableTarget="scrollableCommentDiv"
-                                    >
-                                        {comments.map((comment) => (
-                                            <CommentItem
-                                                key={comment.id}
-                                                comment={comment}
-                                                currentUserId={currentUserId}
-                                                onReplyClick={handleReplyClick}
-                                                handleEditComment={
-                                                    handleEditComment
-                                                }
-                                                handleDeleteComment={
-                                                    handleDeleteComment
-                                                }
-                                                handleTimestampClick={
-                                                    handleTimestampClick
-                                                }
-                                                handleReplySubmit={
-                                                    handleReplySubmit
-                                                }
-                                                replyingTo={replyingTo}
-                                                setReplyingTo={setReplyingTo}
-                                                highlightedCommentId={
-                                                    highlightedCommentId
-                                                }
-                                                expandedComments={
-                                                    expandedComments
-                                                }
-                                                toggleExpandComment={
-                                                    toggleExpandComment
-                                                }
-                                            />
-                                        ))}
-                                    </InfiniteScroll>
-                                ) : (
-                                    <Typography
-                                        style={{
-                                            color: "#fff",
-                                            fontSize: "16px",
-                                        }}
-                                    >
-                                        No comments yet.
-                                    </Typography>
-                                )}
-                            </div>
-                            <Form
-                                form={form}
-                                onFinish={(values) => {
-                                    handleReplySubmit({
-                                        comment: values.comment,
-                                    });
-                                }}
-                                style={{ flexShrink: 0 }}
-                            >
-                                <Form.Item
-                                    label={
-                                        <span style={{ color: "white" }}>
-                                            {`Commenting at ${Math.floor(
-                                                videoTime / 60
-                                            )
-                                                .toString()
-                                                .padStart(2, "0")}:${Math.floor(
-                                                videoTime % 60
-                                            )
-                                                .toString()
-                                                .padStart(2, "0")}`}
-                                        </span>
-                                    }
-                                    name="comment"
-                                    rules={[
-                                        {
-                                            required: true,
-                                            message: "Please enter a comment",
-                                        },
-                                    ]}
+                                    ))}
+                                </InfiniteScroll>
+                            ) : (
+                                <Typography
+                                    style={{
+                                        color: "#fff",
+                                        fontSize: "16px",
+                                    }}
                                 >
-                                    <TextArea
-                                        rows={3}
-                                        placeholder={`Comment at ${Math.floor(
+                                    No comments yet.
+                                </Typography>
+                            )}
+                        </div>
+                        <Form
+                            form={form}
+                            onFinish={(values) => {
+                                handleReplySubmit({
+                                    comment: values.comment,
+                                });
+                            }}
+                            style={{ flexShrink: 0, height: formHeight, width: "100%" }} // Ensure full width
+                        >
+                            <Form.Item
+                                label={
+                                    <span style={{ color: "white" }}>
+                                        {`Commenting at ${Math.floor(
                                             videoTime / 60
                                         )
                                             .toString()
@@ -528,46 +478,70 @@ const CommentSidebar = ({
                                         )
                                             .toString()
                                             .padStart(2, "0")}`}
-                                        style={{
-                                            backgroundColor:
-                                                "rgba(255, 255, 255, 0.1)",
-                                            color: "#e0e0e0",
-                                            borderRadius: 8,
-                                            border: "1px solid rgba(255, 255, 255, 0.1)",
-                                        }}
-                                    />
-                                </Form.Item>
-                                <Form.Item>
-                                    <Button
-                                        type="primary"
-                                        htmlType="submit"
-                                        style={{
-                                            width: "100%",
-                                            borderRadius: 8,
-                                        }}
-                                    >
-                                        Post
-                                    </Button>
-                                </Form.Item>
-                            </Form>
-                        </div>
-                    ) : (
-                        <div
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                height: "100%",
-                            }}
-                        >
-                            <Typography
-                                style={{ color: "#fff", fontSize: "16px" }}
+                                    </span>
+                                }
+                                name="comment"
+                                rules={[
+                                    {
+                                        required: true,
+                                        message: "Please enter a comment",
+                                    },
+                                ]}
+                                style={{ width: "100%", marginBottom: "8px" }} // Adjusted margin
                             >
-                                No media selected
-                            </Typography>
-                        </div>
-                    )}
-                </div>
+                                <TextArea
+                                    rows={3}
+                                    placeholder={`Comment at ${Math.floor(
+                                        videoTime / 60
+                                    )
+                                        .toString()
+                                        .padStart(2, "0")}:${Math.floor(
+                                        videoTime % 60
+                                    )
+                                        .toString()
+                                        .padStart(2, "0")}`}
+                                    style={{
+                                        backgroundColor:
+                                            "rgba(255, 255, 255, 0.1)",
+                                        color: "#e0e0e0",
+                                        borderRadius: 8,
+                                        border: "1px solid rgba(255, 255, 255, 0.1)",
+                                        width: "100%", // Ensure TextArea takes full width
+                                        boxSizing: "border-box", // Prevent padding issues
+                                        padding: "8px", // Added padding for better appearance
+                                    }}
+                                />
+                            </Form.Item>
+                            <Form.Item style={{ width: "100%", marginBottom: 0 }}>
+                                <Button
+                                    type="primary"
+                                    htmlType="submit"
+                                    style={{
+                                        width: "100%",
+                                        borderRadius: 8,
+                                    }}
+                                >
+                                    Post
+                                </Button>
+                            </Form.Item>
+                        </Form>
+                    </div>
+                ) : (
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            height: "100%",
+                        }}
+                    >
+                        <Typography
+                            style={{ color: "#fff", fontSize: "16px" }}
+                        >
+                            No media selected
+                        </Typography>
+                    </div>
+                )}
             </div>
         )
     );

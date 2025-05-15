@@ -53,10 +53,6 @@ const MainContent = ({
             }
     );
 
-    useEffect(() => {
-        console.log("Media state updated in MainContent:", media.data);
-    }, [media]);
-
     const getColSpan = () => {
         if (contentWidth >= 1400) return 6;
         if (contentWidth >= 1200) return 8;

@@ -8,6 +8,7 @@ module.exports = {
         core: "./Modules/Core/Resources/assets/js/index.js",
         media: "./Modules/Media/Resources/assets/js/index.js",
         user: "./Modules/User/Resources/assets/js/index.js",
+        script: "./Modules/Script/Resources/assets/js/index.js",
     },
     output: {
         path: path.resolve(__dirname, "public/modules"),

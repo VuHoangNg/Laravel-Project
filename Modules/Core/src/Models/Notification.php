@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 use Modules\Auth\src\Models\User;
 use Modules\Media\src\Models\Media1;
 use Modules\Media\src\Models\Comment;
+use Modules\Script\src\Models\Script;
+use Modules\Script\src\Models\FeedBack;
 
 class Notification extends Model
 {
@@ -17,9 +19,15 @@ class Notification extends Model
         'triggered_by_id',
         'media1_id',
         'comment_id',
+        'script_id',
+        'feedback_id',
         'type',
         'message',
         'is_read',
+    ];
+
+    protected $casts = [
+        'is_read' => 'boolean',
     ];
 
     public function user()
@@ -40,5 +48,15 @@ class Notification extends Model
     public function comment()
     {
         return $this->belongsTo(Comment::class, 'comment_id');
+    }
+
+    public function script()
+    {
+        return $this->belongsTo(Script::class, 'script_id');
+    }
+
+    public function feedback()
+    {
+        return $this->belongsTo(FeedBack::class, 'feedback_id');
     }
 }
