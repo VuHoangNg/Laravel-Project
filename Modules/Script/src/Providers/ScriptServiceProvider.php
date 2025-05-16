@@ -5,7 +5,8 @@ namespace Modules\Script\src\Providers;
 use Illuminate\Support\ServiceProvider;
 use Modules\Script\src\Repositories\FeedBackRepositoryInterface;
 use Modules\Script\src\Repositories\FeedBackRepository;
-
+use Modules\Script\src\Repositories\ScriptRepositoryInterface;
+use Modules\Script\src\Repositories\ScriptRepository;
 class ScriptServiceProvider extends ServiceProvider
 {
     /**
@@ -41,6 +42,7 @@ class ScriptServiceProvider extends ServiceProvider
         $this->app->register(RouteServiceProvider::class);
 
         // Bind FeedBackRepositoryInterface to FeedBackRepository
+        $this->app->bind(ScriptRepositoryInterface::class, ScriptRepository::class);
         $this->app->bind(FeedBackRepositoryInterface::class, FeedBackRepository::class);
     }
 

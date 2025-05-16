@@ -129,7 +129,7 @@ const ScriptTab = ({ contentHeight, media1_id, scriptId, feedbackId }) => {
         return () => {
             isMounted.current = false;
         };
-    }, [wasDrawerClosed]);
+    }, [media1_id,wasDrawerClosed]);
 
     const handleCreate = () => {
         getScriptContext.openModal();
