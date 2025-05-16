@@ -100,7 +100,7 @@ const FeedBackDrawer = ({
         return () => {
             isMounted.current = false;
         };
-    }, [selectedScript.key, highlightedFeedbackId, feedbacks]);
+    }, []);
 
     const loadInitialFeedbacks = async () => {
         if (selectedScript.key && !highlightedFeedbackId) {

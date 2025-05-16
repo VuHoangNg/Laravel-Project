@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Component } from "react";
+import React, { useState, useEffect, Component, useRef } from "react";
 import {
     MenuFoldOutlined,
     MenuUnfoldOutlined,
@@ -79,6 +79,7 @@ function Core() {
     const [notificationPage, setNotificationPage] = useState(1);
     const [initLoading, setInitLoading] = useState(true);
     const [loading, setLoading] = useState(false);
+    const isMounted = useRef(false);
     const [totalNotifications, setTotalNotifications] = useState(0);
     const [unreadCount, setUnreadCount] = useState(0);
     const { token } = useSelector((state) => state.auth);
@@ -121,6 +122,8 @@ function Core() {
     };
 
     useEffect(() => {
+        isMounted.current = true;
+
         if (!token || !userId) {
             if (!token) {
                 window.location.href = "/auth/login";
@@ -128,13 +131,17 @@ function Core() {
             return;
         }
 
-        fetchNotifications(notificationPage).then(({ data, total, unreadCount }) => {
-            setInitLoading(false);
-            setNotifications(data);
-            setTotalNotifications(total);
-            setUnreadCount(unreadCount);
+        // Fetch initial notifications
+        fetchNotifications(1).then(({ data, total, unreadCount }) => {
+            if (isMounted.current) {
+                setInitLoading(false);
+                setNotifications(data);
+                setTotalNotifications(total);
+                setUnreadCount(unreadCount);
+            }
         });
 
+        // Set up Pusher for real-time notifications
         Pusher.logToConsole = true;
         const pusher = new Pusher("f630b112e131865a702e", {
             cluster: "ap1",
@@ -146,19 +153,22 @@ function Core() {
 
         const channel = pusher.subscribe(`notifications.${userId}`);
         channel.bind("App\\Events\\NewCommentNotification", (data) => {
-            setNotifications((prev) => {
-                if (!prev.find((n) => n.id === data.id)) {
-                    return [data, ...prev];
+            if (isMounted.current) {
+                setNotifications((prev) => {
+                    if (!prev.find((n) => n.id === data.id)) {
+                        return [data, ...prev];
+                    }
+                    return prev;
+                });
+                setTotalNotifications((prev) => prev + 1);
+                if (!data.is_read) {
+                    setUnreadCount((prev) => prev + 1);
                 }
-                return prev;
-            });
-            setTotalNotifications((prev) => prev + 1);
-            if (!data.is_read) {
-                setUnreadCount((prev) => prev + 1);
             }
         });
 
         return () => {
+            isMounted.current = false;
             try {
                 pusher.unsubscribe(`notifications.${userId}`);
                 pusher.disconnect();
@@ -166,7 +176,7 @@ function Core() {
                 console.warn("Error during Pusher cleanup:", err);
             }
         };
-    }, []);
+    }, [token, userId]);
 
     const handleLogout = () => {
         Modal.confirm({

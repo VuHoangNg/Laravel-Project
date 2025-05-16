@@ -13,7 +13,7 @@ module.exports = {
   module: {
     rules: [
       {
-        test: /\.jsx?$/, 
+        test: /\.jsx?$/,
         exclude: /node_modules/,
         use: {
           loader: "babel-loader",
@@ -23,13 +23,18 @@ module.exports = {
         },
       },
       {
-        test: /\.scss$/, 
+        test: /\.scss$/,
         use: ["style-loader", "css-loader", "sass-loader"],
       },
     ],
   },
   resolve: {
-    extensions: [".js", ".jsx"],
+    extensions: [".js", ".jsx", ".tgz"], // Added .tgz to handle xlsx package
+    modules: [path.resolve(__dirname, "node_modules"), "node_modules"], // Ensure node_modules is resolved
+    fallback: {
+      // Fallback for xlsx if needed (optional, depending on runtime)
+      fs: false,
+    },
   },
   devServer: {
     headers: {

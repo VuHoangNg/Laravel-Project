@@ -1,14 +1,29 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Table, Button, Card, Modal, Form, Input, Tooltip, Drawer, message } from "antd";
+import {
+    Table,
+    Button,
+    Card,
+    Modal,
+    Form,
+    Input,
+    Tooltip,
+    Drawer,
+    message,
+    Upload,
+} from "antd";
 import {
     EditOutlined,
     DeleteOutlined,
     CommentOutlined,
+    UploadOutlined,
+    DownloadOutlined,
 } from "@ant-design/icons";
 import { useScriptContext } from "../context/ScriptContext";
 import { useSelector, useDispatch } from "react-redux";
 import FeedBackDrawer from "./FeedBackDrawer";
 import { SET_FEEDBACKS } from "../reducer/action";
+import * as XLSX from "xlsx";
+import { useSearchParams } from "react-router-dom";
 
 const ScriptTab = ({ contentHeight, media1_id, scriptId, feedbackId }) => {
     const {
@@ -26,138 +41,95 @@ const ScriptTab = ({ contentHeight, media1_id, scriptId, feedbackId }) => {
     const [showFeedBackDrawer, setShowFeedBackDrawer] = useState(false);
     const fetchedMediaId = useRef(null);
     const fetchedFeedbackId = useRef(null);
-    const [isScriptsLoaded, setIsScriptsLoaded] = useState(false); // New state to track script loading
-
+    const [isScriptsLoaded, setIsScriptsLoaded] = useState(false);
+    const [wasDrawerClosed, setWasDrawerClosed] = useState(false);
+    const [searchParams, setSearchParams] = useSearchParams();
     const getCookie = (name) => {
         const value = `; ${document.cookie}`;
         const parts = value.split(`; ${name}=`);
-        if (parts.length === 2) {
-            const cookieValue = parts.pop().split(";").shift();
-            return cookieValue;
-        }
+        if (parts.length === 2) return parts.pop().split(";").shift();
         return null;
     };
     const currentUserId = parseInt(getCookie("id"));
 
     useEffect(() => {
         isMounted.current = true;
-
-        // Fetch scripts if media1_id is provided and not already fetched
         if (media1_id && fetchedMediaId.current !== media1_id) {
             fetchedMediaId.current = media1_id;
-            setIsScriptsLoaded(false); // Reset loading state
-            getScriptContext.fetchScripts(media1_id)
-                .then(() => {
-                    if (isMounted.current) {
-                        setIsScriptsLoaded(true); // Mark scripts as loaded
-                    }
-                })
+            setIsScriptsLoaded(false);
+            getScriptContext
+                .fetchScripts(media1_id)
+                .then(() => setIsScriptsLoaded(true))
                 .catch((err) => {
-                    if (isMounted.current) {
-                        console.error("Failed to fetch scripts:", err);
-                        message.error("Failed to fetch scripts");
-                        setIsScriptsLoaded(true); // Allow processing even on error
-                    }
+                    console.error("Failed to fetch scripts:", err);
+                    message.error("Failed to fetch scripts");
+                    setIsScriptsLoaded(true);
                 });
         }
-
-        // Handle script selection if scriptId is provided and scripts are loaded
         if (scriptId && isScriptsLoaded && scripts?.data) {
-            const script = scripts.data.find((s) => s.id === parseInt(scriptId));
-            if (script && isMounted.current) {
-                const newScript = {
+            const script = scripts.data.find(
+                (s) => s.id === parseInt(scriptId)
+            );
+            if (script) {
+                setSelectedScript({
                     key: script.id,
                     part: script.part,
                     est_time: script.est_time,
                     direction: script.direction,
                     detail: script.detail,
                     note: script.note,
-                };
-                setSelectedScript(newScript);
+                });
                 setShowFeedBackDrawer(true);
-            } else if (!script && isMounted.current) {
-                // Fallback: Set a temporary selectedScript to open drawer
+            } else if (!script) {
                 setSelectedScript({ key: parseInt(scriptId) });
                 setShowFeedBackDrawer(true);
-                console.warn(`Script with id ${scriptId} not found in scripts.data`);
+                console.warn(`Script with id ${scriptId} not found`);
             }
         }
-
-        // Fetch feedback if feedbackId is provided and not already fetched
         if (feedbackId && fetchedFeedbackId.current !== feedbackId) {
             fetchedFeedbackId.current = feedbackId;
             feedBackContext
                 .fetchFeedbackById(feedbackId)
                 .then((feedbackData) => {
-                    if (isMounted.current) {
-                        // Flatten the feedback structure to include parent and children
-                        const feedbacks = [];
-                        if (feedbackData.parent_id) {
-                            // If feedback has a parent, include the parent as the root
-                            const parentFeedback = {
-                                id: feedbackData.id,
-                                text: feedbackData.text,
-                                timestamp: feedbackData.timestamp,
-                                parent_id: null, // Treat parent as root
-                                script_id: feedbackData.script_id,
-                                user: feedbackData.user,
-                                created_at: feedbackData.created_at,
-                                updated_at: feedbackData.updated_at,
-                                children: feedbackData.children || [],
-                            };
-                            feedbacks.push(parentFeedback);
-                            // Include the requested feedback as a child
-                            feedbacks.push({
-                                id: feedbackData.id,
-                                text: feedbackData.text,
-                                timestamp: feedbackData.timestamp,
-                                parent_id: feedbackData.parent_id,
-                                script_id: feedbackData.script_id,
-                                user: feedbackData.user,
-                                created_at: feedbackData.created_at,
-                                updated_at: feedbackData.updated_at,
-                                children: [],
-                            });
-                        } else {
-                            // If no parent, use the feedback directly
-                            feedbacks.push({
-                                ...feedbackData,
-                                children: feedbackData.children || [],
-                            });
-                        }
-
-                        // Build the feedback tree using feedBackContext's buildFeedbackTree
-                        const feedbackTree = feedBackContext.buildFeedbackTree(feedbacks);
-
-                        // Use scriptId directly if selectedScript isn't set yet
-                        const targetScriptId = selectedScript?.key || parseInt(scriptId);
-                        dispatch({
-                            type: SET_FEEDBACKS,
-                            payload: {
-                                scriptId: targetScriptId,
-                                feedbacks: feedbackTree,
-                            },
-                        });
-
-                        // Ensure selectedScript is set for the drawer
-                        if (!selectedScript && scriptId && isMounted.current) {
-                            setSelectedScript({ key: parseInt(scriptId) });
-                        }
-                        setShowFeedBackDrawer(true);
-                    }
+                    const feedbacks = feedbackData.parent_id
+                        ? [
+                              {
+                                  ...feedbackData,
+                                  parent_id: null,
+                                  children: feedbackData.children || [],
+                              },
+                              { ...feedbackData, children: [] },
+                          ]
+                        : [
+                              {
+                                  ...feedbackData,
+                                  children: feedbackData.children || [],
+                              },
+                          ];
+                    const feedbackTree =
+                        feedBackContext.buildFeedbackTree(feedbacks);
+                    const targetScriptId =
+                        selectedScript?.key || parseInt(scriptId);
+                    dispatch({
+                        type: SET_FEEDBACKS,
+                        payload: {
+                            scriptId: targetScriptId,
+                            feedbacks: feedbackTree,
+                        },
+                    });
+                    if (!selectedScript)
+                        setSelectedScript({ key: parseInt(scriptId) });
+                    setShowFeedBackDrawer(true);
                 })
                 .catch((err) => {
-                    if (isMounted.current) {
-                        console.error("Failed to fetch feedback:", err);
-                        message.error("Feedback not found");
-                    }
+                    console.error("Failed to fetch feedback:", err);
+                    message.error("Feedback not found");
                 });
         }
-
         return () => {
             isMounted.current = false;
         };
-    }, [media1_id, scriptId, feedbackId, isScriptsLoaded, scripts]); // Added isScriptsLoaded
+    }, [wasDrawerClosed]);
 
     const handleCreate = () => {
         getScriptContext.openModal();
@@ -175,7 +147,6 @@ const ScriptTab = ({ contentHeight, media1_id, scriptId, feedbackId }) => {
     };
 
     const handleFeedback = (record) => {
-        console.log("handleFeedback: record =", record);
         setSelectedScript(record);
         setShowFeedBackDrawer(true);
     };
@@ -201,6 +172,13 @@ const ScriptTab = ({ contentHeight, media1_id, scriptId, feedbackId }) => {
         }
     };
 
+    const handleDrawerClose = () => {
+        setShowFeedBackDrawer(false);
+        setSelectedScript(null);
+        setWasDrawerClosed(true);
+        setSearchParams(`?id=${media1_id}`);
+    };
+
     const handleDeleteConfirm = async () => {
         try {
             await deleteScriptContext.deleteScript(
@@ -208,26 +186,112 @@ const ScriptTab = ({ contentHeight, media1_id, scriptId, feedbackId }) => {
                 media1_id
             );
             deleteScriptContext.closeDeleteModal();
-            if (isMounted.current) {
-                getScriptContext.fetchScripts(media1_id);
-            }
+            if (isMounted.current) getScriptContext.fetchScripts(media1_id);
         } catch (error) {
             console.error("Delete confirm error:", error);
         }
     };
 
+    const handleExport = async (format) => {
+        if (!scripts.data || scripts.data.length === 0) {
+            message.error("No scripts available to export.");
+            return;
+        }
+        try {
+            const data = await getScriptContext.exportScripts(media1_id);
+            const formattedData = data.map((script) => ({
+                Part: script.part,
+                "Est. Time": script.est_time,
+                Direction: script.direction,
+                Detail: script.detail,
+                Note: script.note,
+            }));
+            const ws = XLSX.utils.json_to_sheet(formattedData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Scripts");
+            const exportData =
+                format === "csv"
+                    ? XLSX.write(wb, { bookType: "csv", type: "array" })
+                    : XLSX.write(wb, { bookType: "xlsx", type: "array" });
+            const blob = new Blob([exportData], {
+                type:
+                    format === "csv"
+                        ? "text/csv"
+                        : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `scripts_${
+                new Date().toISOString().split("T")[0]
+            }.${format}`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            message.error("Failed to export scripts: " + error.message);
+        }
+    };
+
+    const handleImport = async (file) => {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: "array" });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                const formattedData = jsonData.map((row) => ({
+                    media1_id,
+                    part: row.Part || row.part,
+                    est_time: String(row["Est. Time"] || row.est_time), // Ensure string
+                    direction: row.Direction || row.direction,
+                    detail: row.Detail || row.detail,
+                    note: row.Note || row.note,
+                }));
+
+                const requiredFields = [
+                    "part",
+                    "est_time",
+                    "direction",
+                    "detail",
+                ];
+                const invalidEntries = formattedData.filter((row) =>
+                    requiredFields.some((field) => !row[field])
+                );
+                if (invalidEntries.length > 0) {
+                    message.error(
+                        "Some entries are missing required fields (part, est_time, direction, detail)."
+                    );
+                    return;
+                }
+
+                await getScriptContext.importScripts(media1_id, formattedData);
+                message.success(
+                    "Scripts imported successfully! All existing scripts were replaced."
+                );
+                await getScriptContext.fetchScripts(media1_id);
+            } catch (error) {
+                console.error("Import error:", error);
+                message.error(
+                    error.response?.data?.message || "Failed to import scripts"
+                );
+            }
+        };
+        reader.readAsArrayBuffer(file);
+        return false;
+    };
+
     const dataSource = getScriptContext.isModalOpen
         ? []
-        : scripts && scripts.data
-        ? scripts.data.map((script) => ({
+        : scripts?.data?.map((script) => ({
               key: script.id,
               part: script.part,
               est_time: script.est_time,
               direction: script.direction,
               detail: script.detail,
               note: script.note,
-          }))
-        : [];
+          })) || [];
 
     const columns = [
         {
@@ -306,9 +370,37 @@ const ScriptTab = ({ contentHeight, media1_id, scriptId, feedbackId }) => {
                     flex: 1,
                 }}
                 extra={
-                    <Button type="primary" onClick={handleCreate}>
-                        Add
-                    </Button>
+                    <div>
+                        <Upload
+                            accept=".xlsx,.csv"
+                            showUploadList={false}
+                            beforeUpload={handleImport}
+                        >
+                            <Button
+                                icon={<UploadOutlined />}
+                                style={{ marginRight: 8 }}
+                            >
+                                Import
+                            </Button>
+                        </Upload>
+                        <Button
+                            icon={<DownloadOutlined />}
+                            onClick={() => handleExport("xlsx")}
+                            style={{ marginRight: 8 }}
+                        >
+                            Export Excel
+                        </Button>
+                        <Button
+                            icon={<DownloadOutlined />}
+                            onClick={() => handleExport("csv")}
+                            style={{ marginRight: 8 }}
+                        >
+                            Export CSV
+                        </Button>
+                        <Button type="primary" onClick={handleCreate}>
+                            Add
+                        </Button>
+                    </div>
                 }
             >
                 <Table
@@ -329,10 +421,7 @@ const ScriptTab = ({ contentHeight, media1_id, scriptId, feedbackId }) => {
                     onCancel={getScriptContext.closeModal}
                     width={600}
                     style={{ top: 20 }}
-                    bodyStyle={{
-                        background: "#ffffff",
-                        padding: 24,
-                    }}
+                    bodyStyle={{ background: "#ffffff", padding: 24 }}
                 >
                     <Form
                         form={form}
@@ -451,9 +540,7 @@ const ScriptTab = ({ contentHeight, media1_id, scriptId, feedbackId }) => {
                         textAlign: "center",
                     }}
                 >
-                    <Form.Item>
-                        <div>Are you sure you want to delete this script?</div>
-                    </Form.Item>
+                    <div>Are you sure you want to delete this script?</div>
                 </Modal>
             </Card>
             {selectedScript && (
@@ -461,10 +548,7 @@ const ScriptTab = ({ contentHeight, media1_id, scriptId, feedbackId }) => {
                     title="Feedback"
                     placement="right"
                     width={600}
-                    onClose={() => {
-                        setShowFeedBackDrawer(false);
-                        setSelectedScript(null);
-                    }}
+                    onClose={handleDrawerClose}
                     open={showFeedBackDrawer}
                     bodyStyle={{
                         background: "rgba(28, 37, 38, 0.95)",

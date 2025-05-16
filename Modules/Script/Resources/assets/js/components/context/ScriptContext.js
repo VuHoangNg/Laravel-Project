@@ -19,9 +19,7 @@ const ScriptContext = createContext();
 export const useScriptContext = () => {
     const context = useContext(ScriptContext);
     if (!context) {
-        throw new Error(
-            "useScriptContext must be used within a ScriptProvider"
-        );
+        throw new Error("useScriptContext must be used within a ScriptProvider");
     }
     return context;
 };
@@ -40,9 +38,7 @@ export const ScriptProvider = ({ api, children }) => {
         async (media1_id) => {
             if (!media1_id) return;
             try {
-                const response = await api.get(
-                    `/api/script/media/${media1_id}`
-                );
+                const response = await api.get(`/api/script/media/${media1_id}`);
                 console.log("Fetch scripts response:", response);
                 const responseScriptData = response.data.data;
                 if (!Array.isArray(responseScriptData)) {
@@ -69,15 +65,10 @@ export const ScriptProvider = ({ api, children }) => {
         const { media1_id } = values;
         if (!media1_id) throw new Error("media1_id is required");
         try {
-            const response = await api.post(
-                `/api/script/media/${media1_id}`,
-                values
-            );
+            const response = await api.post(`/api/script/media/${media1_id}`, values);
             const responseScriptData = response.data.data;
             if (!responseScriptData || !responseScriptData.id) {
-                throw new Error(
-                    "Invalid response structure: script data missing"
-                );
+                throw new Error("Invalid response structure: script data missing");
             }
             dispatch({ type: ADD_SCRIPT, payload: responseScriptData });
             message.success("Script created successfully!");
@@ -90,16 +81,11 @@ export const ScriptProvider = ({ api, children }) => {
         const { media1_id, ...scriptData } = values;
         if (!media1_id) throw new Error("media1_id is required");
         try {
-            const response = await api.put(
-                `/api/script/media/${media1_id}/${id}`,
-                scriptData
-            );
+            const response = await api.put(`/api/script/media/${media1_id}/${id}`, scriptData);
             if (response.status === 200 || response.status === 201) {
                 const responseScriptData = response.data.data;
                 if (!responseScriptData || !responseScriptData.id) {
-                    throw new Error(
-                        "Invalid response structure: script data missing"
-                    );
+                    throw new Error("Invalid response structure: script data missing");
                 }
                 dispatch({ type: UPDATE_SCRIPT, payload: responseScriptData });
                 message.success("Script updated successfully!");
@@ -114,9 +100,7 @@ export const ScriptProvider = ({ api, children }) => {
     const deleteScript = async (id, media1_id) => {
         if (!media1_id) throw new Error("media1_id is required");
         try {
-            const response = await api.delete(
-                `/api/script/media/${media1_id}/${id}`
-            );
+            const response = await api.delete(`/api/script/media/${media1_id}/${id}`);
             dispatch({ type: DELETE_SCRIPT, payload: id });
             message.success("Script deleted successfully!");
         } catch (error) {
@@ -124,14 +108,40 @@ export const ScriptProvider = ({ api, children }) => {
         }
     };
 
+    // Import and Export Operations
+    const importScripts = async (media1_id, data) => {
+        if (!media1_id || !data) throw new Error("media1_id and data are required");
+        try {
+            const response = await api.post(`/api/script/media/${media1_id}/import`, data, {
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getCookie("token")}` },
+            });
+            if (response.status === 200) {
+                await fetchScripts(media1_id); // Refresh scripts after import
+                message.success("Scripts imported successfully!");
+            } else {
+                throw new Error(`Unexpected status code: ${response.status}`);
+            }
+        } catch (error) {
+            message.error("Failed to import scripts: " + error.message);
+        }
+    };
+
+    const exportScripts = async (media1_id) => {
+        if (!media1_id) throw new Error("media1_id is required");
+        try {
+            const response = await api.get(`/api/script/media/${media1_id}/export`);
+            return response.data.data; // Return raw data for frontend to format
+        } catch (error) {
+            message.error("Failed to export scripts.");
+            throw error;
+        }
+    };
+
     // Feedback Operations
     const getCookie = (name) => {
         const value = `; ${document.cookie}`;
         const parts = value.split(`; ${name}=`);
-        if (parts.length === 2) {
-            return parts.pop().split(";").shift();
-        }
-        return null;
+        return parts.length === 2 ? parts.pop().split(";").shift() : null;
     };
 
     const buildFeedbackTree = (feedbacks) => {
@@ -173,36 +183,22 @@ export const ScriptProvider = ({ api, children }) => {
         return tree;
     };
 
-    const fetchFeedbacks = async (
-        script_id,
-        { page = 1, per_page = 5 } = {}
-    ) => {
+    const fetchFeedbacks = async (script_id, { page = 1, per_page = 5 } = {}) => {
         try {
-            const response = await api.get(
-                `/api/script/feedbacks/${script_id}`,
-                {
-                    params: { page, per_page },
-                    headers: {
-                        Authorization: `Bearer ${getCookie("token")}`,
-                    },
-                }
-            );
+            const response = await api.get(`/api/script/feedbacks/${script_id}`, {
+                params: { page, per_page },
+                headers: { Authorization: `Bearer ${getCookie("token")}` },
+            });
             const feedbackTree = buildFeedbackTree(response.data.data);
             dispatch(
                 page === 1
                     ? {
                           type: SET_FEEDBACKS,
-                          payload: {
-                              scriptId: script_id,
-                              feedbacks: feedbackTree,
-                          },
+                          payload: { scriptId: script_id, feedbacks: feedbackTree },
                       }
                     : {
                           type: APPEND_FEEDBACKS,
-                          payload: {
-                              scriptId: script_id,
-                              feedbacks: feedbackTree,
-                          },
+                          payload: { scriptId: script_id, feedbacks: feedbackTree },
                       }
             );
             return {
@@ -220,14 +216,9 @@ export const ScriptProvider = ({ api, children }) => {
 
     const fetchFeedbackById = async (feedbackId) => {
         try {
-            const response = await api.get(
-                `/api/script/feedback/${feedbackId}`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${getCookie("token")}`,
-                    },
-                }
-            );
+            const response = await api.get(`/api/script/feedback/${feedbackId}`, {
+                headers: { Authorization: `Bearer ${getCookie("token")}` },
+            });
             return response.data.data;
         } catch (error) {
             console.error("Error fetching feedback by ID:", error);
@@ -236,29 +227,13 @@ export const ScriptProvider = ({ api, children }) => {
         }
     };
 
-    const createFeedback = async (
-        script_id,
-        text,
-        timestamp,
-        parentId = null
-    ) => {
+    const createFeedback = async (script_id, text, timestamp, parentId = null) => {
         try {
-            const payload = {
-                script_id,
-                text,
-                timestamp,
-                ...(parentId && { parent_id: parentId }),
-            };
+            const payload = { script_id, text, timestamp, ...(parentId && { parent_id: parentId }) };
             const response = await api.post("/api/script/feedback", payload, {
-                headers: {
-                    Authorization: `Bearer ${getCookie("token")}`,
-                    "Content-Type": "application/json",
-                },
+                headers: { Authorization: `Bearer ${getCookie("token")}`, "Content-Type": "application/json" },
             });
-            dispatch({
-                type: ADD_FEEDBACK,
-                payload: { scriptId: script_id, feedback: response.data.data },
-            });
+            dispatch({ type: ADD_FEEDBACK, payload: { scriptId: script_id, feedback: response.data.data } });
             message.success("Feedback created successfully!");
             return response.data.data;
         } catch (error) {
@@ -268,31 +243,14 @@ export const ScriptProvider = ({ api, children }) => {
         }
     };
 
-    const updateFeedback = async (
-        script_id,
-        feedbackId,
-        text,
-        timestamp = 0
-    ) => {
+    const updateFeedback = async (script_id, feedbackId, text, timestamp = 0) => {
         try {
             const payload = { text };
-            if (timestamp !== undefined) {
-                payload.timestamp = timestamp;
-            }
-            const response = await api.put(
-                `/api/script/feedback/${feedbackId}`,
-                payload,
-                {
-                    headers: {
-                        Authorization: `Bearer ${getCookie("token")}`,
-                        "Content-Type": "application/json",
-                    },
-                }
-            );
-            dispatch({
-                type: UPDATE_FEEDBACK,
-                payload: { scriptId: script_id, feedback: response.data.data },
+            if (timestamp !== undefined) payload.timestamp = timestamp;
+            const response = await api.put(`/api/script/feedback/${feedbackId}`, payload, {
+                headers: { Authorization: `Bearer ${getCookie("token")}`, "Content-Type": "application/json" },
             });
+            dispatch({ type: UPDATE_FEEDBACK, payload: { scriptId: script_id, feedback: response.data.data } });
             message.success("Feedback updated successfully!");
             return response.data.data;
         } catch (error) {
@@ -305,14 +263,9 @@ export const ScriptProvider = ({ api, children }) => {
     const deleteFeedback = async (script_id, feedbackId) => {
         try {
             await api.delete(`/api/script/feedback/${feedbackId}`, {
-                headers: {
-                    Authorization: `Bearer ${getCookie("token")}`,
-                },
+                headers: { Authorization: `Bearer ${getCookie("token")}` },
             });
-            dispatch({
-                type: DELETE_FEEDBACK,
-                payload: { scriptId: script_id, feedbackId },
-            });
+            dispatch({ type: DELETE_FEEDBACK, payload: { scriptId: script_id, feedbackId } });
             message.success("Feedback deleted successfully!");
         } catch (error) {
             console.error("Error deleting feedback:", error);
@@ -351,7 +304,7 @@ export const ScriptProvider = ({ api, children }) => {
     const value = {
         createScriptContext: { createScript, resetForm, formData },
         editingScriptContext: { editingScript, updateScript },
-        getScriptContext: { fetchScripts, isModalOpen, openModal, closeModal },
+        getScriptContext: { fetchScripts, isModalOpen, openModal, closeModal, importScripts, exportScripts },
         deleteScriptContext: {
             deleteScript: (id, media1_id) => deleteScript(id, media1_id),
             scriptToDelete,
@@ -369,9 +322,6 @@ export const ScriptProvider = ({ api, children }) => {
         },
     };
 
-    return (
-        <ScriptContext.Provider value={value}>
-            {children}
-        </ScriptContext.Provider>
-    );
+    return <ScriptContext.Provider value={value}>{children}</ScriptContext.Provider>;
 };
+
