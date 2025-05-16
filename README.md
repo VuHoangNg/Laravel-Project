@@ -7,7 +7,7 @@ Built with **Laravel 9** and the `nwidart/laravel-modules` package, VProject pro
 
 ## 🔑 Key Features
 
--   Modular architecture (Auth, Blog, Core, Media, User modules)
+-   Modular architecture (Auth, Blog, Core, Media, User, Script modules)
 -   Media management with image and video support (including HLS processing)
 -   Nested comment system for media items
 -   Real-time notifications via Pusher
@@ -117,6 +117,7 @@ VProject/
 │   ├── Core/                 # Core functionality (e.g., notifications)
 │   ├── Media/                # Media and comment management
 │   └── User/                 # User management
+│   └── Script/               # Script management
 ├── public/                   # Public assets and compiled frontend files
 │   └── modules/              # Compiled JavaScript for each module
 ├── database/                 # Migrations, factories, and seeders
@@ -196,6 +197,7 @@ public/modules/<module>/<module>.js
 -   `npm run blog`: Watch the Blog module.
 -   `npm run media`: Watch the Media module.
 -   `npm run user`: Watch the User module.
+-   `npm run script`: Watch the Script module.
 
 ---
 
