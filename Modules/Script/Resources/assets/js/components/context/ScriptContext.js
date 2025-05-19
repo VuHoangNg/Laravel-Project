@@ -39,7 +39,6 @@ export const ScriptProvider = ({ api, children }) => {
             if (!media1_id) return;
             try {
                 const response = await api.get(`/api/script/media/${media1_id}`);
-                console.log("Fetch scripts response:", response);
                 const responseScriptData = response.data.data;
                 if (!Array.isArray(responseScriptData)) {
                     throw new Error(
@@ -109,11 +108,16 @@ export const ScriptProvider = ({ api, children }) => {
     };
 
     // Import and Export Operations
-    const importScripts = async (media1_id, data) => {
-        if (!media1_id || !data) throw new Error("media1_id and data are required");
+    const importScripts = async (media1_id, file) => {
+        if (!media1_id || !file) throw new Error("media1_id and file are required");
         try {
-            const response = await api.post(`/api/script/media/${media1_id}/import`, data, {
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getCookie("token")}` },
+            const formData = new FormData();
+            formData.append('file', file);
+            const response = await api.post(`/api/script/media/${media1_id}/import`, formData, {
+                headers: {
+                    'Authorization': `Bearer ${getCookie("token")}`,
+                    'Content-Type': 'multipart/form-data',
+                },
             });
             if (response.status === 200) {
                 await fetchScripts(media1_id); // Refresh scripts after import
@@ -129,8 +133,19 @@ export const ScriptProvider = ({ api, children }) => {
     const exportScripts = async (media1_id) => {
         if (!media1_id) throw new Error("media1_id is required");
         try {
-            const response = await api.get(`/api/script/media/${media1_id}/export`);
-            return response.data.data; // Return raw data for frontend to format
+            const response = await api.get(`/api/script/media/${media1_id}/export`, {
+                responseType: 'blob', // Important for file download
+                headers: { 'Authorization': `Bearer ${getCookie("token")}` },
+            });
+            const blob = new Blob([response.data], {
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `scripts_${new Date().toISOString().split('T')[0]}.xlsx`;
+            a.click();
+            window.URL.revokeObjectURL(url);
         } catch (error) {
             message.error("Failed to export scripts.");
             throw error;
@@ -324,4 +339,3 @@ export const ScriptProvider = ({ api, children }) => {
 
     return <ScriptContext.Provider value={value}>{children}</ScriptContext.Provider>;
 };
-

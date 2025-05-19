@@ -9,6 +9,7 @@ use Modules\Script\src\Repositories\ScriptRepositoryInterface;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Modules\Script\src\Resources\ScriptResource;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ScriptController extends Controller
 {
@@ -131,33 +132,17 @@ class ScriptController extends Controller
     public function import_scripts(Request $request, $media1_id): JsonResponse
     {
         try {
-            $data = $request->json()->all();
+            $request->validate([
+                'file' => 'required|file|mimes:xlsx,csv|max:2048', // Max 2MB
+            ]);
 
-            if (!is_array($data) || empty($data)) {
-                return response()->json(['message' => 'No scripts provided for import'], 422);
-            }
+            $file = $request->file('file');
 
-            // Validate each item
-            foreach ($data as $index => $item) {
-                $validator = \Illuminate\Support\Facades\Validator::make($item, [
-                    'part' => 'required|string|max:255',
-                    'est_time' => 'required|string|max:10',
-                    'direction' => 'required|string',
-                    'detail' => 'required|string',
-                    'note' => 'nullable|string',
-                ]);
-
-                if ($validator->fails()) {
-                    return response()->json([
-                        'message' => 'Validation failed for script at index ' . $index,
-                        'errors' => $validator->errors(),
-                    ], 422);
-                }
-            }
-
-            $this->scriptRepository->import($media1_id, $data);
+            $this->scriptRepository->import($media1_id, $file);
 
             return response()->json(['message' => 'Scripts imported successfully'], 200);
+        } catch (ValidationException $e) {
+            return response()->json(['message' => $e->getMessage(), 'errors' => $e->errors()], 422);
         } catch (ModelNotFoundException $e) {
             return response()->json(['message' => 'Media1 not found'], 404);
         } catch (\Exception $e) {
@@ -166,11 +151,12 @@ class ScriptController extends Controller
         }
     }
 
-    public function export_scripts($media1_id): JsonResponse
+    public function export_scripts($media1_id)
     {
         try {
-            $scripts = $this->scriptRepository->export($media1_id);
-            return response()->json(['data' => $scripts], 200);
+            $export = $this->scriptRepository->export($media1_id);
+            $date = now()->format('Y-m-d');
+            return Excel::download($export, "scripts_{$date}.xlsx");
         } catch (\Exception $e) {
             return response()->json(['message' => 'Failed to export scripts'], 500);
         }

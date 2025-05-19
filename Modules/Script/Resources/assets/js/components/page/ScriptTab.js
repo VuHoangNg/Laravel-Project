@@ -22,7 +22,6 @@ import { useScriptContext } from "../context/ScriptContext";
 import { useSelector, useDispatch } from "react-redux";
 import FeedBackDrawer from "./FeedBackDrawer";
 import { SET_FEEDBACKS } from "../reducer/action";
-import * as XLSX from "xlsx";
 import { useSearchParams } from "react-router-dom";
 
 const ScriptTab = ({ contentHeight, media1_id, scriptId, feedbackId }) => {
@@ -129,7 +128,7 @@ const ScriptTab = ({ contentHeight, media1_id, scriptId, feedbackId }) => {
         return () => {
             isMounted.current = false;
         };
-    }, [media1_id,wasDrawerClosed]);
+    }, [media1_id, wasDrawerClosed]);
 
     const handleCreate = () => {
         getScriptContext.openModal();
@@ -192,94 +191,25 @@ const ScriptTab = ({ contentHeight, media1_id, scriptId, feedbackId }) => {
         }
     };
 
-    const handleExport = async (format) => {
+    const handleExport = async () => {
         if (!scripts.data || scripts.data.length === 0) {
             message.error("No scripts available to export.");
             return;
         }
         try {
-            const data = await getScriptContext.exportScripts(media1_id);
-            const formattedData = data.map((script) => ({
-                Part: script.part,
-                "Est. Time": script.est_time,
-                Direction: script.direction,
-                Detail: script.detail,
-                Note: script.note,
-            }));
-            const ws = XLSX.utils.json_to_sheet(formattedData);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Scripts");
-            const exportData =
-                format === "csv"
-                    ? XLSX.write(wb, { bookType: "csv", type: "array" })
-                    : XLSX.write(wb, { bookType: "xlsx", type: "array" });
-            const blob = new Blob([exportData], {
-                type:
-                    format === "csv"
-                        ? "text/csv"
-                        : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `scripts_${
-                new Date().toISOString().split("T")[0]
-            }.${format}`;
-            a.click();
-            window.URL.revokeObjectURL(url);
+            await getScriptContext.exportScripts(media1_id);
         } catch (error) {
-            message.error("Failed to export scripts: " + error.message);
+            console.error("Export error:", error);
         }
     };
 
     const handleImport = async (file) => {
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            try {
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, { type: "array" });
-                const sheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[sheetName];
-                const jsonData = XLSX.utils.sheet_to_json(worksheet);
-                const formattedData = jsonData.map((row) => ({
-                    media1_id,
-                    part: row.Part || row.part,
-                    est_time: String(row["Est. Time"] || row.est_time), // Ensure string
-                    direction: row.Direction || row.direction,
-                    detail: row.Detail || row.detail,
-                    note: row.Note || row.note,
-                }));
-
-                const requiredFields = [
-                    "part",
-                    "est_time",
-                    "direction",
-                    "detail",
-                ];
-                const invalidEntries = formattedData.filter((row) =>
-                    requiredFields.some((field) => !row[field])
-                );
-                if (invalidEntries.length > 0) {
-                    message.error(
-                        "Some entries are missing required fields (part, est_time, direction, detail)."
-                    );
-                    return;
-                }
-
-                await getScriptContext.importScripts(media1_id, formattedData);
-                message.success(
-                    "Scripts imported successfully! All existing scripts were replaced."
-                );
-                await getScriptContext.fetchScripts(media1_id);
-            } catch (error) {
-                console.error("Import error:", error);
-                message.error(
-                    error.response?.data?.message || "Failed to import scripts"
-                );
-            }
-        };
-        reader.readAsArrayBuffer(file);
-        return false;
+        try {
+            await getScriptContext.importScripts(media1_id, file);
+        } catch (error) {
+            console.error("Import error:", error);
+        }
+        return false; // Prevent Ant Design Upload from handling the file
     };
 
     const dataSource = getScriptContext.isModalOpen
@@ -385,17 +315,10 @@ const ScriptTab = ({ contentHeight, media1_id, scriptId, feedbackId }) => {
                         </Upload>
                         <Button
                             icon={<DownloadOutlined />}
-                            onClick={() => handleExport("xlsx")}
+                            onClick={handleExport}
                             style={{ marginRight: 8 }}
                         >
                             Export Excel
-                        </Button>
-                        <Button
-                            icon={<DownloadOutlined />}
-                            onClick={() => handleExport("csv")}
-                            style={{ marginRight: 8 }}
-                        >
-                            Export CSV
                         </Button>
                         <Button type="primary" onClick={handleCreate}>
                             Add

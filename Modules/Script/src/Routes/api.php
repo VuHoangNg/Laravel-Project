@@ -6,8 +6,8 @@ use Modules\Script\src\Controllers\FeedBackController;
 
 Route::prefix('script')->middleware('auth:sanctum')->group(function () {
     //Import-Export
-    Route::post('/media/{media1_id}/import', [ScriptController::class, 'import_scripts'])->name('script.import');
-    Route::get('/media/{media1_id}/export', [ScriptController::class, 'export_scripts'])->name('script.export');
+    Route::post('/media/{media1_id}/import', [ScriptController::class, 'import_scripts']);
+    Route::get('/media/{media1_id}/export', [ScriptController::class, 'export_scripts']);
     // Script Routes
     Route::get('/media/{media1_id}', [ScriptController::class, 'get_scripts'])->name('script.index');
     Route::post('/media/{media1_id}', [ScriptController::class, 'create_script'])->name('script.store');
