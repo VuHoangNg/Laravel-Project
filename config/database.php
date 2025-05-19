@@ -93,6 +93,19 @@ return [
             // 'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
         ],
 
+       'mongodb' => [
+        'driver' => 'mongodb',
+        'host' => env('DB_HOST', '127.0.0.1'),
+        'port' => env('DB_PORT', 27017),
+        'database' => env('DB_DATABASE', 'vproject'),
+        'username' => env('DB_USERNAME', 'vproject'),
+        'password' => env('DB_PASSWORD', '@Rooler147'),
+        'options' => [
+            'appname' => env('APP_NAME', 'VProject'),
+            'authSource' => 'admin', // Optional: specify the authentication database if different from 'vproject'
+        ],
+    ],
+
     ],
 
     /*

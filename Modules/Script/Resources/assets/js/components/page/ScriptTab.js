@@ -24,6 +24,14 @@ import FeedBackDrawer from "./FeedBackDrawer";
 import { SET_FEEDBACKS } from "../reducer/action";
 import { useSearchParams } from "react-router-dom";
 
+// Inline CSS for the highlighted row (you can move this to a separate CSS file)
+const highlightStyle = {
+    highlightedRow: {
+        backgroundColor: "rgba(255, 255, 0, 0.1)", // Light yellow background for highlight
+        borderLeft: "4px solid #faad14", // Yellow border for emphasis
+    },
+};
+
 const ScriptTab = ({ contentHeight, media1_id, scriptId, feedbackId }) => {
     const {
         createScriptContext,
@@ -205,7 +213,11 @@ const ScriptTab = ({ contentHeight, media1_id, scriptId, feedbackId }) => {
 
     const handleImport = async (file) => {
         try {
-            await getScriptContext.importScripts(media1_id, file);
+            const result = await getScriptContext.importScripts(media1_id, file);
+            if (result.errors.length > 0) {
+                // Errors are already displayed in ScriptProvider, but you can add additional UI here
+                console.log(`Imported ${result.successCount} scripts, ${result.errors.length} rows failed.`);
+            }
         } catch (error) {
             console.error("Import error:", error);
         }
@@ -287,8 +299,21 @@ const ScriptTab = ({ contentHeight, media1_id, scriptId, feedbackId }) => {
         },
     ];
 
+    // Function to determine the row class for highlighting
+    const getRowClassName = (record) => {
+        return record.key === parseInt(scriptId) ? "highlighted-row" : "";
+    };
+
     return (
         <div style={{ display: "flex", height: contentHeight, width: "100%" }}>
+            <style>
+                {`
+                    .highlighted-row {
+                        background-color: rgba(255, 255, 0, 0.1);
+                        border-left: 4px solid #faad14;
+                    }
+                `}
+            </style>
             <Card
                 title={null}
                 bordered={false}
@@ -332,6 +357,7 @@ const ScriptTab = ({ contentHeight, media1_id, scriptId, feedbackId }) => {
                     pagination={false}
                     scroll={{ y: contentHeight - 80, x: 1020 }}
                     style={{ background: "#1C2526", color: "#e0e0e0" }}
+                    rowClassName={getRowClassName} // Apply the highlight class
                 />
                 <Modal
                     title={

@@ -120,13 +120,61 @@ export const ScriptProvider = ({ api, children }) => {
                 },
             });
             if (response.status === 200) {
-                await fetchScripts(media1_id); // Refresh scripts after import
-                message.success("Scripts imported successfully!");
+                await fetchScripts(media1_id);
+                message.success(response.data.message || "Scripts imported successfully!");
+                return { successCount: response.data.success_count, errors: [] };
+            } else if (response.status === 422) {
+                const { success_count, errors } = response.data;
+                if (!Array.isArray(errors) || errors.length === 0) {
+                    message.error(`Imported ${success_count} scripts, but some rows failed validation. No specific errors provided.`);
+                    await fetchScripts(media1_id);
+                    return { successCount: success_count, errors: [] };
+                }
+                const errorMessage = errors.map(err => {
+                    if (!err.row || !err.errors) {
+                        return `Row ${err.row || 'unknown'}: Validation error`;
+                    }
+                    return `Row ${err.row}: ${Object.entries(err.errors).map(([field, messages]) => {
+                        // Map est_time to estimated time for display
+                        const displayField = field === 'est_time' ? 'estimated time' : field;
+                        return `${displayField}: ${messages.join(', ')}`;
+                    }).join('; ')}`;
+                }).join('\n');
+                message.error({
+                    content: `Imported ${success_count} scripts, but some rows failed:\n${errorMessage}`,
+                    duration: 10,
+                    style: { whiteSpace: 'pre-wrap' },
+                });
+                await fetchScripts(media1_id);
+                return { successCount: success_count, errors };
             } else {
                 throw new Error(`Unexpected status code: ${response.status}`);
             }
         } catch (error) {
-            message.error("Failed to import scripts: " + error.message);
+            const errorMessage = error.response?.data?.message || "Failed to import scripts.";
+            const successCount = error.response?.data?.success_count || 0;
+            const errors = error.response?.data?.errors || [];
+            if (Array.isArray(errors) && errors.length > 0) {
+                const errorMessageText = errors.map(err => {
+                    if (!err.row || !err.errors) {
+                        return `Row ${err.row || 'unknown'}: Validation error`;
+                    }
+                    return `Row ${err.row}: ${Object.entries(err.errors).map(([field, messages]) => {
+                        // Map est_time to estimated time for display
+                        const displayField = field === 'est_time' ? 'estimated time' : field;
+                        return `${displayField}: ${messages.join(', ')}`;
+                    }).join('; ')}`;
+                }).join('\n');
+                message.error({
+                    content: `Imported ${successCount} scripts, but some rows failed:\n${errorMessageText}`,
+                    duration: 10,
+                    style: { whiteSpace: 'pre-wrap' },
+                });
+            } else {
+                message.error(errorMessage);
+            }
+            await fetchScripts(media1_id);
+            throw error;
         }
     };
 
@@ -134,7 +182,7 @@ export const ScriptProvider = ({ api, children }) => {
         if (!media1_id) throw new Error("media1_id is required");
         try {
             const response = await api.get(`/api/script/media/${media1_id}/export`, {
-                responseType: 'blob', // Important for file download
+                responseType: 'blob',
                 headers: { 'Authorization': `Bearer ${getCookie("token")}` },
             });
             const blob = new Blob([response.data], {
