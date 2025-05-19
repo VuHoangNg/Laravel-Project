@@ -6,7 +6,7 @@ use Modules\Script\src\Models\FeedBack;
 use Modules\Auth\src\Models\User;
 use UnauthorizedException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Support\Facades\Storage; // Added import
+use Illuminate\Support\Facades\Storage;
 
 class FeedBackRepository implements FeedBackRepositoryInterface
 {
@@ -74,24 +74,25 @@ class FeedBackRepository implements FeedBackRepositoryInterface
                 // Fetch all siblings (other children of the same parent)
                 $siblings = FeedBack::where('parent_id', $feedback->parent_id)
                     ->where('id', '!=', $feedback->id)
-                    ->with(['user'])
+                    ->with(['user', 'children.user'])
+                    ->select([
+                        'id',
+                        'text',
+                        'timestamp',
+                        'formatted_timestamp',
+                        'parent_id',
+                        'script_id',
+                        'created_at',
+                        'updated_at',
+                    ])
                     ->get()
-                    ->map(function ($sibling) {
-                        return [
-                            'id' => $sibling->id,
-                            'text' => $sibling->text,
-                            'timestamp' => $sibling->timestamp,
-                            'formatted_timestamp' => $sibling->formatted_timestamp,
-                            'parent_id' => $sibling->parent_id,
-                            'script_id' => $sibling->script_id,
-                            'user' => $this->userToArray($sibling->user),
-                            'created_at' => $sibling->created_at,
-                            'updated_at' => $sibling->updated_at,
-                            'children' => $sibling->children ?? [],
-                        ];
-                    });
+                    ->each(function ($sibling) {
+                        $sibling->setAttribute('user', $this->userToArray($sibling->user));
+                        $sibling->setAttribute('children', $sibling->children ?? []);
+                    })
+                    ->toArray();
 
-                $response['children'] = array_merge($response['children'], $siblings->all());
+                $response['children'] = array_merge($response['children'], $siblings);
             }
         } else {
             // If no parent, just include all children
