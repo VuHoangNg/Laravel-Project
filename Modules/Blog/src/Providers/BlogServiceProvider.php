@@ -6,6 +6,8 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Database\Eloquent\Factory;
 use Modules\Blog\src\Repositories\BlogRepository;
 use Modules\Blog\src\Repositories\BlogRepositoryInterface;
+use Modules\Blog\src\Repositories\ReportRepositoryInterface;
+use Modules\Blog\src\Repositories\ReportRepository;
 class BlogServiceProvider extends ServiceProvider
 {
     /**
@@ -41,6 +43,7 @@ class BlogServiceProvider extends ServiceProvider
     {
         $this->app->register(RouteServiceProvider::class);
         $this->app->bind(BlogRepositoryInterface::class, BlogRepository::class);
+        $this->app->bind(ReportRepositoryInterface::class, ReportRepository::class);
     }
 
     /**
