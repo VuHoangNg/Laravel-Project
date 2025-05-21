@@ -15,11 +15,13 @@ import {
     Spin,
     Alert,
     Tag,
+    Drawer, // Import Drawer
 } from "antd";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useBlogContext } from "../context/BlogContext";
 import { setMedia } from "../../../../../../Media/Resources/assets/js/components/reducer/action";
 import VideoPlayer from "../../../../../../Core/Resources/assets/js/components/page/VideoPlayer";
+import ReportDashboard from "./ReportDashboard"; // Import ReportDashboard
 
 const { Title } = Typography;
 const { Meta } = Card;
@@ -62,6 +64,8 @@ function BlogContent({ api }) {
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [isReportDrawerOpen, setIsReportDrawerOpen] = useState(false); // State for Drawer
+    const [selectedBlogId, setSelectedBlogId] = useState(null); // State for selected blog ID
 
     // Track mounted state
     const isMounted = useRef(false);
@@ -251,6 +255,17 @@ function BlogContent({ api }) {
         }
     };
 
+    // Drawer handlers
+    const handleOpenReportDrawer = (blogId) => {
+        setSelectedBlogId(blogId);
+        setIsReportDrawerOpen(true);
+    };
+
+    const handleCloseReportDrawer = () => {
+        setIsReportDrawerOpen(false);
+        setSelectedBlogId(null);
+    };
+
     const columns = [
         {
             title: "Title",
@@ -279,6 +294,21 @@ function BlogContent({ api }) {
                 ) : (
                     "No Media"
                 ),
+        },
+        {
+            title: "Report",
+            key: "report",
+            render: (text, record) => (
+                <Button
+                    type="link"
+                    onClick={(e) => {
+                        e.stopPropagation(); // Prevent row click
+                        handleOpenReportDrawer(record.id);
+                    }}
+                >
+                    View Report
+                </Button>
+            ),
         },
     ];
 
@@ -493,6 +523,15 @@ function BlogContent({ api }) {
                     </>
                 )}
             </Modal>
+            <Drawer
+                title={`Report for Blog ID: ${selectedBlogId}`}
+                placement="right"
+                width="80%"
+                onClose={handleCloseReportDrawer}
+                open={isReportDrawerOpen}
+            >
+                {selectedBlogId && <ReportDashboard blogId={selectedBlogId} />}
+            </Drawer>
         </div>
     );
 }

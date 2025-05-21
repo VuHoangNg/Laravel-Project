@@ -1,7 +1,11 @@
 import React, { useState, useEffect, Component, useRef } from "react";
 import {
+    MenuFoldOutlined,
+    MenuUnfoldOutlined,
+    UploadOutlined,
     UserOutlined,
     VideoCameraOutlined,
+    LogoutOutlined,
     ContainerOutlined,
     HomeOutlined,
     BellOutlined,
@@ -23,13 +27,13 @@ import {
 import { Routes, Route, Link, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { clearToken } from "../reducer/actions";
+import api from "../../api/api";
 import Blog from "../../../../../../Blog/Resources/assets/js/app";
 import User from "../../../../../../User/Resources/assets/js";
 import Media from "../../../../../../Media/Resources/assets/js";
 import { logout } from "../../../../../../Auth/Resources/assets/js/components/reducer/actions";
 import Pusher from "pusher-js";
 import NotificationsList from "./NotificationsList";
-import ReportDashboard from "./ReportDashboard";
 
 // Error Boundary Component
 class CoreErrorBoundary extends Component {
@@ -69,7 +73,7 @@ const { Header, Sider, Content } = Layout;
 
 const PAGE_SIZE = 5;
 
-function Core({ api }) {
+function Core() {
     const [collapsed, setCollapsed] = useState(false);
     const [notifications, setNotifications] = useState([]);
     const [notificationPage, setNotificationPage] = useState(1);
@@ -222,6 +226,7 @@ function Core({ api }) {
         }
     };
 
+
     const onLoadMore = () => {
         setLoading(true);
         setNotifications((prev) =>
@@ -360,6 +365,7 @@ function Core({ api }) {
                                                   ).toLocaleString()
                                                 : "Unknown time"
                                         }`}
+
                                     />
                                 </Skeleton>
                             </List.Item>
@@ -425,7 +431,10 @@ function Core({ api }) {
                                 overlay={notificationMenu}
                                 trigger={["click"]}
                             >
-                                <Badge count={unreadCount} offset={[-5, 5]}>
+                                <Badge
+                                    count={unreadCount}
+                                    offset={[-5, 5]}
+                                >
                                     <Button
                                         type="text"
                                         icon={<BellOutlined />}
@@ -498,7 +507,14 @@ function Core({ api }) {
                         }}
                     >
                         <Routes>
-                            <Route path="/" element={<ReportDashboard />} />
+                            <Route
+                                path="/"
+                                element={
+                                    <Layout>
+                                        <Typography>Home Page</Typography>
+                                    </Layout>
+                                }
+                            />
                             <Route
                                 path="/blog/*"
                                 element={<Blog api={api} />}

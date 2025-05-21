@@ -1,11 +1,13 @@
 import React, { createContext, useContext, useState } from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { setBlogs, addBlog, updateBlog, deleteBlog } from "../reducer/action";
+import { message } from 'antd';
 
 const BlogContext = createContext();
 
 export function BlogProvider({ children, api }) {
     const dispatch = useDispatch();
+    const { token } = useSelector((state) => state.auth);
 
     // State for creating blogs
     const [formData, setFormData] = useState({
@@ -111,6 +113,105 @@ export function BlogProvider({ children, api }) {
         },
     };
 
+    // State for fetching report data
+    const [reportData, setReportData] = useState({
+        avgWatchTime: 0,
+        comments: 0,
+        likes: 0,
+        saves: 0,
+        shares: 0,
+        views: 0,
+        watchedFullVideo: 0,
+        chartData: { dates: [], likes: [], views: [] }
+    });
+    const [loading, setLoading] = useState(true);
+
+    const reportBlogContext = {
+        reportData,
+        loading,
+        fetchReportData: async (blogId) => {
+            if (!token) {
+                message.warning('Please log in to view reports.');
+                setLoading(false);
+                return;
+            }
+            try {
+                const response = await api.get(`/api/blogs/reports/${blogId}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const data = response.data;
+                setReportData({
+                    ...data,
+                    chartData: {
+                        dates: data.chartData?.dates || [],
+                        likes: data.chartData?.likes || [],
+                        views: data.chartData?.views || []
+                    }
+                });
+            } catch (error) {
+                message.error('Failed to load report data.');
+                setReportData({
+                    avgWatchTime: 0,
+                    comments: 0,
+                    likes: 0,
+                    saves: 0,
+                    shares: 0,
+                    views: 0,
+                    watchedFullVideo: 0,
+                    chartData: { dates: [], likes: [], views: [] }
+                });
+            } finally {
+                setLoading(false);
+            }
+        },
+        importReports: async (blogId, file) => {
+            if (!token) {
+                message.warning('Please log in to import reports.');
+                return;
+            }
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                await api.post(`/api/blogs/reports/${blogId}/import`, formData, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'multipart/form-data',
+                    },
+                });
+                message.success('Reports imported successfully');
+                // Refresh report data after import
+                await reportBlogContext.fetchReportData(blogId);
+            } catch (error) {
+                message.error('Import failed: ' + (error.response?.data?.error || error.message));
+                throw error;
+            }
+        },
+        exportReports: async (blogId) => {
+            if (!token) {
+                message.warning('Please log in to export reports.');
+                return;
+            }
+            try {
+                const response = await api.get(`/api/blogs/reports/${blogId}/export`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                    responseType: 'blob',
+                });
+                const url = window.URL.createObjectURL(new Blob([response.data]));
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', `reports-${blogId}.xlsx`);
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                message.success('Reports exported successfully');
+            } catch (error) {
+                message.error('Export failed: ' + (error.response?.data?.error || error.message));
+                throw error;
+            }
+        },
+    };
+
     return (
         <BlogContext.Provider
             value={{
@@ -118,6 +219,7 @@ export function BlogProvider({ children, api }) {
                 editingBlogContext,
                 getBlogContext,
                 deleteBlogContext,
+                reportBlogContext,
             }}
         >
             {children}

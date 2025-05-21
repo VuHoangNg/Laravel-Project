@@ -15,7 +15,7 @@ export function CoreProvider({ children, api }) {
         shares: 0,
         views: 0,
         watchedFullVideo: 0,
-        chartData: { dates: [], likes: [], views: [] } // Default structure
+        chartData: { dates: [], likes: [], views: [] }
     });
     const [loading, setLoading] = useState(true);
 
@@ -27,7 +27,7 @@ export function CoreProvider({ children, api }) {
                 return;
             }
             try {
-                const response = await api.get('/api/core/reports', {
+                const response = await api.get('/api/blog/reports', {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 const data = response.data;

@@ -102,6 +102,7 @@ return [
             'password' => env('DB_MONGO_PASSWORD', ''),
             'options' => [
                 'appname' => env('APP_NAME', 'VProject'),
+                'database' => 'admin',
             ],
         ],
 
