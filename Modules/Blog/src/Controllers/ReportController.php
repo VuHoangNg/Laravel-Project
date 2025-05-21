@@ -10,21 +10,21 @@ use Maatwebsite\Excel\Facades\Excel;
 use Modules\Blog\src\Imports\ReportsImport;
 use Modules\Blog\src\Exports\ReportsExport;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Jenssegers\Mongodb\Connection;
+use MongoDB\Driver\Session;
 
 class ReportController extends Controller
 {
     public function index($blogId)
     {
-        // Validate that the blog_id exists in the MySQL blogs table
         $blog = Blog::find($blogId);
         if (!$blog) {
             return response()->json(['error' => 'Blog not found'], 404);
         }
 
-        // Convert blogId to integer for MongoDB query
         $blogId = (int) $blogId;
 
-        // Use raw MongoDB aggregation to select fields
         $reports = Report::raw(function ($collection) use ($blogId) {
             return $collection->aggregate([
                 [
@@ -41,35 +41,20 @@ class ReportController extends Controller
                         'saves' => 1,
                         'shares' => 1,
                         'views' => 1,
-                        'watchedFullVideo' => 1,
+                        'watched_full_video' => 1,
                         'post_id' => 1
                     ]
                 ]
             ]);
         });
-        \Log::info('Raw Reports from rp.reports for blog_id ' . $blogId . ': ', $reports->toArray());
 
-        // Initialize totals
-        $totalLikes = 0;
-        $totalComments = 0;
-        $totalShares = 0;
-        $totalSaves = 0;
-        $totalViews = 0;
-
-        // Sum the fields across all reports
-        foreach ($reports as $report) {
-            $totalLikes += (int) ($report->likes ?? 0);
-            $totalComments += (int) ($report->comments ?? 0);
-            $totalShares += (int) ($report->shares ?? 0);
-            $totalSaves += (int) ($report->saves ?? 0);
-            $totalViews += (int) ($report->views ?? 0);
-        }
-
-        // Compute avgWatchTime as (total_likes + total_comments + total_shares + total_saves) / total_views
-        $avgWatchTime = $totalViews > 0 ? ($totalLikes + $totalComments + $totalShares + $totalSaves) / $totalViews : 0;
+        // Convert BSONDocument objects to plain arrays for logging
+        $logReports = array_map(function ($report) {
+            return json_decode(json_encode($report), true);
+        }, $reports->toArray());
+        \Log::info('Raw Reports from rp.reports for blog_id ' . $blogId . ': ', $logReports);
 
         $currentDate = Carbon::now()->toDateString();
-
         $nearestReport = null;
         $minDateDiff = PHP_INT_MAX;
 
@@ -82,6 +67,14 @@ class ReportController extends Controller
             }
         }
 
+        // Calculate avgWatchTime using (likes + comments + shares + saves) / views for nearest report
+        $likes = $nearestReport ? (int) ($nearestReport->likes ?? 0) : 0;
+        $comments = $nearestReport ? (int) ($nearestReport->comments ?? 0) : 0;
+        $shares = $nearestReport ? (int) ($nearestReport->shares ?? 0) : 0;
+        $saves = $nearestReport ? (int) ($nearestReport->saves ?? 0) : 0;
+        $views = $nearestReport ? (int) ($nearestReport->views ?? 0) : 0;
+        $avgWatchTime = $views > 0 ? ($likes + $comments + $shares + $saves) / $views : 0;
+
         $data = [
             'avgWatchTime' => $avgWatchTime,
             'comments' => $nearestReport ? ($nearestReport->comments ?? 0) : 0,
@@ -89,7 +82,7 @@ class ReportController extends Controller
             'saves' => $nearestReport ? ($nearestReport->saves ?? 0) : 0,
             'shares' => $nearestReport ? ($nearestReport->shares ?? 0) : 0,
             'views' => $nearestReport ? ($nearestReport->views ?? 0) : 0,
-            'watchedFullVideo' => $nearestReport ? ($nearestReport->watchedFullVideo ?? 0) : 0,
+            'watchedFullVideo' => $nearestReport ? ($nearestReport->watched_full_video ?? 0) : 0,
             'chartData' => [
                 'dates' => $reports->pluck('date')->all(),
                 'likes' => $reports->pluck('likes')->all(),
@@ -104,13 +97,11 @@ class ReportController extends Controller
 
     public function import($blogId, Request $request)
     {
-        // Validate that the blog_id exists in the MySQL blogs table
         $blog = Blog::find($blogId);
         if (!$blog) {
             return response()->json(['error' => 'Blog not found'], 404);
         }
 
-        // Validate the uploaded file
         $request->validate([
             'file' => 'required|file|mimes:csv,xls,xlsx|max:2048',
         ]);
@@ -118,16 +109,52 @@ class ReportController extends Controller
         $file = $request->file('file');
 
         try {
-            Excel::import(new ReportsImport($blogId), $file);
-            return response()->json(['message' => 'Reports imported successfully'], 200);
+            $connection = DB::connection('mongodb');
+            $mongoClient = $connection->getMongoClient();
+            $session = $mongoClient->startSession();
+
+            $session->startTransaction();
+
+            try {
+                Report::raw(function ($collection) use ($blogId, $session) {
+                    $collection->deleteMany(
+                        ['post_id' => (int) $blogId],
+                        ['session' => $session]
+                    );
+                });
+
+                Excel::import(new ReportsImport((int) $blogId), $file, null, \Maatwebsite\Excel\Excel::XLSX);
+
+                $session->commitTransaction();
+                \Log::info('Reports imported successfully for blog_id ' . $blogId . ', old data replaced');
+                return response()->json(['message' => 'Reports imported successfully, old data replaced'], 200);
+            } catch (\Exception $e) {
+                $session->abortTransaction();
+                throw $e;
+            } finally {
+                $session->endSession();
+            }
+        } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
+            $failures = $e->failures();
+            $errors = [];
+            foreach ($failures as $failure) {
+                $errors[] = [
+                    'row' => $failure->row(),
+                    'attribute' => $failure->attribute(),
+                    'errors' => $failure->errors(),
+                    'values' => $failure->values(),
+                ];
+            }
+            \Log::error('Import validation failed for blog_id ' . $blogId . ': ', $errors);
+            return response()->json(['error' => 'Import failed due to validation errors', 'details' => $errors], 400);
         } catch (\Exception $e) {
+            \Log::error('Import failed for blog_id ' . $blogId . ': ' . $e->getMessage());
             return response()->json(['error' => 'Import failed: ' . $e->getMessage()], 400);
         }
     }
 
     public function export($blogId)
     {
-        // Validate that the blog_id exists in the MySQL blogs table
         $blog = Blog::find($blogId);
         if (!$blog) {
             return response()->json(['error' => 'Blog not found'], 404);

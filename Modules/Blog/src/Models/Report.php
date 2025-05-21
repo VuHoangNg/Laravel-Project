@@ -18,18 +18,17 @@ class Report extends Model
 
     protected $casts = [
         'campaign_id' => 'integer',
-        'date' => 'date',
         'influencer_id' => 'integer',
         'post_id' => 'integer',
-        'activity' => 'string',
-        'avg_watch_time' => 'float',
+        'platform_id' => 'integer',
         'comments' => 'integer',
         'items_sold' => 'integer',
         'likes' => 'integer',
-        'platform_id' => 'integer',
         'saves' => 'integer',
         'shares' => 'integer',
         'views' => 'integer',
-        'watched_full_video' => 'float'
+        'avg_watch_time' => 'float',
+        'watched_full_video' => 'float',
+        'date' => 'date',
     ];
 }

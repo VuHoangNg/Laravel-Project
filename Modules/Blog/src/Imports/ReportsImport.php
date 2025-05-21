@@ -19,7 +19,7 @@ class ReportsImport implements ToModel, WithHeadingRow, WithValidation
 
     public function model(array $row)
     {
-        Log::info('Imported row data: ', $row); // Debug the incoming data
+        Log::info('Importing row for blog_id ' . $this->blogId . ': ', $row);
 
         return new Report([
             'campaign_id' => (int) ($row['campaign_id'] ?? 0),
@@ -35,7 +35,7 @@ class ReportsImport implements ToModel, WithHeadingRow, WithValidation
             'saves' => (int) ($row['saves'] ?? 0),
             'shares' => (int) ($row['shares'] ?? 0),
             'views' => (int) ($row['views'] ?? 0),
-            'watched_full_video' => (float) ($row['watched_full_video'] ?? 0),
+            'watched_full_video' => (float) ($row['watched_full_video_%'] ?? 0),
         ]);
     }
 
@@ -54,7 +54,7 @@ class ReportsImport implements ToModel, WithHeadingRow, WithValidation
             'saves' => 'required|integer|min:0',
             'shares' => 'required|integer|min:0',
             'views' => 'required|integer|min:0',
-            'watched_full_video' => 'nullable|numeric|min:0|max:100',
+            'watched_full_video_%' => 'nullable|numeric|min:0|max:100',
         ];
     }
 
@@ -62,7 +62,17 @@ class ReportsImport implements ToModel, WithHeadingRow, WithValidation
     {
         return [
             'avg_watch_time_s' => 'AVG_WATCH_TIME(S)',
-            'watched_full_video' => 'WATCHED_FULL_VIDEO (%)',
+            'watched_full_video_%' => 'WATCHED_FULL_VIDEO (%)',
         ];
+    }
+
+    public function batchSize(): int
+    {
+        return 1000;
+    }
+
+    public function chunkSize(): int
+    {
+        return 1000;
     }
 }
