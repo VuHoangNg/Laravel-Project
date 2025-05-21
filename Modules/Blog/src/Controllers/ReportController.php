@@ -82,13 +82,15 @@ class ReportController extends Controller
             'saves' => $nearestReport ? ($nearestReport->saves ?? 0) : 0,
             'shares' => $nearestReport ? ($nearestReport->shares ?? 0) : 0,
             'views' => $nearestReport ? ($nearestReport->views ?? 0) : 0,
-            'watchedFullVideo' => $nearestReport ? ($nearestReport->watched_full_video ?? 0) : 0,
+            'watchedFullVideo' => $nearestReport ? (float) ($nearestReport->watched_full_video ?? 0) : 0,
             'chartData' => [
-                'dates' => $reports->pluck('date')->all(),
+                'dates' => $reports->pluck('date')->map(function ($date) {
+                    return Carbon::parse($date)->format('Y-m-d');
+                })->all(),
                 'likes' => $reports->pluck('likes')->all(),
                 'views' => $reports->pluck('views')->all(),
             ],
-            'nearestDate' => $nearestReport ? $nearestReport->date : null
+            'nearestDate' => $nearestReport ? Carbon::parse($nearestReport->date)->format('Y-m-d') : null
         ];
 
         \Log::info('Report Data from rp database for blog_id ' . $blogId . ' (nearest to ' . $currentDate . '): ', $data);
