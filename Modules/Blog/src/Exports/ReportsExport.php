@@ -42,7 +42,7 @@ class ReportsExport implements FromCollection, WithHeadings, WithMapping, WithCo
             'SAVES',
             'SHARES',
             'VIEWS',
-            'WATCHED_FULL_VIDEO (%)',
+            'WATCHED_FULL_VIDEO_(%)',
         ];
     }
 
