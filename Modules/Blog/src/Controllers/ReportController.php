@@ -15,10 +15,20 @@ class ReportController extends Controller
         $this->reportRepository = $reportRepository;
     }
 
-    public function index($blogId)
+    public function index(Request $request, $blogId)
     {
         try {
-            $data = $this->reportRepository->getReportData((int) $blogId);
+            $likesDateFrom = $request->query('likesDateFrom');
+            $likesDateTo = $request->query('likesDateTo');
+            $viewsDateFrom = $request->query('viewsDateFrom');
+            $viewsDateTo = $request->query('viewsDateTo');
+            $data = $this->reportRepository->getReportData(
+                (int) $blogId,
+                $likesDateFrom,
+                $likesDateTo,
+                $viewsDateFrom,
+                $viewsDateTo
+            );
             return response()->json($data);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], $e->getCode() ?: 400);

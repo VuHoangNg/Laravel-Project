@@ -117,51 +117,100 @@ export function BlogProvider({ children, api }) {
     const [reportData, setReportData] = useState({
         avgWatchTime: 0,
         comments: 0,
+        itemsSold: 0,
         likes: 0,
         saves: 0,
         shares: 0,
         views: 0,
         watchedFullVideo: 0,
-        chartData: { dates: [], likes: [], views: [] },
+        chartData: {
+            likes: { dates: [], data: [] },
+            views: { dates: [], data: [] },
+        },
+        likesDateFrom: null,
+        likesDateTo: null,
+        viewsDateFrom: null,
+        viewsDateTo: null,
+        nearestDate: null,
     });
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false); // For import/export
+    const [chartLoading, setChartLoading] = useState(false); // For chart data fetching
 
     const reportBlogContext = {
         reportData,
         loading,
-        fetchReportData: async (blogId) => {
+        chartLoading, // Expose chartLoading
+        fetchReportData: async (
+            blogId,
+            likesDateFrom = null,
+            likesDateTo = null,
+            viewsDateFrom = null,
+            viewsDateTo = null
+        ) => {
             if (!token) {
                 message.warning("Please log in to view reports.");
-                setLoading(false);
                 return;
             }
             try {
+                setChartLoading(true); // Set chart-specific loading
+                const params = {};
+                if (likesDateFrom) params.likesDateFrom = likesDateFrom;
+                if (likesDateTo) params.likesDateTo = likesDateTo;
+                if (viewsDateFrom) params.viewsDateFrom = viewsDateFrom;
+                if (viewsDateTo) params.viewsDateTo = viewsDateTo;
                 const response = await api.get(`/api/blogs/reports/${blogId}`, {
                     headers: { Authorization: `Bearer ${token}` },
+                    params,
                 });
                 const data = response.data;
                 setReportData({
-                    ...data,
+                    avgWatchTime: data.avgWatchTime ?? 0,
+                    comments: data.comments ?? 0,
+                    itemsSold: 0,
+                    likes: data.likes ?? 0,
+                    saves: data.saves ?? 0,
+                    shares: data.shares ?? 0,
+                    views: data.views ?? 0,
+                    watchedFullVideo: data.watchedFullVideo ?? 0,
                     chartData: {
-                        dates: data.chartData?.dates || [],
-                        likes: data.chartData?.likes || [],
-                        views: data.chartData?.views || [],
+                        likes: {
+                            dates: data.chartData?.likes?.dates || [],
+                            data: data.chartData?.likes?.data || [],
+                        },
+                        views: {
+                            dates: data.chartData?.views?.dates || [],
+                            data: data.chartData?.views?.data || [],
+                        },
                     },
+                    likesDateFrom: data.likesDateFrom || null,
+                    likesDateTo: data.likesDateTo || null,
+                    viewsDateFrom: data.viewsDateFrom || null,
+                    viewsDateTo: data.viewsDateTo || null,
+                    nearestDate: data.nearestDate || null,
                 });
             } catch (error) {
                 message.error("Failed to load report data.");
                 setReportData({
                     avgWatchTime: 0,
                     comments: 0,
+                    itemsSold: 0,
                     likes: 0,
                     saves: 0,
                     shares: 0,
                     views: 0,
                     watchedFullVideo: 0,
-                    chartData: { dates: [], likes: [], views: [] },
+                    chartData: {
+                        likes: { dates: [], data: [] },
+                        views: { dates: [], data: [] },
+                    },
+                    likesDateFrom: null,
+                    likesDateTo: null,
+                    viewsDateFrom: null,
+                    viewsDateTo: null,
+                    nearestDate: null,
                 });
             } finally {
-                setLoading(false);
+                setChartLoading(false); // Reset chart-specific loading
             }
         },
         importReports: async (blogId, file) => {
@@ -169,23 +218,19 @@ export function BlogProvider({ children, api }) {
                 message.warning("Please log in to import reports.");
                 return;
             }
-            setLoading(true); // Set loading to true before import
+            setLoading(true); // Use global loading for import
             const formData = new FormData();
             formData.append("file", file);
 
             try {
-                await api.post(
-                    `/api/blogs/reports/${blogId}/import`,
-                    formData,
-                    {
-                        headers: {
-                            Authorization: `Bearer ${token}`,
-                            "Content-Type": "multipart/form-data",
-                        },
-                    }
-                );
+                await api.post(`/api/blogs/reports/${blogId}/import`, formData, {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        "Content-Type": "multipart/form-data",
+                    },
+                });
                 message.success("Reports imported successfully");
-                await reportBlogContext.fetchReportData(blogId); // Refresh data
+                await reportBlogContext.fetchReportData(blogId); // This will use chartLoading
             } catch (error) {
                 message.error(
                     "Import failed: " +
@@ -193,7 +238,7 @@ export function BlogProvider({ children, api }) {
                 );
                 throw error;
             } finally {
-                setLoading(false); // Reset loading after import
+                setLoading(false); // Reset global loading
             }
         },
         exportReports: async (blogId) => {
@@ -201,6 +246,7 @@ export function BlogProvider({ children, api }) {
                 message.warning("Please log in to export reports.");
                 return;
             }
+            setLoading(true); // Use global loading for export
             try {
                 const response = await api.get(
                     `/api/blogs/reports/${blogId}/export`,
@@ -225,6 +271,8 @@ export function BlogProvider({ children, api }) {
                         (error.response?.data?.error || error.message)
                 );
                 throw error;
+            } finally {
+                setLoading(false); // Reset global loading
             }
         },
     };

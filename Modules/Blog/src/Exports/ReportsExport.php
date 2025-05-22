@@ -50,11 +50,11 @@ class ReportsExport implements FromCollection, WithHeadings, WithMapping, WithCo
     {
         return [
             $this->safeInt($report->campaign_id),
-            $report->date ? Carbon::parse($report->date)->format('Y-m-d') : '1970-01-01',
+            $report->date ?? '', // Use raw date string or empty string if null
             $this->safeInt($report->influencer_id),
             $this->safeInt($report->post_id),
             $report->activity ?? 'Unknown',
-            $this->safeFloat($this->nearestAvgWatchTime), // Use nearest day's calculated value for all rows
+            $this->safeFloat($this->nearestAvgWatchTime),
             $this->safeInt($report->comments),
             $this->safeInt($report->items_sold),
             $this->safeInt($report->likes),
@@ -87,7 +87,7 @@ class ReportsExport implements FromCollection, WithHeadings, WithMapping, WithCo
 
     private function calculateNearestAvgWatchTime(): float
     {
-        $currentDate = Carbon::today()->toDateString(); // 2025-05-21
+        $currentDate = Carbon::today()->toDateString(); // e.g., 2025-05-22
         $reports = Report::where('post_id', $this->blogId)->get();
 
         $nearestReport = null;
@@ -96,8 +96,7 @@ class ReportsExport implements FromCollection, WithHeadings, WithMapping, WithCo
         // Find the nearest day's report
         foreach ($reports as $report) {
             if ($report->date) {
-                $reportDate = Carbon::parse($report->date);
-                $dateDiff = abs(strtotime($currentDate) - $reportDate->timestamp);
+                $dateDiff = abs(strtotime($currentDate) - strtotime($report->date));
                 if ($dateDiff < $minDateDiff) {
                     $minDateDiff = $dateDiff;
                     $nearestReport = $report;
@@ -105,7 +104,12 @@ class ReportsExport implements FromCollection, WithHeadings, WithMapping, WithCo
             }
         }
 
-        // Calculate avg_watch_time for the nearest day's data
+        // Use avg_watch_time from the nearest report if available
+        if ($nearestReport && isset($nearestReport->avg_watch_time)) {
+            return (float) ($nearestReport->avg_watch_time ?? 0);
+        }
+
+        // Fallback to calculated value if avg_watch_time is not available
         if ($nearestReport) {
             $likes = (int) ($nearestReport->likes ?? 0);
             $comments = (int) ($nearestReport->comments ?? 0);

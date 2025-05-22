@@ -13,7 +13,7 @@ class Report extends Model
     protected $fillable = [
         'campaign_id', 'date', 'influencer_id', 'post_id', 'activity',
         'avg_watch_time', 'comments', 'items_sold', 'likes', 'platform_id',
-        'saves', 'shares', 'views', 'watched_full_video'
+        'saves', 'shares', 'views', 'watched_full_video', 'date_import'
     ];
 
     protected $casts = [
@@ -29,6 +29,7 @@ class Report extends Model
         'views' => 'integer',
         'avg_watch_time' => 'float',
         'watched_full_video' => 'float',
-        'date' => 'date',
+        'date' => 'string',
+        'date_import' => 'string',
     ];
 }

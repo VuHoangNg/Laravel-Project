@@ -7,6 +7,7 @@ use Maatwebsite\Excel\Concerns\ToModel;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithValidation;
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class ReportsImport implements ToModel, WithHeadingRow, WithValidation
 {
@@ -23,10 +24,10 @@ class ReportsImport implements ToModel, WithHeadingRow, WithValidation
 
         return new Report([
             'campaign_id' => (int) ($row['campaign_id'] ?? 0),
-            'date' => $row['date'] ?? null,
+            'date' => $row['date'] ?? null, // String in Y-m-d format
             'influencer_id' => (int) ($row['influencer_id'] ?? 0),
             'post_id' => $this->blogId,
-            'activity' => $row['activity'] ?? 'Short Video || ',
+            'activity' => $row['activity'] ?? 'Short Video',
             'comments' => (int) ($row['comments'] ?? 0),
             'items_sold' => (int) ($row['items_sold'] ?? 0),
             'likes' => (int) ($row['likes'] ?? 0),
@@ -35,6 +36,7 @@ class ReportsImport implements ToModel, WithHeadingRow, WithValidation
             'shares' => (int) ($row['shares'] ?? 0),
             'views' => (int) ($row['views'] ?? 0),
             'watched_full_video' => (float) ($row['watched_full_video'] ?? 0),
+            'date_import' => Carbon::now('Asia/Bangkok')->format('Y-m-d H:i:s'),
         ]);
     }
 
