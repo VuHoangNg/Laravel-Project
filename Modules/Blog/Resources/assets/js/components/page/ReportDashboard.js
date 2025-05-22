@@ -20,15 +20,17 @@ import moment from "moment-timezone";
 const { RangePicker } = DatePicker;
 
 const ReportDashboard = ({ blogId }) => {
-    const { reportBlogContext } = useBlogContext();
+    const { reportBlogContext, getBlogContext } = useBlogContext();
     const {
         reportData,
         loading, // For import/export
-        chartLoading, // For chart data fetching
+        likesLoading, // For likes chart data fetching
+        viewsLoading, // For views chart data fetching
         fetchReportData,
         importReports,
         exportReports,
     } = reportBlogContext;
+    const { isModalOpen } = getBlogContext; // For debugging Drawer state
     const isMounted = useRef(false);
     const [lastFetchedParams, setLastFetchedParams] = useState(null);
     const [likesDateRange, setLikesDateRange] = useState([null, null]);
@@ -83,56 +85,66 @@ const ReportDashboard = ({ blogId }) => {
     }, [blogId, likesDateRange, viewsDateRange, fetchReportData]);
 
     const handleLikesDateRangeChange = (dates) => {
-        setLikesDateRange(dates);
+        setLikesDateRange(dates || [null, null]);
     };
 
     const handleViewsDateRangeChange = (dates) => {
-        setViewsDateRange(dates);
+        setViewsDateRange(dates || [null, null]);
     };
 
     const disabledLikesDate = (current) => {
-        if (!current || !reportData.chartData.likes.dates) return true;
+        if (!current || !Array.isArray(reportData.chartData.likes.dates)) {
+            return false;
+        }
         const dateStr = current.format("YYYY-MM-DD");
         return !reportData.chartData.likes.dates.includes(dateStr);
     };
 
     const disabledViewsDate = (current) => {
-        if (!current || !reportData.chartData.views.dates) return true;
+        if (!current || !Array.isArray(reportData.chartData.views.dates)) {
+            return false;
+        }
         const dateStr = current.format("YYYY-MM-DD");
         return !reportData.chartData.views.dates.includes(dateStr);
     };
 
-    const likesFormattedDates = reportData.chartData.likes.dates.map((date) => {
-        if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return "Invalid Date";
-        const parsedDate = new Date(date);
-        if (isNaN(parsedDate.getTime())) return "Invalid Date";
-        const day = parsedDate.getDate();
-        const month = parsedDate.toLocaleString("en-us", { month: "long" });
-        const year = parsedDate.getFullYear();
-        return `${day} ${month} ${year}`;
-    });
+    const likesFormattedDates = Array.isArray(reportData.chartData.likes.dates)
+        ? reportData.chartData.likes.dates.map((date) => {
+              if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date))
+                  return "Invalid Date";
+              const parsedDate = new Date(date);
+              if (isNaN(parsedDate.getTime())) return "Invalid Date";
+              const day = parsedDate.getDate();
+              const month = parsedDate.toLocaleString("en-us", { month: "long" });
+              const year = parsedDate.getFullYear();
+              return `${day} ${month} ${year}`;
+          })
+        : ["No Data"];
 
-    const viewsFormattedDates = reportData.chartData.views.dates.map((date) => {
-        if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return "Invalid Date";
-        const parsedDate = new Date(date);
-        if (isNaN(parsedDate.getTime())) return "Invalid Date";
-        const day = parsedDate.getDate();
-        const month = parsedDate.toLocaleString("en-us", { month: "long" });
-        const year = parsedDate.getFullYear();
-        return `${day} ${month} ${year}`;
-    });
+    const viewsFormattedDates = Array.isArray(reportData.chartData.views.dates)
+        ? reportData.chartData.views.dates.map((date) => {
+              if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date))
+                  return "Invalid Date";
+              const parsedDate = new Date(date);
+              if (isNaN(parsedDate.getTime())) return "Invalid Date";
+              const day = parsedDate.getDate();
+              const month = parsedDate.toLocaleString("en-us", { month: "long" });
+              const year = parsedDate.getFullYear();
+              return `${day} ${month} ${year}`;
+          })
+        : ["No Data"];
 
-    const likesValues = reportData.chartData.likes.data.filter(
-        (value) => value !== null
-    );
+    const likesValues = Array.isArray(reportData.chartData.likes.data)
+        ? reportData.chartData.likes.data.filter((value) => value !== null)
+        : [];
     const likesMin = likesValues.length > 0 ? Math.min(...likesValues) : 0;
     const likesMax = likesValues.length > 0 ? Math.max(...likesValues) : 0;
     const likesRange = likesMax - likesMin;
     const likesTickInterval = likesRange > 0 ? Math.ceil(likesRange / 5) : 1000;
 
-    const viewsValues = reportData.chartData.views.data.filter(
-        (value) => value !== null
-    );
+    const viewsValues = Array.isArray(reportData.chartData.views.data)
+        ? reportData.chartData.views.data.filter((value) => value !== null)
+        : [];
     const viewsMin = viewsValues.length > 0 ? Math.min(...viewsValues) : 0;
     const viewsMax = viewsValues.length > 0 ? Math.max(...viewsValues) : 0;
     const viewsRange = viewsMax - viewsMin;
@@ -226,7 +238,7 @@ const ReportDashboard = ({ blogId }) => {
         legend: { enabled: false },
     };
 
-    // Show loading for the entire component only during import/export
+    // Show loading for the entire component during import/export
     if (loading) {
         return (
             <div style={{ padding: 24 }}>
@@ -389,8 +401,10 @@ const ReportDashboard = ({ blogId }) => {
                 </Col>
                 <Col span={24}>
                     <Card>
-                        {chartLoading ? (
+                        {likesLoading ? (
                             <Skeleton active paragraph={{ rows: 4 }} />
+                        ) : reportData.chartData.likes.dates.length === 0 ? (
+                            <Typography.Text>No likes data available</Typography.Text>
                         ) : (
                             <HighchartsReact
                                 highcharts={Highcharts}
@@ -416,8 +430,10 @@ const ReportDashboard = ({ blogId }) => {
                 </Col>
                 <Col span={24}>
                     <Card>
-                        {chartLoading ? (
+                        {viewsLoading ? (
                             <Skeleton active paragraph={{ rows: 4 }} />
+                        ) : reportData.chartData.views.dates.length === 0 ? (
+                            <Typography.Text>No views data available</Typography.Text>
                         ) : (
                             <HighchartsReact
                                 highcharts={Highcharts}

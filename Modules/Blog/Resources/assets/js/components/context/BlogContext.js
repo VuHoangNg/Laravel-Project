@@ -134,12 +134,14 @@ export function BlogProvider({ children, api }) {
         nearestDate: null,
     });
     const [loading, setLoading] = useState(false); // For import/export
-    const [chartLoading, setChartLoading] = useState(false); // For chart data fetching
+    const [likesLoading, setLikesLoading] = useState(false); // For likes chart data fetching
+    const [viewsLoading, setViewsLoading] = useState(false); // For views chart data fetching
 
     const reportBlogContext = {
         reportData,
         loading,
-        chartLoading, // Expose chartLoading
+        likesLoading,
+        viewsLoading,
         fetchReportData: async (
             blogId,
             likesDateFrom = null,
@@ -152,7 +154,17 @@ export function BlogProvider({ children, api }) {
                 return;
             }
             try {
-                setChartLoading(true); // Set chart-specific loading
+                // Set loading states based on provided date parameters
+                const isLikesFetch = likesDateFrom || likesDateTo;
+                const isViewsFetch = viewsDateFrom || viewsDateTo;
+                if (isLikesFetch) setLikesLoading(true);
+                if (isViewsFetch) setViewsLoading(true);
+                // If no specific date parameters, fetch both
+                if (!isLikesFetch && !isViewsFetch) {
+                    setLikesLoading(true);
+                    setViewsLoading(true);
+                }
+
                 const params = {};
                 if (likesDateFrom) params.likesDateFrom = likesDateFrom;
                 if (likesDateTo) params.likesDateTo = likesDateTo;
@@ -162,7 +174,26 @@ export function BlogProvider({ children, api }) {
                     headers: { Authorization: `Bearer ${token}` },
                     params,
                 });
-                const data = response.data;
+                const data = response.data || {};
+                // Ensure chartData is valid
+                const validatedChartData = {
+                    likes: {
+                        dates: Array.isArray(data.chartData?.likes?.dates)
+                            ? data.chartData.likes.dates
+                            : [],
+                        data: Array.isArray(data.chartData?.likes?.data)
+                            ? data.chartData.likes.data
+                            : [],
+                    },
+                    views: {
+                        dates: Array.isArray(data.chartData?.views?.dates)
+                            ? data.chartData.views.dates
+                            : [],
+                        data: Array.isArray(data.chartData?.views?.data)
+                            ? data.chartData.views.data
+                            : [],
+                    },
+                };
                 setReportData({
                     avgWatchTime: data.avgWatchTime ?? 0,
                     comments: data.comments ?? 0,
@@ -172,16 +203,7 @@ export function BlogProvider({ children, api }) {
                     shares: data.shares ?? 0,
                     views: data.views ?? 0,
                     watchedFullVideo: data.watchedFullVideo ?? 0,
-                    chartData: {
-                        likes: {
-                            dates: data.chartData?.likes?.dates || [],
-                            data: data.chartData?.likes?.data || [],
-                        },
-                        views: {
-                            dates: data.chartData?.views?.dates || [],
-                            data: data.chartData?.views?.data || [],
-                        },
-                    },
+                    chartData: validatedChartData,
                     likesDateFrom: data.likesDateFrom || null,
                     likesDateTo: data.likesDateTo || null,
                     viewsDateFrom: data.viewsDateFrom || null,
@@ -189,16 +211,12 @@ export function BlogProvider({ children, api }) {
                     nearestDate: data.nearestDate || null,
                 });
             } catch (error) {
-                message.error("Failed to load report data.");
-                setReportData({
-                    avgWatchTime: 0,
-                    comments: 0,
-                    itemsSold: 0,
-                    likes: 0,
-                    saves: 0,
-                    shares: 0,
-                    views: 0,
-                    watchedFullVideo: 0,
+                message.error(
+                    "Failed to load report data: " +
+                        (error.response?.data?.error || error.message)
+                );
+                setReportData((prev) => ({
+                    ...prev,
                     chartData: {
                         likes: { dates: [], data: [] },
                         views: { dates: [], data: [] },
@@ -207,10 +225,17 @@ export function BlogProvider({ children, api }) {
                     likesDateTo: null,
                     viewsDateFrom: null,
                     viewsDateTo: null,
-                    nearestDate: null,
-                });
+                }));
             } finally {
-                setChartLoading(false); // Reset chart-specific loading
+                // Reset loading states based on what was fetched
+                const isLikesFetch = likesDateFrom || likesDateTo;
+                const isViewsFetch = viewsDateFrom || viewsDateTo;
+                if (isLikesFetch || (!isLikesFetch && !isViewsFetch)) {
+                    setLikesLoading(false);
+                }
+                if (isViewsFetch || (!isLikesFetch && !isViewsFetch)) {
+                    setViewsLoading(false);
+                }
             }
         },
         importReports: async (blogId, file) => {
@@ -218,7 +243,7 @@ export function BlogProvider({ children, api }) {
                 message.warning("Please log in to import reports.");
                 return;
             }
-            setLoading(true); // Use global loading for import
+            setLoading(true);
             const formData = new FormData();
             formData.append("file", file);
 
@@ -230,7 +255,7 @@ export function BlogProvider({ children, api }) {
                     },
                 });
                 message.success("Reports imported successfully");
-                await reportBlogContext.fetchReportData(blogId); // This will use chartLoading
+                await reportBlogContext.fetchReportData(blogId);
             } catch (error) {
                 message.error(
                     "Import failed: " +
@@ -238,7 +263,7 @@ export function BlogProvider({ children, api }) {
                 );
                 throw error;
             } finally {
-                setLoading(false); // Reset global loading
+                setLoading(false);
             }
         },
         exportReports: async (blogId) => {
@@ -246,7 +271,7 @@ export function BlogProvider({ children, api }) {
                 message.warning("Please log in to export reports.");
                 return;
             }
-            setLoading(true); // Use global loading for export
+            setLoading(true);
             try {
                 const response = await api.get(
                     `/api/blogs/reports/${blogId}/export`,
@@ -272,7 +297,7 @@ export function BlogProvider({ children, api }) {
                 );
                 throw error;
             } finally {
-                setLoading(false); // Reset global loading
+                setLoading(false);
             }
         },
     };
