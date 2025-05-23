@@ -15,17 +15,48 @@ class ReportController extends Controller
         $this->reportRepository = $reportRepository;
     }
 
-    public function index(Request $request, $blogId)
+    /**
+     * Get statistics data for a specific blog, including nearest date metrics.
+     */
+    public function getStatistics(Request $request, $blogId)
+    {
+        try {
+            $data = $this->reportRepository->getStatisticsData((int) $blogId);
+            return response()->json($data);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], $e->getCode() ?: 400);
+        }
+    }
+
+    /**
+     * Get likes chart data for a specific blog with optional date range.
+     */
+    public function getLikesChart(Request $request, $blogId)
     {
         try {
             $likesDateFrom = $request->query('likesDateFrom');
             $likesDateTo = $request->query('likesDateTo');
-            $viewsDateFrom = $request->query('viewsDateFrom');
-            $viewsDateTo = $request->query('viewsDateTo');
-            $data = $this->reportRepository->getReportData(
+            $data = $this->reportRepository->getLikesChartData(
                 (int) $blogId,
                 $likesDateFrom,
-                $likesDateTo,
+                $likesDateTo
+            );
+            return response()->json($data);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], $e->getCode() ?: 400);
+        }
+    }
+
+    /**
+     * Get views chart data for a specific blog with optional date range.
+     */
+    public function getViewsChart(Request $request, $blogId)
+    {
+        try {
+            $viewsDateFrom = $request->query('viewsDateFrom');
+            $viewsDateTo = $request->query('viewsDateTo');
+            $data = $this->reportRepository->getViewsChartData(
+                (int) $blogId,
                 $viewsDateFrom,
                 $viewsDateTo
             );

@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import {
     Typography,
-    Table,
     Button,
     Modal,
     Form,
@@ -15,13 +14,13 @@ import {
     Spin,
     Alert,
     Tag,
-    Drawer, // Import Drawer
+    Drawer,
+    Carousel,
 } from "antd";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useBlogContext } from "../context/BlogContext";
 import { setMedia } from "../../../../../../Media/Resources/assets/js/components/reducer/action";
-import VideoPlayer from "../../../../../../Core/Resources/assets/js/components/page/VideoPlayer";
-import ReportDashboard from "./ReportDashboard"; // Import ReportDashboard
+import ReportDashboard from "./ReportDashboard";
 
 const { Title } = Typography;
 const { Meta } = Card;
@@ -34,7 +33,7 @@ function BlogContent({ api }) {
             state.blogs.blogs || {
                 data: [],
                 current_page: 1,
-                per_page: 10,
+                per_page: 12,
                 total: 0,
                 last_page: 1,
             }
@@ -64,8 +63,8 @@ function BlogContent({ api }) {
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [isReportDrawerOpen, setIsReportDrawerOpen] = useState(false); // State for Drawer
-    const [selectedBlogId, setSelectedBlogId] = useState(null); // State for selected blog ID
+    const [isReportDrawerOpen, setIsReportDrawerOpen] = useState(false);
+    const [selectedBlogId, setSelectedBlogId] = useState(null);
 
     // Track mounted state
     const isMounted = useRef(false);
@@ -229,8 +228,8 @@ function BlogContent({ api }) {
     const handleImageError = (e, item) => {
         console.error(
             `Failed to load image for ${item?.title || "unknown"}:`,
-            item?.url,
-            item?.thumbnail_url
+            item?.path,
+            item?.thumbnail_path
         );
         e.target.src = "https://via.placeholder.com/150?text=Image+Not+Found";
     };
@@ -255,7 +254,6 @@ function BlogContent({ api }) {
         }
     };
 
-    // Drawer handlers
     const handleOpenReportDrawer = (blogId) => {
         setSelectedBlogId(blogId);
         setIsReportDrawerOpen(true);
@@ -266,58 +264,33 @@ function BlogContent({ api }) {
         setSelectedBlogId(null);
     };
 
-    const columns = [
-        {
-            title: "Title",
-            dataIndex: "title",
-            key: "title",
-        },
-        {
-            title: "Content",
-            dataIndex: "content",
-            key: "content",
-            render: (text) => (text ? text.substring(0, 50) + "..." : ""),
-        },
-        {
-            title: "Media",
-            dataIndex: "media",
-            key: "media",
-            render: (media) =>
-                media && Array.isArray(media) && media.length > 0 ? (
-                    <Space wrap>
-                        {media.map((item) => (
-                            <Tag key={item.id} color="blue">
-                                {item.title}
-                            </Tag>
-                        ))}
-                    </Space>
-                ) : (
-                    "No Media"
-                ),
-        },
-        {
-            title: "Report",
-            key: "report",
-            render: (text, record) => (
-                <Button
-                    type="link"
-                    onClick={(e) => {
-                        e.stopPropagation(); // Prevent row click
-                        handleOpenReportDrawer(record.id);
-                    }}
-                >
-                    View Report
-                </Button>
-            ),
-        },
-    ];
+    const [activeIndex, setActiveIndex] = useState(0);
+
+    const carouselSettings = {
+        infinite: true,
+        speed: 500,
+        slidesToShow: 1,
+        slidesToScroll: 1,
+        afterChange: (current) => setActiveIndex(current),
+        autoplaySpeed: 5000,
+        dotPosition: "bottom",
+        dots: true,
+    };
 
     return (
-        <div style={{ padding: "24px" }}>
-            <Title level={2}>Blog Management</Title>
-
+        <div className="p-6">
+            <Row justify="space-between" align="middle">
+                <Title level={2}>Blog Management</Title>
+                <Button
+                    type="primary"
+                    onClick={handleOpenCreate}
+                    className="mb-4"
+                >
+                    Add Blog
+                </Button>
+            </Row>
             {loading && (
-                <div style={{ textAlign: "center", margin: "20px 0" }}>
+                <div className="text-center my-5">
                     <Spin size="large" />
                 </div>
             )}
@@ -329,39 +302,164 @@ function BlogContent({ api }) {
                     showIcon
                     closable
                     onClose={() => setError(null)}
-                    style={{ marginBottom: 16 }}
+                    className="mb-4"
                 />
             )}
             {!loading && (
                 <>
-                    <Button
-                        type="primary"
-                        onClick={handleOpenCreate}
-                        style={{ marginBottom: 16 }}
-                    >
-                        Add Blog
-                    </Button>
-                    <Table
-                        columns={columns}
-                        dataSource={blogs.data || []}
-                        rowKey="id"
-                        scroll={{ x: "max-content" }}
-                        pagination={{
-                            current: blogs.current_page,
-                            pageSize: blogs.per_page,
-                            total: blogs.total,
-                            showSizeChanger: true,
-                            pageSizeOptions: ["10", "20", "50"],
-                        }}
-                        onChange={handleTableChange}
-                        onRow={(record) => ({
-                            onClick: () => handleRowClick(record),
-                            style: { cursor: "pointer" },
-                        })}
-                        locale={{
-                            emptyText:
-                                "No blogs available. Create a new blog to get started!",
-                        }}
+                    <Row gutter={[16, 16]}>
+                        {blogs.data && blogs.data.length > 0 ? (
+                            blogs.data.map((blog) => (
+                                <Col xs={24} sm={12} md={6} key={blog.id}>
+                                    <Card
+                                        hoverable
+                                        className="cursor-pointer"
+                                        onClick={() => handleRowClick(blog)}
+                                        cover={
+                                            blog.media &&
+                                            blog.media.length > 0 ? (
+                                                <div
+                                                    style={{
+                                                        aspectRatio: "16/9",
+                                                        overflow: "hidden",
+                                                    }}
+                                                >
+                                                    <Carousel
+                                                        autoplay={{
+                                                            dotDuration: true,
+                                                        }}
+                                                        autoplaySpeed={5000}
+                                                    >
+                                                        {blog.media.map(
+                                                            (item) => (
+                                                                <div
+                                                                    key={
+                                                                        item.id
+                                                                    }
+                                                                    style={{
+                                                                        position:
+                                                                            "relative",
+                                                                    }}
+                                                                >
+                                                                    <img
+                                                                        alt={
+                                                                            item.title
+                                                                        }
+                                                                        src={
+                                                                            item.type ===
+                                                                                "video" &&
+                                                                            item.thumbnail_path
+                                                                                ? `/storage/${item.thumbnail_path}`
+                                                                                : item.type ===
+                                                                                      "image" ||
+                                                                                  !item.type
+                                                                                ? `/storage/${item.path}`
+                                                                                : "https://via.placeholder.com/150?text=Image+Not+Found"
+                                                                        }
+                                                                        style={{
+                                                                            width: "100%",
+                                                                            height: "250px",
+                                                                            objectFit:
+                                                                                "fill",
+                                                                        }}
+                                                                        onError={(
+                                                                            e
+                                                                        ) =>
+                                                                            handleImageError(
+                                                                                e,
+                                                                                item
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                    <Tag
+                                                                        color={
+                                                                            item.type ===
+                                                                            "video"
+                                                                                ? "red"
+                                                                                : item.type ===
+                                                                                      "image" ||
+                                                                                  !item.type
+                                                                                ? "blue"
+                                                                                : "gray"
+                                                                        }
+                                                                        className="absolute top-2 left-2"
+                                                                    >
+                                                                        {item.type ===
+                                                                        "video"
+                                                                            ? "Video"
+                                                                            : item.type ===
+                                                                                  "image" ||
+                                                                              !item.type
+                                                                            ? "Image"
+                                                                            : "Unknown"}
+                                                                    </Tag>
+                                                                </div>
+                                                            )
+                                                        )}
+                                                    </Carousel>
+                                                    <p>
+                                                        Active Slide:{" "}
+                                                        {activeIndex + 1} of{" "}
+                                                        {blog.media.length}
+                                                    </p>
+                                                </div>
+                                            ) : (
+                                                <img
+                                                    alt="No Media"
+                                                    src="https://via.placeholder.com/150?text=No+Media"
+                                                    style={{
+                                                        aspectRatio: "16/9",
+                                                        objectFit: "inherit",
+                                                    }}
+                                                />
+                                            )
+                                        }
+                                    >
+                                        <Meta
+                                            title={blog.title}
+                                            description={
+                                                blog.content
+                                                    ? blog.content.substring(
+                                                          0,
+                                                          50
+                                                      ) + "..."
+                                                    : ""
+                                            }
+                                        />
+                                        <Button
+                                            type="link"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleOpenReportDrawer(blog.id);
+                                            }}
+                                            className="mt-2"
+                                        >
+                                            View Report
+                                        </Button>
+                                    </Card>
+                                </Col>
+                            ))
+                        ) : (
+                            <Col span={24}>
+                                <Alert
+                                    message="No Blogs Available"
+                                    description="Create a new blog to get started!"
+                                    type="info"
+                                    showIcon
+                                />
+                            </Col>
+                        )}
+                    </Row>
+                    <Pagination
+                        style={{ marginTop: 16, textAlign: "center" }}
+                        current={blogs.current_page}
+                        pageSize={blogs.per_page}
+                        total={blogs.total}
+                        onChange={(page, pageSize) =>
+                            handleTableChange({ current: page, pageSize })
+                        }
+                        showSizeChanger
+                        pageSizeOptions={["12", "24", "48"]}
                     />
                 </>
             )}
@@ -414,7 +512,7 @@ function BlogContent({ api }) {
                 style={{ maxHeight: "80vh", overflowY: "auto" }}
             >
                 {loading ? (
-                    <div style={{ textAlign: "center", margin: "20px 0" }}>
+                    <div className="text-center my-5">
                         <Spin size="large" />
                     </div>
                 ) : error ? (
@@ -425,7 +523,7 @@ function BlogContent({ api }) {
                         showIcon
                         closable
                         onClose={() => setError(null)}
-                        style={{ marginBottom: 16 }}
+                        className="mb-4"
                     />
                 ) : !media.data || media.data.length === 0 ? (
                     <Alert
@@ -438,7 +536,7 @@ function BlogContent({ api }) {
                     <>
                         <Row gutter={[16, 16]}>
                             {media.data.map((item) => {
-                                const isVideoMedia = item.type === 'video';
+                                const isVideoMedia = item.type === "video";
                                 const isSelected = selectedMediaIds.includes(
                                     item.id
                                 );
@@ -453,34 +551,24 @@ function BlogContent({ api }) {
                                                     : "1px solid #d9d9d9",
                                             }}
                                             cover={
-                                                isVideoMedia ? (
-                                                    <VideoPlayer
-                                                        src={item.url}
-                                                        style={{
-                                                            height: 250,
-                                                            objectFit: "cover",
-                                                        }}
-                                                    />
-                                                ) : (
-                                                    <img
-                                                        alt={item.title}
-                                                        src={
-                                                            item.thumbnail_url ||
-                                                            item.url ||
-                                                            "https://via.placeholder.com/150?text=Image+Not+Found"
-                                                        }
-                                                        style={{
-                                                            height: 250,
-                                                            objectFit: "cover",
-                                                        }}
-                                                        onError={(e) =>
-                                                            handleImageError(
-                                                                e,
-                                                                item
-                                                            )
-                                                        }
-                                                    />
-                                                )
+                                                <img
+                                                    alt={item.title}
+                                                    src={
+                                                        item.thumbnail_url ||
+                                                        item.url ||
+                                                        "https://via.placeholder.com/150?text=Image+Not+Found"
+                                                    }
+                                                    style={{
+                                                        height: 250,
+                                                        objectFit: "cover",
+                                                    }}
+                                                    onError={(e) =>
+                                                        handleImageError(
+                                                            e,
+                                                            item
+                                                        )
+                                                    }
+                                                />
                                             }
                                             onClick={() =>
                                                 handleSelectMedia(item.id)
@@ -517,7 +605,7 @@ function BlogContent({ api }) {
                             pageSize={mediaPagination.limit}
                             total={mediaPagination.total}
                             onChange={handleMediaPageChange}
-                            showSizeChanger={true}
+                            showSizeChanger
                             pageSizeOptions={["6", "12", "24"]}
                         />
                     </>

@@ -75,7 +75,7 @@ export function BlogProvider({ children, api }) {
             setEditingBlog(null);
             setIsModalOpen(false);
         },
-        fetchBlogs: async (page = 1, perPage = 10, options = {}) => {
+        fetchBlogs: async (page = 1, perPage = 12, options = {}) => {
             try {
                 const response = await api.get("/api/blogs", {
                     params: { page, perPage, fields: "id,title,content,media" },
@@ -134,108 +134,146 @@ export function BlogProvider({ children, api }) {
         nearestDate: null,
     });
     const [loading, setLoading] = useState(false); // For import/export
+    const [statsLoading, setStatsLoading] = useState(false); // For statistics data fetching
     const [likesLoading, setLikesLoading] = useState(false); // For likes chart data fetching
     const [viewsLoading, setViewsLoading] = useState(false); // For views chart data fetching
 
     const reportBlogContext = {
         reportData,
         loading,
+        statsLoading,
         likesLoading,
         viewsLoading,
-        fetchReportData: async (
-            blogId,
-            likesDateFrom = null,
-            likesDateTo = null,
-            viewsDateFrom = null,
-            viewsDateTo = null
-        ) => {
+        fetchStatisticsData: async (blogId) => {
             if (!token) {
                 message.warning("Please log in to view reports.");
                 return;
             }
             try {
-                // Set loading states based on provided date parameters
-                const isLikesFetch = likesDateFrom || likesDateTo;
-                const isViewsFetch = viewsDateFrom || viewsDateTo;
-                if (isLikesFetch) setLikesLoading(true);
-                if (isViewsFetch) setViewsLoading(true);
-                // If no specific date parameters, fetch both
-                if (!isLikesFetch && !isViewsFetch) {
-                    setLikesLoading(true);
-                    setViewsLoading(true);
-                }
-
-                const params = {};
-                if (likesDateFrom) params.likesDateFrom = likesDateFrom;
-                if (likesDateTo) params.likesDateTo = likesDateTo;
-                if (viewsDateFrom) params.viewsDateFrom = viewsDateFrom;
-                if (viewsDateTo) params.viewsDateTo = viewsDateTo;
-                const response = await api.get(`/api/blogs/reports/${blogId}`, {
+                setStatsLoading(true);
+                const response = await api.get(`/api/blogs/reports/${blogId}/statistics`, {
                     headers: { Authorization: `Bearer ${token}` },
-                    params,
                 });
                 const data = response.data || {};
-                // Ensure chartData is valid
-                const validatedChartData = {
-                    likes: {
-                        dates: Array.isArray(data.chartData?.likes?.dates)
-                            ? data.chartData.likes.dates
-                            : [],
-                        data: Array.isArray(data.chartData?.likes?.data)
-                            ? data.chartData.likes.data
-                            : [],
-                    },
-                    views: {
-                        dates: Array.isArray(data.chartData?.views?.dates)
-                            ? data.chartData.views.dates
-                            : [],
-                        data: Array.isArray(data.chartData?.views?.data)
-                            ? data.chartData.views.data
-                            : [],
-                    },
-                };
-                setReportData({
+                setReportData((prev) => ({
+                    ...prev,
                     avgWatchTime: data.avgWatchTime ?? 0,
                     comments: data.comments ?? 0,
-                    itemsSold: 0,
                     likes: data.likes ?? 0,
                     saves: data.saves ?? 0,
                     shares: data.shares ?? 0,
                     views: data.views ?? 0,
                     watchedFullVideo: data.watchedFullVideo ?? 0,
-                    chartData: validatedChartData,
-                    likesDateFrom: data.likesDateFrom || null,
-                    likesDateTo: data.likesDateTo || null,
-                    viewsDateFrom: data.viewsDateFrom || null,
-                    viewsDateTo: data.viewsDateTo || null,
                     nearestDate: data.nearestDate || null,
-                });
+                }));
             } catch (error) {
                 message.error(
-                    "Failed to load report data: " +
+                    "Failed to load statistics data: " +
+                        (error.response?.data?.error || error.message)
+                );
+                setReportData((prev) => ({
+                    ...prev,
+                    avgWatchTime: 0,
+                    comments: 0,
+                    likes: 0,
+                    saves: 0,
+                    shares: 0,
+                    views: 0,
+                    watchedFullVideo: 0,
+                    nearestDate: null,
+                }));
+            } finally {
+                setStatsLoading(false);
+            }
+        },
+        fetchLikesChartData: async (blogId, likesDateFrom = null, likesDateTo = null) => {
+            if (!token) {
+                message.warning("Please log in to view reports.");
+                return;
+            }
+            try {
+                setLikesLoading(true);
+                const params = {};
+                if (likesDateFrom) params.likesDateFrom = likesDateFrom;
+                if (likesDateTo) params.likesDateTo = likesDateTo;
+                const response = await api.get(`/api/blogs/reports/${blogId}/likes`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                    params,
+                });
+                const data = response.data || {};
+                setReportData((prev) => ({
+                    ...prev,
+                    chartData: {
+                        ...prev.chartData,
+                        likes: {
+                            dates: Array.isArray(data.likes?.dates) ? data.likes.dates : [],
+                            data: Array.isArray(data.likes?.data) ? data.likes.data : [],
+                        },
+                    },
+                    likesDateFrom: data.likesDateFrom || null,
+                    likesDateTo: data.likesDateTo || null,
+                }));
+            } catch (error) {
+                message.error(
+                    "Failed to load likes chart data: " +
                         (error.response?.data?.error || error.message)
                 );
                 setReportData((prev) => ({
                     ...prev,
                     chartData: {
+                        ...prev.chartData,
                         likes: { dates: [], data: [] },
-                        views: { dates: [], data: [] },
                     },
                     likesDateFrom: null,
                     likesDateTo: null,
+                }));
+            } finally {
+                setLikesLoading(false);
+            }
+        },
+        fetchViewsChartData: async (blogId, viewsDateFrom = null, viewsDateTo = null) => {
+            if (!token) {
+                message.warning("Please log in to view reports.");
+                return;
+            }
+            try {
+                setViewsLoading(true);
+                const params = {};
+                if (viewsDateFrom) params.viewsDateFrom = viewsDateFrom;
+                if (viewsDateTo) params.viewsDateTo = viewsDateTo;
+                const response = await api.get(`/api/blogs/reports/${blogId}/views`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                    params,
+                });
+                const data = response.data || {};
+                setReportData((prev) => ({
+                    ...prev,
+                    chartData: {
+                        ...prev.chartData,
+                        views: {
+                            dates: Array.isArray(data.views?.dates) ? data.views.dates : [],
+                            data: Array.isArray(data.views?.data) ? data.views.data : [],
+                        },
+                    },
+                    viewsDateFrom: data.viewsDateFrom || null,
+                    viewsDateTo: data.viewsDateTo || null,
+                }));
+            } catch (error) {
+                message.error(
+                    "Failed to load views chart data: " +
+                        (error.response?.data?.error || error.message)
+                );
+                setReportData((prev) => ({
+                    ...prev,
+                    chartData: {
+                        ...prev.chartData,
+                        views: { dates: [], data: [] },
+                    },
                     viewsDateFrom: null,
                     viewsDateTo: null,
                 }));
             } finally {
-                // Reset loading states based on what was fetched
-                const isLikesFetch = likesDateFrom || likesDateTo;
-                const isViewsFetch = viewsDateFrom || viewsDateTo;
-                if (isLikesFetch || (!isLikesFetch && !isViewsFetch)) {
-                    setLikesLoading(false);
-                }
-                if (isViewsFetch || (!isLikesFetch && !isViewsFetch)) {
-                    setViewsLoading(false);
-                }
+                setViewsLoading(false);
             }
         },
         importReports: async (blogId, file) => {
@@ -255,7 +293,12 @@ export function BlogProvider({ children, api }) {
                     },
                 });
                 message.success("Reports imported successfully");
-                await reportBlogContext.fetchReportData(blogId);
+                // Fetch all data after import
+                await Promise.all([
+                    reportBlogContext.fetchStatisticsData(blogId),
+                    reportBlogContext.fetchLikesChartData(blogId),
+                    reportBlogContext.fetchViewsChartData(blogId),
+                ]);
             } catch (error) {
                 message.error(
                     "Import failed: " +
@@ -273,16 +316,11 @@ export function BlogProvider({ children, api }) {
             }
             setLoading(true);
             try {
-                const response = await api.get(
-                    `/api/blogs/reports/${blogId}/export`,
-                    {
-                        headers: { Authorization: `Bearer ${token}` },
-                        responseType: "blob",
-                    }
-                );
-                const url = window.URL.createObjectURL(
-                    new Blob([response.data])
-                );
+                const response = await api.get(`/api/blogs/reports/${blogId}/export`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                    responseType: "blob",
+                });
+                const url = window.URL.createObjectURL(new Blob([response.data]));
                 const link = document.createElement("a");
                 link.href = url;
                 link.setAttribute("download", `reports-${blogId}.xlsx`);

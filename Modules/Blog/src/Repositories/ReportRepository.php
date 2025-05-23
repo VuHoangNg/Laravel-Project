@@ -11,99 +11,33 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Facades\Excel;
 use Carbon\Carbon;
-use MongoDB\Driver\Session;
 use Exception;
 
 class ReportRepository implements ReportRepositoryInterface
 {
     /**
-     * Retrieve report data for a specific blog ID, with separate date ranges for likes and views charts.
+     * Retrieve statistics data for a specific blog ID, based on the nearest date.
      *
      * @param int $blogId
-     * @param string|null $likesDateFrom
-     * @param string|null $likesDateTo
-     * @param string|null $viewsDateFrom
-     * @param string|null $viewsDateTo
      * @return array
      */
-    public function getReportData(
-        int $blogId,
-        ?string $likesDateFrom = null,
-        ?string $likesDateTo = null,
-        ?string $viewsDateFrom = null,
-        ?string $viewsDateTo = null
-    ): array {
+    public function getStatisticsData(int $blogId): array
+    {
         $blog = Blog::find($blogId);
         if (!$blog) {
             throw new Exception('Blog not found', 404);
         }
 
         // Build MongoDB match query for all reports
-        $baseMatchQuery = [
+        $matchQuery = [
             'post_id' => $blogId,
             'date' => ['$ne' => null]
         ];
 
-        // Match query for likes chart
-        $likesMatchQuery = $baseMatchQuery;
-        if ($likesDateFrom && $likesDateTo) {
-            $likesMatchQuery['date'] = [
-                '$gte' => $likesDateFrom,
-                '$lte' => $likesDateTo
-            ];
-        }
-
-        // Match query for views chart
-        $viewsMatchQuery = $baseMatchQuery;
-        if ($viewsDateFrom && $viewsDateTo) {
-            $viewsMatchQuery['date'] = [
-                '$gte' => $viewsDateFrom,
-                '$lte' => $viewsDateTo
-            ];
-        }
-
-        // Match query for statistics (intersection of both ranges)
-        $statsMatchQuery = $baseMatchQuery;
-        if ($likesDateFrom && $likesDateTo && $viewsDateFrom && $viewsDateTo) {
-            // Use the most restrictive range (latest start, earliest end)
-            $statsMatchQuery['date'] = [
-                '$gte' => max($likesDateFrom, $viewsDateFrom),
-                '$lte' => min($likesDateTo, $viewsDateTo)
-            ];
-        } elseif ($likesDateFrom && $likesDateTo) {
-            $statsMatchQuery['date'] = [
-                '$gte' => $likesDateFrom,
-                '$lte' => $likesDateTo
-            ];
-        } elseif ($viewsDateFrom && $viewsDateTo) {
-            $statsMatchQuery['date'] = [
-                '$gte' => $viewsDateFrom,
-                '$lte' => $viewsDateTo
-            ];
-        }
-
-        // Fetch reports for likes chart
-        $likesReports = Report::raw(function ($collection) use ($likesMatchQuery) {
-            return $collection->aggregate([
-                ['$match' => $likesMatchQuery],
-                ['$project' => ['date' => 1, 'likes' => 1]]
-            ]);
-        });
-
-        // Fetch reports for views chart
-        $viewsReports = Report::raw(function ($collection) use ($viewsMatchQuery) {
-            return $collection->aggregate([
-                ['$match' => $viewsMatchQuery],
-                ['$project' => ['date' => 1, 'views' => 1]]
-            ]);
-        });
-
         // Fetch reports for statistics
-        $statsReports = Report::raw(function ($collection) use ($statsMatchQuery) {
+        $statsReports = Report::raw(function ($collection) use ($matchQuery) {
             return $collection->aggregate([
-                [
-                    '$match' => $statsMatchQuery
-                ],
+                ['$match' => $matchQuery],
                 [
                     '$project' => [
                         'date' => 1,
@@ -141,6 +75,56 @@ class ReportRepository implements ReportRepositoryInterface
         $views = $nearestReport ? (int) ($nearestReport->views ?? 0) : 0;
         $avgWatchTime = $views > 0 ? ($likes + $comments + $shares + $saves) / $views : 0;
 
+        return [
+            'avgWatchTime' => $avgWatchTime,
+            'comments' => $nearestReport ? ($nearestReport->comments ?? 0) : 0,
+            'likes' => $nearestReport ? ($nearestReport->likes ?? 0) : 0,
+            'saves' => $nearestReport ? ($nearestReport->saves ?? 0) : 0,
+            'shares' => $nearestReport ? ($nearestReport->shares ?? 0) : 0,
+            'views' => $nearestReport ? ($nearestReport->views ?? 0) : 0,
+            'watchedFullVideo' => $nearestReport ? ($nearestReport->watched_full_video ?? 0) : 0,
+            'nearestDate' => $nearestReport ? Carbon::parse($nearestReport->date)->format('Y-m-d') : null
+        ];
+    }
+
+    /**
+     * Retrieve likes chart data for a specific blog ID with optional date range.
+     *
+     * @param int $blogId
+     * @param string|null $likesDateFrom
+     * @param string|null $likesDateTo
+     * @return array
+     */
+    public function getLikesChartData(
+        int $blogId,
+        ?string $likesDateFrom = null,
+        ?string $likesDateTo = null
+    ): array {
+        $blog = Blog::find($blogId);
+        if (!$blog) {
+            throw new Exception('Blog not found', 404);
+        }
+
+        // Build MongoDB match query
+        $matchQuery = [
+            'post_id' => $blogId,
+            'date' => ['$ne' => null]
+        ];
+        if ($likesDateFrom && $likesDateTo) {
+            $matchQuery['date'] = [
+                '$gte' => $likesDateFrom,
+                '$lte' => $likesDateTo
+            ];
+        }
+
+        // Fetch reports for likes chart
+        $likesReports = Report::raw(function ($collection) use ($matchQuery) {
+            return $collection->aggregate([
+                ['$match' => $matchQuery],
+                ['$project' => ['date' => 1, 'likes' => 1]]
+            ]);
+        });
+
         // Prepare chart data for likes
         $likesDates = [];
         $likesData = [];
@@ -148,6 +132,54 @@ class ReportRepository implements ReportRepositoryInterface
             $likesDates[] = Carbon::parse($report->date)->format('Y-m-d');
             $likesData[] = $report->likes ?? 0;
         }
+
+        return [
+            'likes' => [
+                'dates' => $likesDates,
+                'data' => $likesData
+            ],
+            'likesDateFrom' => $likesDateFrom,
+            'likesDateTo' => $likesDateTo
+        ];
+    }
+
+    /**
+     * Retrieve views chart data for a specific blog ID with optional date range.
+     *
+     * @param int $blogId
+     * @param string|null $viewsDateFrom
+     * @param string|null $viewsDateTo
+     * @return array
+     */
+    public function getViewsChartData(
+        int $blogId,
+        ?string $viewsDateFrom = null,
+        ?string $viewsDateTo = null
+    ): array {
+        $blog = Blog::find($blogId);
+        if (!$blog) {
+            throw new Exception('Blog not found', 404);
+        }
+
+        // Build MongoDB match query
+        $matchQuery = [
+            'post_id' => $blogId,
+            'date' => ['$ne' => null]
+        ];
+        if ($viewsDateFrom && $viewsDateTo) {
+            $matchQuery['date'] = [
+                '$gte' => $viewsDateFrom,
+                '$lte' => $viewsDateTo
+            ];
+        }
+
+        // Fetch reports for views chart
+        $viewsReports = Report::raw(function ($collection) use ($matchQuery) {
+            return $collection->aggregate([
+                ['$match' => $matchQuery],
+                ['$project' => ['date' => 1, 'views' => 1]]
+            ]);
+        });
 
         // Prepare chart data for views
         $viewsDates = [];
@@ -157,33 +189,14 @@ class ReportRepository implements ReportRepositoryInterface
             $viewsData[] = $report->views ?? 0;
         }
 
-        $data = [
-            'avgWatchTime' => $avgWatchTime,
-            'comments' => $nearestReport ? ($nearestReport->comments ?? 0) : 0,
-            'likes' => $nearestReport ? ($nearestReport->likes ?? 0) : 0,
-            'saves' => $nearestReport ? ($nearestReport->saves ?? 0) : 0,
-            'shares' => $nearestReport ? ($nearestReport->shares ?? 0) : 0,
-            'views' => $nearestReport ? ($nearestReport->views ?? 0) : 0,
-            'watchedFullVideo' => $nearestReport ? ($nearestReport->watched_full_video ?? 0) : 0,
-            'chartData' => [
-                'likes' => [
-                    'dates' => $likesDates,
-                    'data' => $likesData
-                ],
-                'views' => [
-                    'dates' => $viewsDates,
-                    'data' => $viewsData
-                ]
+        return [
+            'views' => [
+                'dates' => $viewsDates,
+                'data' => $viewsData
             ],
-            'likesDateFrom' => $likesDateFrom,
-            'likesDateTo' => $likesDateTo,
             'viewsDateFrom' => $viewsDateFrom,
-            'viewsDateTo' => $viewsDateTo,
-            'nearestDate' => $nearestReport ? Carbon::parse($nearestReport->date)->format('Y-m-d') : null
+            'viewsDateTo' => $viewsDateTo
         ];
-
-        Log::info("Report Data for blog_id {$blogId} (likesDateFrom: {$likesDateFrom}, likesDateTo: {$likesDateTo}, viewsDateFrom: {$viewsDateFrom}, viewsDateTo: {$viewsDateTo}, nearestDate: {$data['nearestDate']}): ", $data);
-        return $data;
     }
 
     /**

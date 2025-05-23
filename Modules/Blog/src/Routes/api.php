@@ -13,7 +13,9 @@ Route::prefix('api/blogs')->group(function () {
 });
 
 Route::prefix('api/blogs/reports')->group(function () {
-    Route::get('/{blogId}', [ReportController::class, 'index']);
-    Route::post('/{blogId}/import', [ReportController::class, 'import']);
-    Route::get('/{blogId}/export', [ReportController::class, 'export']);
+    Route::get('/{blogId}/statistics', [ReportController::class, 'getStatistics'])->name('blogs.reports.statistics');
+    Route::get('/{blogId}/likes', [ReportController::class, 'getLikesChart'])->name('blogs.reports.likes');
+    Route::get('/{blogId}/views', [ReportController::class, 'getViewsChart'])->name('blogs.reports.views');
+    Route::post('/{blogId}/import', [ReportController::class, 'import'])->name('blogs.reports.import');
+    Route::get('/{blogId}/export', [ReportController::class, 'export'])->name('blogs.reports.export');
 });

@@ -23,14 +23,17 @@ const ReportDashboard = ({ blogId }) => {
     const { reportBlogContext, getBlogContext } = useBlogContext();
     const {
         reportData,
-        loading, // For import/export
-        likesLoading, // For likes chart data fetching
-        viewsLoading, // For views chart data fetching
-        fetchReportData,
+        loading,
+        statsLoading,
+        likesLoading,
+        viewsLoading,
+        fetchStatisticsData,
+        fetchLikesChartData,
+        fetchViewsChartData,
         importReports,
         exportReports,
     } = reportBlogContext;
-    const { isModalOpen } = getBlogContext; // For debugging Drawer state
+    const { isModalOpen } = getBlogContext;
     const isMounted = useRef(false);
     const [lastFetchedParams, setLastFetchedParams] = useState(null);
     const [likesDateRange, setLikesDateRange] = useState([null, null]);
@@ -62,13 +65,12 @@ const ReportDashboard = ({ blogId }) => {
             });
 
             if (lastFetchedParams !== currentParams) {
-                fetchReportData(
-                    blogId,
-                    likesDateFrom,
-                    likesDateTo,
-                    viewsDateFrom,
-                    viewsDateTo
-                )
+                // Fetch all data if blogId changes or parameters change
+                Promise.all([
+                    fetchStatisticsData(blogId),
+                    fetchLikesChartData(blogId, likesDateFrom, likesDateTo),
+                    fetchViewsChartData(blogId, viewsDateFrom, viewsDateTo),
+                ])
                     .then(() => {
                         if (isMounted.current) {
                             setLastFetchedParams(currentParams);
@@ -82,7 +84,7 @@ const ReportDashboard = ({ blogId }) => {
         return () => {
             isMounted.current = false;
         };
-    }, [blogId, likesDateRange, viewsDateRange, fetchReportData]);
+    }, [blogId, likesDateRange, viewsDateRange]);
 
     const handleLikesDateRangeChange = (dates) => {
         setLikesDateRange(dates || [null, null]);
@@ -321,69 +323,77 @@ const ReportDashboard = ({ blogId }) => {
                     : "No data available"}
             </Typography.Title>
             <Row gutter={[16, 16]}>
-                <Col span={6}>
-                    <Card>
-                        <Statistic
-                            title="Avg Watch Time (s)"
-                            value={(reportData.avgWatchTime ?? 0).toFixed(2)}
-                        />
-                    </Card>
-                </Col>
-                <Col span={6}>
-                    <Card>
-                        <Statistic
-                            title="Comments"
-                            value={reportData.comments ?? 0}
-                        />
-                    </Card>
-                </Col>
-                <Col span={6}>
-                    <Card>
-                        <Statistic title="Items Sold" value={0} />
-                    </Card>
-                </Col>
-                <Col span={6}>
-                    <Card>
-                        <Statistic
-                            title="Likes"
-                            value={reportData.likes ?? 0}
-                        />
-                    </Card>
-                </Col>
-                <Col span={6}>
-                    <Card>
-                        <Statistic
-                            title="Views"
-                            value={reportData.views ?? 0}
-                        />
-                    </Card>
-                </Col>
-                <Col span={6}>
-                    <Card>
-                        <Statistic
-                            title="Saves"
-                            value={reportData.saves ?? 0}
-                        />
-                    </Card>
-                </Col>
-                <Col span={6}>
-                    <Card>
-                        <Statistic
-                            title="Shares"
-                            value={reportData.shares ?? 0}
-                        />
-                    </Card>
-                </Col>
-                <Col span={6}>
-                    <Card>
-                        <Statistic
-                            title="Watched Full Video (%)"
-                            value={(reportData.watchedFullVideo ?? 0).toFixed(
-                                2
-                            )}
-                        />
-                    </Card>
-                </Col>
+                {statsLoading ? (
+                    [...Array(8)].map((_, index) => (
+                        <Col span={6} key={index}>
+                            <Skeleton active title paragraph={{ rows: 1 }} />
+                        </Col>
+                    ))
+                ) : (
+                    <>
+                        <Col span={6}>
+                            <Card>
+                                <Statistic
+                                    title="Avg Watch Time (s)"
+                                    value={(reportData.avgWatchTime ?? 0).toFixed(2)}
+                                />
+                            </Card>
+                        </Col>
+                        <Col span={6}>
+                            <Card>
+                                <Statistic
+                                    title="Comments"
+                                    value={reportData.comments ?? 0}
+                                />
+                            </Card>
+                        </Col>
+                        <Col span={6}>
+                            <Card>
+                                <Statistic title="Items Sold" value={0} />
+                            </Card>
+                        </Col>
+                        <Col span={6}>
+                            <Card>
+                                <Statistic
+                                    title="Likes"
+                                    value={reportData.likes ?? 0}
+                                />
+                            </Card>
+                        </Col>
+                        <Col span={6}>
+                            <Card>
+                                <Statistic
+                                    title="Views"
+                                    value={reportData.views ?? 0}
+                                />
+                            </Card>
+                        </Col>
+                        <Col span={6}>
+                            <Card>
+                                <Statistic
+                                    title="Saves"
+                                    value={reportData.saves ?? 0}
+                                />
+                            </Card>
+                        </Col>
+                        <Col span={6}>
+                            <Card>
+                                <Statistic
+                                    title="Shares"
+                                    value={reportData.shares ?? 0}
+                                />
+                            </Card>
+                        </Col>
+                        <Col span={6}>
+                            <Card>
+                                <Statistic
+                                    title="Watched Full Video (%)"
+                                    value={(reportData.watchedFullVideo ?? 0).toFixed(2)}
+                                />
+                            </Card>
+                        </Col>
+                    </>
+                )}
             </Row>
             <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
                 <Col>
