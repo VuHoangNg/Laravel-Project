@@ -31,7 +31,6 @@ const FeedBackDrawer = ({
     const [loadedPages, setLoadedPages] = useState(new Set());
     const [expandedFeedbacks, setExpandedFeedbacks] = useState(new Set());
     const [form] = Form.useForm();
-    const [messageText, setMessageText] = useState(""); // Added state for messageText
     const PAGE_SIZE = 10;
     const scrollPositionRef = useRef(0);
 
@@ -102,7 +101,7 @@ const FeedBackDrawer = ({
         return () => {
             isMounted.current = false;
         };
-    }, []);
+    }, [highlightedFeedbackId, feedbacks, selectedScript.key]);
 
     const loadInitialFeedbacks = async () => {
         if (selectedScript.key && !highlightedFeedbackId) {
@@ -158,6 +157,13 @@ const FeedBackDrawer = ({
             }
 
             if (isMounted.current) {
+                dispatch({
+                    type: SET_FEEDBACKS,
+                    payload: {
+                        scriptId: selectedScript.key,
+                        feedbacks: feedBackContext.buildFeedbackTree(response.data),
+                    },
+                });
                 setLoadedPages((prev) => new Set(prev).add(targetPage));
                 setHasMore(response.current_page < response.last_page);
                 setPage((prev) => targetPage + 1);
@@ -184,8 +190,8 @@ const FeedBackDrawer = ({
         setReplyingTo(feedback);
     };
 
-    const handleReplySubmit = async () => { // Modified to use messageText state
-        if (!messageText.trim()) {
+    const handleReplySubmit = async (payload) => {
+        if (!payload.feedback.trim()) {
             message.error("Feedback cannot be empty");
             return;
         }
@@ -193,9 +199,9 @@ const FeedBackDrawer = ({
         try {
             const response = await feedBackContext.createFeedback(
                 selectedScript.key,
-                messageText,
+                payload.feedback,
                 0, // Default timestamp
-                replyingTo?.id || null
+                payload.parent_id || null
             );
             if (response && isMounted.current) {
                 dispatch({
@@ -215,14 +221,14 @@ const FeedBackDrawer = ({
                         },
                     },
                 });
-                if (replyingTo?.id) {
+                if (payload.parent_id) {
                     setExpandedFeedbacks((prev) =>
-                        new Set(prev).add(replyingTo.id)
+                        new Set(prev).add(payload.parent_id)
                     );
                 }
-                setMessageText(""); // Reset messageText
-                setReplyingTo(null); // Reset replyingTo
                 form.resetFields();
+                setReplyingTo(null);
+                message.success("Feedback submitted successfully");
             }
         } catch (error) {
             console.error(
@@ -269,7 +275,27 @@ const FeedBackDrawer = ({
             .deleteFeedback(selectedScript.key, feedbackId)
             .then(() => {
                 loadMoreFeedbacks(true); // Reload feedbacks after deletion
+                message.success("Feedback deleted successfully");
+            })
+            .catch((error) => {
+                console.error(
+                    "Error deleting feedback:",
+                    error.response || error.message
+                );
+                message.error("Failed to delete feedback");
             });
+    };
+
+    // Placeholder flattenFeedbacks function (implement as needed)
+    const flattenFeedbacks = (feedbacks) => {
+        let result = [];
+        feedbacks.forEach((feedback) => {
+            result.push(feedback);
+            if (feedback.children?.length > 0) {
+                result = result.concat(flattenFeedbacks(feedback.children));
+            }
+        });
+        return result;
     };
 
     return (
@@ -279,7 +305,7 @@ const FeedBackDrawer = ({
                 flexDirection: "column",
                 height: "100%",
                 width: "100%",
-                overflowX:"hidden"
+                overflowX: "hidden",
             }}
         >
             <Title
@@ -315,7 +341,7 @@ const FeedBackDrawer = ({
                     </div>
                 ) : feedbacks.length > 0 ? (
                     <InfiniteScroll
-                        style={{overflowX:"hidden"}}
+                        style={{ overflowX: "hidden" }}
                         dataLength={feedbacks.length}
                         next={() => loadMoreFeedbacks()}
                         hasMore={hasMore}
@@ -356,44 +382,68 @@ const FeedBackDrawer = ({
                     </Typography>
                 )}
             </div>
-            <Row
-                style={{
-                    backgroundColor: "#1C2526",
-                    padding: "0px 16px 0px 16px",
-                    borderRadius: 8,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    flexShrink: 1,
-                    minHeight: 100,
-                    width: "100%",
+            <Form
+                form={form}
+                onFinish={(values) => {
+                    handleReplySubmit({
+                        feedback: values.feedback,
+                        parent_id: replyingTo?.id || null,
+                    });
                 }}
+                style={{ flexShrink: 0, height: formHeight, width: "100%" }}
             >
-                <TextArea
-                    value={messageText}
-                    onChange={(e) => setMessageText(e.target.value)}
-                    autoSize={{ minRows: 1, maxRows: 3 }}
-                    placeholder="Enter your feedback"
+                <Row
                     style={{
-                        backgroundColor: "rgba(255, 255, 255, 0.1)",
-                        color: "#fff",
-                        border: "1px solid rgba(255, 255, 255, 0.1)",
-                        borderRadius: 4,
-                        padding: "8px 40px 8px 8px",
-                        resize: "none",
-                        flex: 1,
+                        backgroundColor: "#1C2526",
+                        padding: "0px 16px 0px 16px",
+                        borderRadius: 8,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        flexShrink: 1,
+                        minHeight: 100,
+                        width: "100%",
                     }}
-                />
-                <Button
-                    type="primary"
-                    icon={<SendOutlined />}
-                    onClick={handleReplySubmit}
-                    style={{
-                        backgroundColor: "#1890ff",
-                        borderColor: "#1890ff",
-                    }}
-                />
-            </Row>
+                >
+                    <Form.Item
+                        name="feedback"
+                        rules={[
+                            {
+                                required: true,
+                                message: "Feedback cannot be empty",
+                            },
+                        ]}
+                        style={{ flex: 1, marginBottom: 0 }}
+                    >
+                        <TextArea
+                            autoSize={{ minRows: 1, maxRows: 3 }}
+                            placeholder={
+                                replyingTo
+                                    ? `Reply to ${replyingTo.user?.username || "Anonymous"}...`
+                                    : "Enter your feedback"
+                            }
+                            style={{
+                                backgroundColor: "rgba(255, 255, 255, 0.1)",
+                                color: "#fff",
+                                border: "1px solid rgba(255, 255, 255, 0.1)",
+                                borderRadius: 4,
+                                padding: "8px 40px 8px 8px",
+                                resize: "none",
+                                flex: 1,
+                            }}
+                        />
+                    </Form.Item>
+                    <Button
+                        type="primary"
+                        icon={<SendOutlined />}
+                        htmlType="submit"
+                        style={{
+                            backgroundColor: "#1890ff",
+                            borderColor: "#1890ff",
+                        }}
+                    />
+                </Row>
+            </Form>
         </div>
     );
 };

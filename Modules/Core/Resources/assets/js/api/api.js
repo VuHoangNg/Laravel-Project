@@ -2,7 +2,7 @@ import axios from "axios";
 
 // Create Axios instance
 const api = axios.create({
-    baseURL: "http://vproject:8000", // Your backend base URL
+    baseURL: "https://12b5-115-73-213-17.ngrok-free.app", // Your backend base URL
     headers: {
         Accept: "application/json",
         // Let Axios handle Content-Type automatically for multipart/form-data
