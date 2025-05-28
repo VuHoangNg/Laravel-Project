@@ -31,7 +31,7 @@ function SignUp() {
     return (
         <div
             style={{
-                minHeight: "100vh",
+                minHeight: "100%",
                 display: "flex",
                 justifyContent: "center",
                 alignItems: "center",
