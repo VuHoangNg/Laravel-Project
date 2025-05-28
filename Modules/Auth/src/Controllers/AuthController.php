@@ -93,27 +93,32 @@ class AuthController extends Controller
 
         $user = User::where('username', $request->username)->first();
 
-        if ($user && Hash::check($request->password, $user->password)) {
-            $token = $user->createToken('auth_token')->plainTextToken;
-
-            $fields = $this->getRequestedFields($request);
-            $responseData = $this->userToArray($user, $fields);
-            if (empty($fields) || in_array('token', $fields)) {
-                $responseData['token'] = $token;
-            }
-            $responseData['message'] = 'Login successful';
-
-            $avatarUrl = $user->avatar ? Storage::url($user->avatar) : null;
-
-            return response()->json($responseData)
-                ->withCookie(Cookie::forever('username', $user->username, null, null, false, false))
-                ->withCookie(Cookie::forever('email', $user->email, null, null, false, false))
-                ->withCookie(Cookie::forever('token', $token, null, null, false, false))
-                ->withCookie(Cookie::forever('id', $user->id, null, null, false, false))
-                ->withCookie(Cookie::forever('avatar', $avatarUrl, null, null, false, false));
+        if (!$user) {
+            return response()->json(['message' => 'Username is incorrect'], 401);
         }
 
-        return response()->json(['message' => 'Invalid credentials'], 401);
+        if (!Hash::check($request->password, $user->password)) {
+            return response()->json(['message' => 'Password is incorrect'], 401);
+        }
+
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        $fields = $this->getRequestedFields($request);
+        $responseData = $this->userToArray($user, $fields);
+
+        if (empty($fields) || in_array('token', $fields)) {
+            $responseData['token'] = $token;
+        }
+        $responseData['message'] = 'Login successful';
+
+        $avatarUrl = $user->avatar ? Storage::url($user->avatar) : null;
+
+        return response()->json($responseData)
+            ->withCookie(Cookie::forever('username', $user->username, '/', 'vproject', false, false))
+            ->withCookie(Cookie::forever('email', $user->email, '/', 'vproject', false, false))
+            ->withCookie(Cookie::forever('token', $token, '/', 'vproject', false, false))
+            ->withCookie(Cookie::forever('id', $user->id, '/', 'vproject', false, false))
+            ->withCookie(Cookie::forever('avatar', $avatarUrl, '/', 'vproject', false, false));
     }
 
     public function logout(Request $request): JsonResponse

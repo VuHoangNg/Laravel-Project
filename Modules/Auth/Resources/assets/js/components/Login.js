@@ -14,7 +14,6 @@ function Login() {
         setLoading(true);
         try {
             await dispatch(login(values));
-            window.location.href = "/core";
         } catch (error) {
             message.error(error.response?.data?.message || "Login failed");
         } finally {
@@ -29,7 +28,7 @@ function Login() {
     return (
         <div
             style={{
-                minHeight: "100vh",
+                minHeight: "100%",
                 display: "flex",
                 justifyContent: "center",
                 alignItems: "center",

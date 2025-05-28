@@ -1,11 +1,12 @@
 import React, { useRef, useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import { Typography, Button, Input, Divider, Spin, Skeleton, Form } from "antd";
+import { Typography, Button, Input, Divider, Spin, Skeleton, Form, Row } from "antd";
 import InfiniteScroll from "react-infinite-scroll-component";
 import FeedBackItem from "./FeedBackItem";
 import { useScriptContext } from "../context/ScriptContext";
 import { ADD_FEEDBACK, SET_FEEDBACKS } from "../reducer/action";
 import { message } from "antd";
+import { SendOutlined } from "@ant-design/icons";
 
 const { Title } = Typography;
 const { TextArea } = Input;
@@ -30,6 +31,7 @@ const FeedBackDrawer = ({
     const [loadedPages, setLoadedPages] = useState(new Set());
     const [expandedFeedbacks, setExpandedFeedbacks] = useState(new Set());
     const [form] = Form.useForm();
+    const [messageText, setMessageText] = useState(""); // Added state for messageText
     const PAGE_SIZE = 10;
     const scrollPositionRef = useRef(0);
 
@@ -52,7 +54,7 @@ const FeedBackDrawer = ({
 
     // Calculate heights
     const titleHeight = 40;
-    const formHeight = 150;
+    const formHeight = 100;
     const padding = 16;
     const feedbacksHeight =
         contentHeight - titleHeight - formHeight - padding * 2;
@@ -182,13 +184,18 @@ const FeedBackDrawer = ({
         setReplyingTo(feedback);
     };
 
-    const handleReplySubmit = async (payload) => {
+    const handleReplySubmit = async () => { // Modified to use messageText state
+        if (!messageText.trim()) {
+            message.error("Feedback cannot be empty");
+            return;
+        }
+
         try {
             const response = await feedBackContext.createFeedback(
                 selectedScript.key,
-                payload.feedback,
+                messageText,
                 0, // Default timestamp
-                payload.parent_id || null
+                replyingTo?.id || null
             );
             if (response && isMounted.current) {
                 dispatch({
@@ -208,11 +215,13 @@ const FeedBackDrawer = ({
                         },
                     },
                 });
-                if (payload.parent_id) {
+                if (replyingTo?.id) {
                     setExpandedFeedbacks((prev) =>
-                        new Set(prev).add(payload.parent_id)
+                        new Set(prev).add(replyingTo.id)
                     );
                 }
+                setMessageText(""); // Reset messageText
+                setReplyingTo(null); // Reset replyingTo
                 form.resetFields();
             }
         } catch (error) {
@@ -220,6 +229,7 @@ const FeedBackDrawer = ({
                 "Error submitting feedback:",
                 error.response || error.message
             );
+            message.error("Failed to submit feedback");
         }
     };
 
@@ -262,10 +272,6 @@ const FeedBackDrawer = ({
             });
     };
 
-    const handleTimestampClick = (timestamp) => {
-        console.log("Timestamp clicked:", timestamp);
-    };
-
     return (
         <div
             style={{
@@ -273,6 +279,7 @@ const FeedBackDrawer = ({
                 flexDirection: "column",
                 height: "100%",
                 width: "100%",
+                overflowX:"hidden"
             }}
         >
             <Title
@@ -290,7 +297,6 @@ const FeedBackDrawer = ({
                 style={{
                     flex: 1,
                     overflowY: "auto",
-                    marginBottom: `${padding}px`,
                     minHeight: feedbacksHeight,
                     width: "100%",
                 }}
@@ -309,6 +315,7 @@ const FeedBackDrawer = ({
                     </div>
                 ) : feedbacks.length > 0 ? (
                     <InfiniteScroll
+                        style={{overflowX:"hidden"}}
                         dataLength={feedbacks.length}
                         next={() => loadMoreFeedbacks()}
                         hasMore={hasMore}
@@ -330,7 +337,6 @@ const FeedBackDrawer = ({
                                 onReplyClick={handleReplyClick}
                                 handleEditFeedback={handleEditFeedback}
                                 handleDeleteFeedback={handleDeleteFeedback}
-                                handleTimestampClick={handleTimestampClick}
                                 handleReplySubmit={handleReplySubmit}
                                 replyingTo={replyingTo}
                                 setReplyingTo={setReplyingTo}
@@ -350,50 +356,44 @@ const FeedBackDrawer = ({
                     </Typography>
                 )}
             </div>
-            <Form
-                form={form}
-                onFinish={(values) => {
-                    handleReplySubmit({
-                        feedback: values.feedback,
-                    });
+            <Row
+                style={{
+                    backgroundColor: "#1C2526",
+                    padding: "0px 16px 0px 16px",
+                    borderRadius: 8,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    flexShrink: 1,
+                    minHeight: 100,
+                    width: "100%",
                 }}
-                style={{ flexShrink: 0, height: formHeight, width: "100%" }}
             >
-                <Form.Item
-                    label={<span style={{ color: "white" }}>Feedback</span>}
-                    name="feedback"
-                    rules={[
-                        { required: true, message: "Please enter a feedback" },
-                    ]}
-                    style={{ width: "100%", marginBottom: "8px" }}
-                >
-                    <TextArea
-                        rows={3}
-                        placeholder="Enter your feedback"
-                        style={{
-                            backgroundColor: "rgba(255, 255, 255, 0.1)",
-                            color: "#e0e0e0",
-                            borderRadius: 8,
-                            border: "1px solid rgba(255, 255, 255, 0.1)",
-                            width: "100%",
-                            boxSizing: "border-box",
-                            padding: "8px",
-                        }}
-                    />
-                </Form.Item>
-                <Form.Item style={{ width: "100%", marginBottom: 0 }}>
-                    <Button
-                        type="primary"
-                        htmlType="submit"
-                        style={{
-                            width: "100%",
-                            borderRadius: 8,
-                        }}
-                    >
-                        Post
-                    </Button>
-                </Form.Item>
-            </Form>
+                <TextArea
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                    autoSize={{ minRows: 1, maxRows: 3 }}
+                    placeholder="Enter your feedback"
+                    style={{
+                        backgroundColor: "rgba(255, 255, 255, 0.1)",
+                        color: "#fff",
+                        border: "1px solid rgba(255, 255, 255, 0.1)",
+                        borderRadius: 4,
+                        padding: "8px 40px 8px 8px",
+                        resize: "none",
+                        flex: 1,
+                    }}
+                />
+                <Button
+                    type="primary"
+                    icon={<SendOutlined />}
+                    onClick={handleReplySubmit}
+                    style={{
+                        backgroundColor: "#1890ff",
+                        borderColor: "#1890ff",
+                    }}
+                />
+            </Row>
         </div>
     );
 };

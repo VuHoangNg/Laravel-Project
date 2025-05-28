@@ -10,6 +10,7 @@ import {
     Drawer,
     message,
     Upload,
+    Spin,
 } from "antd";
 import {
     EditOutlined,
@@ -23,14 +24,6 @@ import { useSelector, useDispatch } from "react-redux";
 import FeedBackDrawer from "./FeedBackDrawer";
 import { SET_FEEDBACKS } from "../reducer/action";
 import { useSearchParams } from "react-router-dom";
-
-// Inline CSS for the highlighted row (you can move this to a separate CSS file)
-const highlightStyle = {
-    highlightedRow: {
-        backgroundColor: "rgba(255, 255, 0, 0.1)", // Light yellow background for highlight
-        borderLeft: "4px solid #faad14", // Yellow border for emphasis
-    },
-};
 
 const ScriptTab = ({ contentHeight, media1_id, scriptId, feedbackId }) => {
     const {
@@ -51,6 +44,9 @@ const ScriptTab = ({ contentHeight, media1_id, scriptId, feedbackId }) => {
     const [isScriptsLoaded, setIsScriptsLoaded] = useState(false);
     const [wasDrawerClosed, setWasDrawerClosed] = useState(false);
     const [searchParams, setSearchParams] = useSearchParams();
+    const [loading, setLoading] = useState(false); // New loading state
+    const page = parseInt(searchParams.get("page") || "1");
+    const perPage = parseInt(searchParams.get("perPage") || "8");
     const getCookie = (name) => {
         const value = `; ${document.cookie}`;
         const parts = value.split(`; ${name}=`);
@@ -183,7 +179,11 @@ const ScriptTab = ({ contentHeight, media1_id, scriptId, feedbackId }) => {
         setShowFeedBackDrawer(false);
         setSelectedScript(null);
         setWasDrawerClosed(true);
-        setSearchParams(`?id=${media1_id}`);
+        setSearchParams({
+            id: media.id,
+            page: page.toString(),
+            perPage: perPage.toString(),
+        });
     };
 
     const handleDeleteConfirm = async () => {
@@ -205,21 +205,33 @@ const ScriptTab = ({ contentHeight, media1_id, scriptId, feedbackId }) => {
             return;
         }
         try {
+            setLoading(true); // Set loading true for export
             await getScriptContext.exportScripts(media1_id);
         } catch (error) {
             console.error("Export error:", error);
+        } finally {
+            setLoading(false); // Set loading false after export
         }
     };
 
     const handleImport = async (file) => {
+        setLoading(true); // Set loading true before import
         try {
-            const result = await getScriptContext.importScripts(media1_id, file);
+            const result = await getScriptContext.importScripts(
+                media1_id,
+                file
+            );
             if (result.errors.length > 0) {
-                // Errors are already displayed in ScriptProvider, but you can add additional UI here
-                console.log(`Imported ${result.successCount} scripts, ${result.errors.length} rows failed.`);
+                console.log(
+                    `Imported ${result.successCount} scripts, ${result.errors.length} rows failed.`
+                );
+            } else {
+                message.success("Scripts imported successfully!");
             }
         } catch (error) {
             console.error("Import error:", error);
+        } finally {
+            setLoading(false); // Set loading false after import
         }
         return false; // Prevent Ant Design Upload from handling the file
     };
@@ -295,11 +307,10 @@ const ScriptTab = ({ contentHeight, media1_id, scriptId, feedbackId }) => {
                     />
                 </>
             ),
-            width: 120,
+            width: 150,
         },
     ];
 
-    // Function to determine the row class for highlighting
     const getRowClassName = (record) => {
         return record.key === parseInt(scriptId) ? "highlighted-row" : "";
     };
@@ -334,6 +345,7 @@ const ScriptTab = ({ contentHeight, media1_id, scriptId, feedbackId }) => {
                             <Button
                                 icon={<UploadOutlined />}
                                 style={{ marginRight: 8 }}
+                                loading={loading} // Show loading on Import button
                             >
                                 Import
                             </Button>
@@ -342,6 +354,7 @@ const ScriptTab = ({ contentHeight, media1_id, scriptId, feedbackId }) => {
                             icon={<DownloadOutlined />}
                             onClick={handleExport}
                             style={{ marginRight: 8 }}
+                            loading={loading} // Show loading on Export button
                         >
                             Export Excel
                         </Button>
@@ -351,14 +364,16 @@ const ScriptTab = ({ contentHeight, media1_id, scriptId, feedbackId }) => {
                     </div>
                 }
             >
-                <Table
-                    dataSource={dataSource}
-                    columns={columns}
-                    pagination={false}
-                    scroll={{ y: contentHeight - 80, x: 1020 }}
-                    style={{ background: "#1C2526", color: "#e0e0e0" }}
-                    rowClassName={getRowClassName} // Apply the highlight class
-                />
+                <Spin spinning={loading}>
+                    <Table
+                        dataSource={dataSource}
+                        columns={columns}
+                        pagination={false}
+                        scroll={{ y: contentHeight - 80, x: 1020 }}
+                        style={{ background: "#1C2526", color: "#e0e0e0" }}
+                        rowClassName={getRowClassName}
+                    />
+                </Spin>
                 <Modal
                     title={
                         editingScriptContext.editingScript
@@ -496,7 +511,7 @@ const ScriptTab = ({ contentHeight, media1_id, scriptId, feedbackId }) => {
                 <Drawer
                     title="Feedback"
                     placement="right"
-                    width={600}
+                    width={500}
                     onClose={handleDrawerClose}
                     open={showFeedBackDrawer}
                     bodyStyle={{

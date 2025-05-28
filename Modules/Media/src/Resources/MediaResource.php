@@ -18,6 +18,7 @@ class MediaResource extends JsonResource
             'thumbnail_url' => $this->thumbnail_url,
             'duration' => $this->duration,
             'status' => $this->status,
+            'blog_id' => $this->blog_id,
         ];
     }
 }

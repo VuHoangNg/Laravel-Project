@@ -35,13 +35,39 @@ const ReportDashboard = ({ blogId }) => {
     } = reportBlogContext;
     const { isModalOpen } = getBlogContext;
     const isMounted = useRef(false);
-    const [lastFetchedParams, setLastFetchedParams] = useState(null);
+    const [lastFetchedStatsParams, setLastFetchedStatsParams] = useState(null);
+    const [lastFetchedLikesParams, setLastFetchedLikesParams] = useState(null);
+    const [lastFetchedViewsParams, setLastFetchedViewsParams] = useState(null);
     const [likesDateRange, setLikesDateRange] = useState([null, null]);
     const [viewsDateRange, setViewsDateRange] = useState([null, null]);
 
+    // Fetch statistics data when blogId changes
     useEffect(() => {
         isMounted.current = true;
 
+        if (blogId && isMounted.current) {
+            const currentStatsParams = JSON.stringify({ blogId });
+
+            if (lastFetchedStatsParams !== currentStatsParams) {
+                fetchStatisticsData(blogId)
+                    .then(() => {
+                        if (isMounted.current) {
+                            setLastFetchedStatsParams(currentStatsParams);
+                        }
+                    })
+                    .catch((error) => {
+                        console.error("Statistics fetch failed:", error);
+                    });
+            }
+        }
+
+        return () => {
+            isMounted.current = false;
+        };
+    }, [blogId, fetchStatisticsData]);
+
+    // Fetch likes chart data when blogId or likesDateRange changes
+    useEffect(() => {
         if (blogId && isMounted.current) {
             const likesDateFrom = likesDateRange[0]
                 ? likesDateRange[0].format("YYYY-MM-DD")
@@ -49,42 +75,54 @@ const ReportDashboard = ({ blogId }) => {
             const likesDateTo = likesDateRange[1]
                 ? likesDateRange[1].format("YYYY-MM-DD")
                 : null;
+            const currentLikesParams = JSON.stringify({
+                blogId,
+                likesDateFrom,
+                likesDateTo,
+            });
+
+            if (lastFetchedLikesParams !== currentLikesParams) {
+                fetchLikesChartData(blogId, likesDateFrom, likesDateTo)
+                    .then(() => {
+                        if (isMounted.current) {
+                            setLastFetchedLikesParams(currentLikesParams);
+                        }
+                    })
+                    .catch((error) => {
+                        console.error("Likes chart fetch failed:", error);
+                    });
+            }
+        }
+    }, [blogId, likesDateRange, fetchLikesChartData]);
+
+    // Fetch views chart data when blogId or viewsDateRange changes
+    useEffect(() => {
+        if (blogId && isMounted.current) {
             const viewsDateFrom = viewsDateRange[0]
                 ? viewsDateRange[0].format("YYYY-MM-DD")
                 : null;
             const viewsDateTo = viewsDateRange[1]
                 ? viewsDateRange[1].format("YYYY-MM-DD")
                 : null;
-
-            const currentParams = JSON.stringify({
+            const currentViewsParams = JSON.stringify({
                 blogId,
-                likesDateFrom,
-                likesDateTo,
                 viewsDateFrom,
                 viewsDateTo,
             });
 
-            if (lastFetchedParams !== currentParams) {
-                // Fetch all data if blogId changes or parameters change
-                Promise.all([
-                    fetchStatisticsData(blogId),
-                    fetchLikesChartData(blogId, likesDateFrom, likesDateTo),
-                    fetchViewsChartData(blogId, viewsDateFrom, viewsDateTo),
-                ])
+            if (lastFetchedViewsParams !== currentViewsParams) {
+                fetchViewsChartData(blogId, viewsDateFrom, viewsDateTo)
                     .then(() => {
                         if (isMounted.current) {
-                            setLastFetchedParams(currentParams);
+                            setLastFetchedViewsParams(currentViewsParams);
                         }
                     })
                     .catch((error) => {
-                        console.error("Fetch failed:", error);
+                        console.error("Views chart fetch failed:", error);
                     });
             }
         }
-        return () => {
-            isMounted.current = false;
-        };
-    }, [blogId, likesDateRange, viewsDateRange]);
+    }, [blogId, viewsDateRange, fetchViewsChartData]);
 
     const handleLikesDateRangeChange = (dates) => {
         setLikesDateRange(dates || [null, null]);
@@ -240,7 +278,6 @@ const ReportDashboard = ({ blogId }) => {
         legend: { enabled: false },
     };
 
-    // Show loading for the entire component during import/export
     if (loading) {
         return (
             <div style={{ padding: 24 }}>

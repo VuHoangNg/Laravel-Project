@@ -9,7 +9,7 @@ if (!token) {
     console.error("No auth token found in localStorage. Please log in again.");
 }
 
-const APP_URL = process.env.APP_URL || "http://127.0.0.1:8000";
+const APP_URL = process.env.APP_URL || "http://vproject:8000";
 
 window.Echo = new Echo({
     broadcaster: 'pusher',

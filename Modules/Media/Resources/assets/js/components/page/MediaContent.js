@@ -22,9 +22,11 @@ const { TabPane } = Tabs;
 
 const MediaContent = ({ api }) => {
     const navigate = useNavigate();
-    const { createMediaContext, getMediaContext, commentContext } = useMediaContext();
+    const { createMediaContext, getMediaContext, commentContext } =
+        useMediaContext();
     const { resetForm, createMedia } = createMediaContext;
-    const { isModalOpen, openModal, closeModal, fetchMedia, fetchMediaById } = getMediaContext;
+    const { isModalOpen, openModal, closeModal, fetchMedia, fetchMediaById } =
+        getMediaContext;
     const [form] = Form.useForm();
     const [commentForm] = Form.useForm();
     const [editCommentForm] = Form.useForm();
@@ -40,7 +42,7 @@ const MediaContent = ({ api }) => {
     const [activeTab, setActiveTab] = useState("asset");
     const videoRef = useRef(null);
     const page = parseInt(searchParams.get("page") || "1");
-    const perPage = parseInt(searchParams.get("perPage") || "12");
+    const perPage = parseInt(searchParams.get("perPage") || "8");
     const commentId = searchParams.get("comment");
     const mediaId = searchParams.get("id");
     const scriptId = searchParams.get("script_id");
@@ -49,14 +51,26 @@ const MediaContent = ({ api }) => {
     const fetchedMediaId = useRef(null);
     const fetchedCommentId = useRef(null);
 
-    const drawerWidth = Math.min(1600, window.innerWidth * 1);
+    const drawerWidth = Math.min(1600, window.innerWidth * 0.8); // 80% width
     const commentSiderWidth = Math.min(Math.max(500, drawerWidth * 0.5), 500);
     const previewSiderWidth = drawerWidth - commentSiderWidth;
 
     const drawerHeaderHeight = 64;
     const tabsHeight = 48;
     const padding = 24;
-    const contentHeight = window.innerHeight - drawerHeaderHeight - tabsHeight - padding;
+    const contentHeight =
+        window.innerHeight - drawerHeaderHeight - tabsHeight - padding;
+
+    const formatTimestamp = (seconds) => {
+        if (isNaN(seconds) || seconds === null || seconds === undefined) {
+            return "00:00";
+        }
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = Math.floor(seconds % 60);
+        return `${minutes.toString().padStart(2, "0")}:${remainingSeconds
+            .toString()
+            .padStart(2, "0")}`;
+    };
 
     const getCookie = (name) => {
         const value = `; ${document.cookie}`;
@@ -76,7 +90,9 @@ const MediaContent = ({ api }) => {
             await fetchMedia(page, perPage);
         } catch (err) {
             if (isMounted.current) {
-                setError(err.response?.data?.message || "Failed to load media.");
+                setError(
+                    err.response?.data?.message || "Failed to load media."
+                );
             }
         } finally {
             if (isMounted.current) {
@@ -86,7 +102,12 @@ const MediaContent = ({ api }) => {
     };
 
     const fetchMediaByIdForPreview = async (mediaId) => {
-        if (!mediaId || !isMounted.current || fetchedMediaId.current === mediaId) return;
+        if (
+            !mediaId ||
+            !isMounted.current ||
+            fetchedMediaId.current === mediaId
+        )
+            return;
         fetchedMediaId.current = mediaId;
         setLoading(true);
         setError(null);
@@ -103,7 +124,9 @@ const MediaContent = ({ api }) => {
             }
         } catch (err) {
             if (isMounted.current) {
-                setError(err.response?.data?.message || "Failed to load media.");
+                setError(
+                    err.response?.data?.message || "Failed to load media."
+                );
             }
         } finally {
             if (isMounted.current) {
@@ -114,14 +137,22 @@ const MediaContent = ({ api }) => {
 
     const fetchCommentsForMedia = useCallback(
         async (mediaId) => {
-            if (!mediaId || !isMounted.current || fetchedCommentId.current === mediaId) return;
+            if (
+                !mediaId ||
+                !isMounted.current ||
+                fetchedCommentId.current === mediaId
+            )
+                return;
             fetchedCommentId.current = mediaId;
             setCommentLoading(true);
             try {
                 await commentContext.fetchComments(mediaId);
             } catch (err) {
                 if (isMounted.current) {
-                    setError(err.response?.data?.message || "Failed to load comments.");
+                    setError(
+                        err.response?.data?.message ||
+                            "Failed to load comments."
+                    );
                 }
             } finally {
                 if (isMounted.current) {
@@ -153,7 +184,11 @@ const MediaContent = ({ api }) => {
     };
 
     const handleCardClick = (media) => {
-        setSearchParams({ id: media.id });
+        setSearchParams({
+            id: media.id,
+            page: page.toString(),
+            perPage: perPage.toString(),
+        });
     };
 
     const handlePageChange = (newPage, newPerPage) => {
@@ -167,14 +202,19 @@ const MediaContent = ({ api }) => {
         setDrawerOpen(false);
         setSelectedMedia(null);
         setActiveTab("asset");
-        setSearchParams({});
+        setSearchParams({ page: page.toString(), perPage: perPage.toString() });
         fetchedMediaId.current = null;
         fetchedCommentId.current = null;
     };
 
     const handleCommentSubmit = async (values) => {
         try {
-            await commentContext.createComment(selectedMedia.id, values.comment, videoTime, null);
+            await commentContext.createComment(
+                selectedMedia.id,
+                values.comment,
+                videoTime,
+                null
+            );
             commentForm.resetFields();
             message.success("Comment posted successfully");
             fetchedCommentId.current = null;
@@ -193,12 +233,21 @@ const MediaContent = ({ api }) => {
         if (Array.isArray(e)) {
             return e.length > 0 ? e[0].originFileObj : null;
         }
-        return e && e.fileList && e.fileList.length > 0 && e.fileList[0].originFileObj;
+        return (
+            e &&
+            e.fileList &&
+            e.fileList.length > 0 &&
+            e.fileList[0].originFileObj
+        );
     };
 
     const handleEditCommentSubmit = async (values) => {
         try {
-            await commentContext.updateComment(editingCommentId, values.comment, videoTime);
+            await commentContext.updateComment(
+                editingCommentId,
+                values.comment,
+                videoTime
+            );
             setEditingCommentId(null);
             editCommentForm.resetFields();
             message.success("Comment updated successfully");
@@ -222,8 +271,8 @@ const MediaContent = ({ api }) => {
 
     const handleTimestampClick = (timestamp) => {
         if (videoRef.current) {
-            videoRef.current.currentTime = timestamp;
-            videoRef.current.play();
+            videoRef.current.seekTo(timestamp, true); // Pass shouldPause=true
+            setVideoTime(timestamp); // Update videoTime immediately
         }
     };
 
@@ -256,9 +305,20 @@ const MediaContent = ({ api }) => {
         }
     };
 
-    const handleVideoPause = () => {
-        if (videoRef.current) {
-            setVideoTime(videoRef.current.currentTime);
+    const handleVideoPause = (currentTime) => {
+        if (!isNaN(currentTime)) {
+            setVideoTime(currentTime);
+        } else {
+            console.warn("Invalid currentTime on pause:", currentTime);
+        }
+    };
+
+    const handleVideoTimeUpdate = (currentTime) => {
+        if (!isNaN(currentTime)) {
+            console.log("Video time updated to:", currentTime);
+            setVideoTime(currentTime);
+        } else {
+            console.warn("Invalid currentTime on timeupdate:", currentTime);
         }
     };
 
@@ -278,9 +338,16 @@ const MediaContent = ({ api }) => {
     }, [page, perPage]);
 
     useEffect(() => {
-        if (mediaId && fetchedMediaId.current !== mediaId) fetchMediaByIdForPreview(mediaId);
-        if (selectedMedia?.id && fetchedCommentId.current !== selectedMedia.id) fetchCommentsForMedia(selectedMedia.id);
-    }, [mediaId, selectedMedia, fetchMediaByIdForPreview, fetchCommentsForMedia]);
+        if (mediaId && fetchedMediaId.current !== mediaId)
+            fetchMediaByIdForPreview(mediaId);
+        if (selectedMedia?.id && fetchedCommentId.current !== selectedMedia.id)
+            fetchCommentsForMedia(selectedMedia.id);
+    }, [
+        mediaId,
+        selectedMedia,
+        fetchMediaByIdForPreview,
+        fetchCommentsForMedia,
+    ]);
 
     return (
         <ConfigProvider
@@ -288,13 +355,14 @@ const MediaContent = ({ api }) => {
                 components: {
                     Tabs: {
                         itemColor: "#e0e0e0",
-                        itemActiveColor: "#1890ff",
-                        itemSelectedColor: "#1890ff",
-                        inkBarColor: "#1890ff",
+                        itemActiveColor: "#40c4ff",
+                        itemSelectedColor: "#40c4ff",
+                        inkBarColor: "#40c4ff",
                         inkBarHeight: 3,
-                        cardPadding: "8px 16px",
+                        cardPadding: "10px 20px",
                         fontSize: 16,
-                        itemHoverColor: "#fff",
+                        itemHoverColor: "#80d8ff",
+                        borderRadius: 6,
                     },
                 },
             }}
@@ -329,8 +397,13 @@ const MediaContent = ({ api }) => {
                 bodyStyle={{
                     padding: 0,
                     overflowY: "hidden",
-                    background: "rgba(28, 37, 38, 0.95)",
-                    boxShadow: "inset 0 0 10px rgba(0, 0, 0, 0.5)",
+                    background: "rgba(28, 37, 38, 0.98)",
+                    boxShadow:
+                        "inset 0 0 10px rgba(0, 0, 0, 0.5), -4px 0 8px rgba(0, 0, 0, 0.3)",
+                    borderRadius: "8px 0 0 8px",
+                }}
+                style={{
+                    transition: "width 0.3s ease-in-out",
                 }}
             >
                 <Tabs
@@ -338,12 +411,17 @@ const MediaContent = ({ api }) => {
                     onChange={setActiveTab}
                     defaultActiveKey="asset"
                     tabPosition="top"
-                    style={{ height: contentHeight }}
+                    style={{
+                        height: contentHeight,
+                        transition: "all 0.3s ease",
+                    }}
                     tabBarStyle={{
-                        background: "#1C2526",
-                        padding: "0 8px",
-                        borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+                        background: "rgba(28, 37, 38, 0.98)",
+                        padding: "0 12px",
+                        borderBottom: "1px solid rgba(255, 255, 255, 0.15)",
                         overflowX: "hidden",
+                        margin: 0,
+                        borderRadius: "8px 8px 0 0",
                     }}
                 >
                     <TabPane tab="Asset" key="asset">
@@ -360,6 +438,7 @@ const MediaContent = ({ api }) => {
                                 selectedMedia={selectedMedia}
                                 videoRef={videoRef}
                                 handleVideoPause={handleVideoPause}
+                                handleVideoTimeUpdate={handleVideoTimeUpdate}
                                 onMediaUpdate={handleMediaUpdate}
                                 contentHeight={contentHeight}
                             />
@@ -373,6 +452,7 @@ const MediaContent = ({ api }) => {
                                 handleDeleteComment={handleDeleteComment}
                                 handleTimestampClick={handleTimestampClick}
                                 videoTime={videoTime}
+                                formatTimestamp={formatTimestamp}
                                 currentUserId={currentUserId}
                                 commentLoading={commentLoading}
                                 commentContext={commentContext}

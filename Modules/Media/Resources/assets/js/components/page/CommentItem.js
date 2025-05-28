@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Typography, Button, Input, Avatar, Space } from "antd";
 import { EditOutlined, DeleteOutlined, CommentOutlined } from "@ant-design/icons";
@@ -8,18 +8,15 @@ const { TextArea } = Input;
 
 // Utility function to parse comment text and create clickable usernames using antd
 const parseCommentText = (text, handleUsernameClick) => {
-  // Regular expression to match @username (alphanumeric with underscores)
   const usernameRegex = /@([a-zA-Z0-9_]+)/g;
   const parts = [];
   let lastIndex = 0;
   let match;
 
-  // Iterate through all matches of @username
   while ((match = usernameRegex.exec(text)) !== null) {
     const username = match[1];
     const startIndex = match.index;
 
-    // Add text before the username
     if (startIndex > lastIndex) {
       parts.push(
         <AntText key={`text-${lastIndex}`} style={{ color: "white" }}>
@@ -28,13 +25,12 @@ const parseCommentText = (text, handleUsernameClick) => {
       );
     }
 
-    // Add the username as a clickable AntLink
     parts.push(
       <AntLink
         key={`username-${startIndex}`}
         onClick={() => handleUsernameClick(username)}
-        style={{ color: "#1890ff" }} // Blue color for usernames
-        hoverable // Enables hover effect (underline)
+        style={{ color: "#1890ff" }}
+        hoverable
       >
         @{username}
       </AntLink>
@@ -43,7 +39,6 @@ const parseCommentText = (text, handleUsernameClick) => {
     lastIndex = usernameRegex.lastIndex;
   }
 
-  // Add remaining text after the last username
   if (lastIndex < text.length) {
     parts.push(
       <AntText key={`text-${lastIndex}`} style={{ color: "white" }}>
@@ -76,10 +71,20 @@ const CommentItem = ({
   const isReplying = replyingTo?.id === comment.id;
   const hasReplies = comment.children?.length > 0;
   const isExpanded = expandedComments.has(comment.id);
+  const replyInputRef = useRef(null);
 
-  // Function to handle username clicks
+  // Move cursor to the end when replying
+  useEffect(() => {
+    if (isReplying && replyInputRef.current) {
+      const input = replyInputRef.current.resizableTextArea?.textArea;
+      if (input) {
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+      }
+    }
+  }, [isReplying]);
+
   const handleUsernameClick = (username) => {
-    // Find the user ID corresponding to the username
     const userId =
       comment.user.username === username
         ? comment.user.id
@@ -125,7 +130,9 @@ const CommentItem = ({
             ? "rgba(24, 144, 255, 0.2)"
             : "transparent",
         transition: "background-color 1s",
-        padding: 8, // Add padding to mimic div styling
+        padding: 8,
+        overflowX: "hidden",
+        overflowY: "hidden",
       }}
     >
       <Space align="start">
@@ -137,13 +144,7 @@ const CommentItem = ({
           {comment.user.username?.charAt(0).toUpperCase()}
         </Avatar>
         <Space direction="vertical" style={{ width: "100%" }}>
-          <AntText
-            style={{
-              fontSize: 12,
-              opacity: 0.7,
-              color: "white",
-            }}
-          >
+          <AntText style={{ fontSize: 12, opacity: 0.7, color: "white" }}>
             {comment.parent_id && (
               <AntText style={{ marginRight: 8, color: "white" }}>↳</AntText>
             )}
@@ -167,7 +168,9 @@ const CommentItem = ({
               "N/A"
             )}
           </AntText>
-          <Space wrap>{parseCommentText(comment.text, handleUsernameClick)}</Space>
+          <Space wrap>
+            {parseCommentText(comment.text, handleUsernameClick)}
+          </Space>
           <Space size="small">
             {isOwner && (
               <>
@@ -204,6 +207,7 @@ const CommentItem = ({
               }}
             >
               <TextArea
+                ref={replyInputRef}
                 rows={3}
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
@@ -226,10 +230,7 @@ const CommentItem = ({
                 >
                   Submit
                 </Button>
-                <Button
-                  onClick={handleCancel}
-                  style={{ borderRadius: 8 }}
-                >
+                <Button onClick={handleCancel} style={{ borderRadius: 8 }}>
                   Cancel
                 </Button>
               </Space>

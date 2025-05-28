@@ -69,7 +69,7 @@ export function MediaProvider({ children, api }) {
         closeModal: () => {
             setIsModalOpen(false);
         },
-        fetchMedia: async (page = 1, perPage = 12, { signal } = {}) => {
+        fetchMedia: async (page = 1, perPage = 8, { signal } = {}) => {
             try {
                 const response = await api.get("/api/media", {
                     params: { page, perPage },

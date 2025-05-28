@@ -10,14 +10,14 @@ const initialState = {
     blogs: {
         data: [],
         current_page: 1,
-        per_page: 12,
+        per_page: 8,
         total: 0,
         last_page: 1,
     },
     media: {
         data: [],
         current_page: 1,
-        per_page: 6,
+        per_page: 8,
         total: 0,
         last_page: 1,
     },

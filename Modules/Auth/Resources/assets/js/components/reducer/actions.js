@@ -6,6 +6,9 @@ export const login = (userData) => async (dispatch) => {
         const response = await api.post("/api/auth/login", userData);
         dispatch({ type: "login", payload: response.data });
         localStorage.setItem("auth_token", response.data.token);
+        if (response.status === 200) {
+            window.location.href = "/core";
+        }
         message.success(`Welcome, ${response.data.username}!`);
     } catch (error) {
         message.error(error.response?.data?.message || "Login failed");

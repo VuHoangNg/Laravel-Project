@@ -29,11 +29,29 @@ class MediaRepository implements MediaRepositoryInterface
         $this->model = $model;
     }
 
-    public function getPaginated(int $perPage, int $page, array $columns = ['*'], array $orderBy = []): LengthAwarePaginator
+    public function getPaginated(
+        int $perPage,
+        int $page,
+        array $columns = ['*'],
+        array $orderBy = [],
+        array $filters = []
+    ): LengthAwarePaginator
     {
         $query = $this->getModel()->newQuery()->select($columns);
+
+        // Apply filters
+        foreach ($filters as $column => $value) {
+            if ($value === null) {
+                $query->whereNull($column);
+            } else {
+                $query->where($column, $value);
+            }
+        }
+
+        // Apply sorting
         $orderBy = $orderBy ?: ['created_at' => 'desc'];
         $query->orderBy(key($orderBy), reset($orderBy));
+
         return $query->paginate($perPage, ['*'], 'page', $page);
     }
 

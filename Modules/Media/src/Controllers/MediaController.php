@@ -27,14 +27,21 @@ class MediaController extends Controller
 
     public function get_all_media(Request $request): JsonResponse
     {
-        $perPage = $request->query('perPage', 10);
+        $perPage = $request->query('perPage', 8);
         $page = $request->query('page', 1);
+        $blogId = $request->query('blog_id');
+
+        $filters = [];
+        if ($blogId === 'null') {
+            $filters['blog_id'] = null;
+        }
 
         $mediaQuery = $this->mediaRepository->getPaginated(
             (int) $perPage,
             (int) $page,
-            ['id', 'title', 'type', 'path', 'thumbnail_path', 'duration', 'status'],
-            ['created_at' => 'desc']
+            ['id', 'title', 'type', 'path', 'thumbnail_path', 'duration', 'status', 'blog_id'],
+            ['created_at' => 'desc'],
+            $filters
         );
 
         return response()->json([

@@ -2,7 +2,7 @@ import axios from "axios";
 
 // Create Axios instance
 const api = axios.create({
-    baseURL: "http://127.0.0.1:8000", // Your backend base URL
+    baseURL: "http://vproject:8000", // Your backend base URL
     headers: {
         Accept: "application/json",
         // Let Axios handle Content-Type automatically for multipart/form-data

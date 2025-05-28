@@ -75,7 +75,7 @@ export function BlogProvider({ children, api }) {
             setEditingBlog(null);
             setIsModalOpen(false);
         },
-        fetchBlogs: async (page = 1, perPage = 12, options = {}) => {
+        fetchBlogs: async (page = 1, perPage = 8, options = {}) => {
             try {
                 const response = await api.get("/api/blogs", {
                     params: { page, perPage, fields: "id,title,content,media" },
