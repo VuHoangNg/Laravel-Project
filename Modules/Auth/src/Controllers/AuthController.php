@@ -114,11 +114,11 @@ class AuthController extends Controller
         $avatarUrl = $user->avatar ? Storage::url($user->avatar) : null;
 
         return response()->json($responseData)
-            ->withCookie(Cookie::forever('username', $user->username, '/', '12b5-115-73-213-17.ngrok-free.app', false, false))
-            ->withCookie(Cookie::forever('email', $user->email, '/', '12b5-115-73-213-17.ngrok-free.app', false, false))
-            ->withCookie(Cookie::forever('token', $token, '/', '12b5-115-73-213-17.ngrok-free.app', false, false))
-            ->withCookie(Cookie::forever('id', $user->id, '/', '12b5-115-73-213-17.ngrok-free.app', false, false))
-            ->withCookie(Cookie::forever('avatar', $avatarUrl, '/', '12b5-115-73-213-17.ngrok-free.app', false, false));
+            ->withCookie(Cookie::forever('username', $user->username, '/', 'vproject', false, false))
+            ->withCookie(Cookie::forever('email', $user->email, '/', 'vproject', false, false))
+            ->withCookie(Cookie::forever('token', $token, '/', 'vproject', false, false))
+            ->withCookie(Cookie::forever('id', $user->id, '/', 'vproject', false, false))
+            ->withCookie(Cookie::forever('avatar', $avatarUrl, '/', 'vproject', false, false));
     }
 
     public function logout(Request $request): JsonResponse

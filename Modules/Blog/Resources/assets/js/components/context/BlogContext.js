@@ -27,11 +27,21 @@ export function BlogProvider({ children, api }) {
             }),
         createBlog: async (data) => {
             try {
+                console.log("Creating blog with data:", data); // Debug log
                 const response = await api.post("/api/blogs", data, {
                     params: { fields: "id,title,content,media" },
                 });
+                console.log("API response:", response); // Debug log
                 dispatch(addBlog(response.data));
+                console.log("Dispatched addBlog with data:", response.data); // Debug log
+                return response.data; // Explicitly return the response data
             } catch (error) {
+                console.error("Error in createBlog:", {
+                    message: error.message,
+                    response: error.response,
+                    status: error.response?.status,
+                    data: error.response?.data,
+                }); // Detailed error log
                 throw error;
             }
         },
@@ -151,9 +161,12 @@ export function BlogProvider({ children, api }) {
             }
             try {
                 setStatsLoading(true);
-                const response = await api.get(`/api/blogs/reports/${blogId}/statistics`, {
-                    headers: { Authorization: `Bearer ${token}` },
-                });
+                const response = await api.get(
+                    `/api/blogs/reports/${blogId}/statistics`,
+                    {
+                        headers: { Authorization: `Bearer ${token}` },
+                    }
+                );
                 const data = response.data || {};
                 setReportData((prev) => ({
                     ...prev,
@@ -186,7 +199,11 @@ export function BlogProvider({ children, api }) {
                 setStatsLoading(false);
             }
         },
-        fetchLikesChartData: async (blogId, likesDateFrom = null, likesDateTo = null) => {
+        fetchLikesChartData: async (
+            blogId,
+            likesDateFrom = null,
+            likesDateTo = null
+        ) => {
             if (!token) {
                 message.warning("Please log in to view reports.");
                 return;
@@ -196,18 +213,25 @@ export function BlogProvider({ children, api }) {
                 const params = {};
                 if (likesDateFrom) params.likesDateFrom = likesDateFrom;
                 if (likesDateTo) params.likesDateTo = likesDateTo;
-                const response = await api.get(`/api/blogs/reports/${blogId}/likes`, {
-                    headers: { Authorization: `Bearer ${token}` },
-                    params,
-                });
+                const response = await api.get(
+                    `/api/blogs/reports/${blogId}/likes`,
+                    {
+                        headers: { Authorization: `Bearer ${token}` },
+                        params,
+                    }
+                );
                 const data = response.data || {};
                 setReportData((prev) => ({
                     ...prev,
                     chartData: {
                         ...prev.chartData,
                         likes: {
-                            dates: Array.isArray(data.likes?.dates) ? data.likes.dates : [],
-                            data: Array.isArray(data.likes?.data) ? data.likes.data : [],
+                            dates: Array.isArray(data.likes?.dates)
+                                ? data.likes.dates
+                                : [],
+                            data: Array.isArray(data.likes?.data)
+                                ? data.likes.data
+                                : [],
                         },
                     },
                     likesDateFrom: data.likesDateFrom || null,
@@ -231,7 +255,11 @@ export function BlogProvider({ children, api }) {
                 setLikesLoading(false);
             }
         },
-        fetchViewsChartData: async (blogId, viewsDateFrom = null, viewsDateTo = null) => {
+        fetchViewsChartData: async (
+            blogId,
+            viewsDateFrom = null,
+            viewsDateTo = null
+        ) => {
             if (!token) {
                 message.warning("Please log in to view reports.");
                 return;
@@ -241,18 +269,25 @@ export function BlogProvider({ children, api }) {
                 const params = {};
                 if (viewsDateFrom) params.viewsDateFrom = viewsDateFrom;
                 if (viewsDateTo) params.viewsDateTo = viewsDateTo;
-                const response = await api.get(`/api/blogs/reports/${blogId}/views`, {
-                    headers: { Authorization: `Bearer ${token}` },
-                    params,
-                });
+                const response = await api.get(
+                    `/api/blogs/reports/${blogId}/views`,
+                    {
+                        headers: { Authorization: `Bearer ${token}` },
+                        params,
+                    }
+                );
                 const data = response.data || {};
                 setReportData((prev) => ({
                     ...prev,
                     chartData: {
                         ...prev.chartData,
                         views: {
-                            dates: Array.isArray(data.views?.dates) ? data.views.dates : [],
-                            data: Array.isArray(data.views?.data) ? data.views.data : [],
+                            dates: Array.isArray(data.views?.dates)
+                                ? data.views.dates
+                                : [],
+                            data: Array.isArray(data.views?.data)
+                                ? data.views.data
+                                : [],
                         },
                     },
                     viewsDateFrom: data.viewsDateFrom || null,
@@ -286,12 +321,16 @@ export function BlogProvider({ children, api }) {
             formData.append("file", file);
 
             try {
-                await api.post(`/api/blogs/reports/${blogId}/import`, formData, {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        "Content-Type": "multipart/form-data",
-                    },
-                });
+                await api.post(
+                    `/api/blogs/reports/${blogId}/import`,
+                    formData,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                            "Content-Type": "multipart/form-data",
+                        },
+                    }
+                );
                 message.success("Reports imported successfully");
                 // Fetch all data after import
                 await Promise.all([
@@ -316,11 +355,16 @@ export function BlogProvider({ children, api }) {
             }
             setLoading(true);
             try {
-                const response = await api.get(`/api/blogs/reports/${blogId}/export`, {
-                    headers: { Authorization: `Bearer ${token}` },
-                    responseType: "blob",
-                });
-                const url = window.URL.createObjectURL(new Blob([response.data]));
+                const response = await api.get(
+                    `/api/blogs/reports/${blogId}/export`,
+                    {
+                        headers: { Authorization: `Bearer ${token}` },
+                        responseType: "blob",
+                    }
+                );
+                const url = window.URL.createObjectURL(
+                    new Blob([response.data])
+                );
                 const link = document.createElement("a");
                 link.href = url;
                 link.setAttribute("download", `reports-${blogId}.xlsx`);

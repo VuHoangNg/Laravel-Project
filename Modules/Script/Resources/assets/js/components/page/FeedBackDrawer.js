@@ -1,6 +1,15 @@
 import React, { useRef, useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import { Typography, Button, Input, Divider, Spin, Skeleton, Form, Row } from "antd";
+import {
+    Typography,
+    Button,
+    Input,
+    Divider,
+    Spin,
+    Skeleton,
+    Form,
+    Row,
+} from "antd";
 import InfiniteScroll from "react-infinite-scroll-component";
 import FeedBackItem from "./FeedBackItem";
 import { useScriptContext } from "../context/ScriptContext";
@@ -43,7 +52,8 @@ const FeedBackDrawer = ({
                     alignItems: "center",
                     justifyContent: "center",
                     height: "100%",
-                    color: "#fff",
+                    color: "#000000",
+                    background: "#FFFFFF",
                 }}
             >
                 <Typography>No script selected</Typography>
@@ -161,7 +171,9 @@ const FeedBackDrawer = ({
                     type: SET_FEEDBACKS,
                     payload: {
                         scriptId: selectedScript.key,
-                        feedbacks: feedBackContext.buildFeedbackTree(response.data),
+                        feedbacks: feedBackContext.buildFeedbackTree(
+                            response.data
+                        ),
                     },
                 });
                 setLoadedPages((prev) => new Set(prev).add(targetPage));
@@ -200,7 +212,7 @@ const FeedBackDrawer = ({
             const response = await feedBackContext.createFeedback(
                 selectedScript.key,
                 payload.feedback,
-                0, // Default timestamp
+                0,
                 payload.parent_id || null
             );
             if (response && isMounted.current) {
@@ -228,7 +240,7 @@ const FeedBackDrawer = ({
                 }
                 form.resetFields();
                 setReplyingTo(null);
-                message.success("Feedback submitted successfully");
+                // message.success("Feedback submitted successfully");
             }
         } catch (error) {
             console.error(
@@ -239,13 +251,13 @@ const FeedBackDrawer = ({
         }
     };
 
-    const handleEditFeedback = async (updatedFeedback) => {
+    const handleEditFeedback = async (feedbackId, text) => {
         try {
             const response = await feedBackContext.updateFeedback(
                 selectedScript.key,
-                updatedFeedback.id,
-                updatedFeedback.text,
-                updatedFeedback.timestamp || 0
+                feedbackId,
+                text,
+                0
             );
             if (response && isMounted.current) {
                 dispatch({
@@ -259,7 +271,7 @@ const FeedBackDrawer = ({
                         ),
                     },
                 });
-                message.success("Feedback updated successfully");
+                // message.success("Feedback updated successfully");
             }
         } catch (error) {
             console.error(
@@ -274,7 +286,7 @@ const FeedBackDrawer = ({
         feedBackContext
             .deleteFeedback(selectedScript.key, feedbackId)
             .then(() => {
-                loadMoreFeedbacks(true); // Reload feedbacks after deletion
+                loadMoreFeedbacks(true);
                 message.success("Feedback deleted successfully");
             })
             .catch((error) => {
@@ -286,7 +298,7 @@ const FeedBackDrawer = ({
             });
     };
 
-    // Placeholder flattenFeedbacks function (implement as needed)
+    // Placeholder flattenFeedbacks function
     const flattenFeedbacks = (feedbacks) => {
         let result = [];
         feedbacks.forEach((feedback) => {
@@ -303,15 +315,15 @@ const FeedBackDrawer = ({
             style={{
                 display: "flex",
                 flexDirection: "column",
-                height: "100%",
-                width: "100%",
-                overflowX: "hidden",
+                overflow: "hidden",
+                background: "#FFFFFF",
+                color: "#000000",
             }}
         >
             <Title
                 level={4}
                 style={{
-                    color: "#fff",
+                    color: "#000000",
                     marginBottom: `${padding}px`,
                     height: titleHeight,
                 }}
@@ -325,6 +337,10 @@ const FeedBackDrawer = ({
                     overflowY: "auto",
                     minHeight: feedbacksHeight,
                     width: "100%",
+                    border: "1px solid #E0E0E0",
+                    marginBottom: 35,
+                    background: "#F9F9F9",
+                    borderRadius: 8,
                 }}
                 id="scrollableFeedBackDiv"
             >
@@ -349,7 +365,7 @@ const FeedBackDrawer = ({
                             <Skeleton avatar paragraph={{ rows: 1 }} active />
                         }
                         endMessage={
-                            <Divider plain style={{ color: "white" }}>
+                            <Divider plain style={{ color: "#000000" }}>
                                 No more feedbacks 🤐
                             </Divider>
                         }
@@ -377,7 +393,18 @@ const FeedBackDrawer = ({
                         ))}
                     </InfiniteScroll>
                 ) : (
-                    <Typography style={{ color: "#fff", fontSize: "16px" }}>
+                    <Typography
+                        style={{
+                            color: "#000000",
+                            fontSize: 16,
+                            textAlign: "center",
+                            padding: "20px",
+                            height: "100%",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                        }}
+                    >
                         No feedbacks yet.
                     </Typography>
                 )}
@@ -394,7 +421,7 @@ const FeedBackDrawer = ({
             >
                 <Row
                     style={{
-                        backgroundColor: "#1C2526",
+                        backgroundColor: "#F5F5F5",
                         padding: "0px 16px 0px 16px",
                         borderRadius: 8,
                         display: "flex",
@@ -419,13 +446,16 @@ const FeedBackDrawer = ({
                             autoSize={{ minRows: 1, maxRows: 3 }}
                             placeholder={
                                 replyingTo
-                                    ? `Reply to ${replyingTo.user?.username || "Anonymous"}...`
+                                    ? `Reply to ${
+                                          replyingTo.user?.username ||
+                                          "Anonymous"
+                                      }...`
                                     : "Enter your feedback"
                             }
                             style={{
-                                backgroundColor: "rgba(255, 255, 255, 0.1)",
-                                color: "#fff",
-                                border: "1px solid rgba(255, 255, 255, 0.1)",
+                                backgroundColor: "#FFFFFF",
+                                color: "#000000",
+                                border: "1px solid #E0E0E0",
                                 borderRadius: 4,
                                 padding: "8px 40px 8px 8px",
                                 resize: "none",

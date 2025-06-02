@@ -17,12 +17,11 @@ import {
     Carousel,
     ConfigProvider,
     Tooltip,
-    message,
     Modal,
+    message,
 } from "antd";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useBlogContext } from "../context/BlogContext";
-import ReportDashboard from "./ReportDashboard";
 import {
     PlusOutlined,
     CloseOutlined,
@@ -30,7 +29,8 @@ import {
     LineChartOutlined,
 } from "@ant-design/icons";
 import { setMedia } from "../../../../../../Media/Resources/assets/js/components/reducer/action";
-
+import BlogDetail from "../action/BlogDetail";
+import ReportDashboard from "./ReportDashboard";
 const { Title } = Typography;
 const { Meta } = Card;
 
@@ -69,7 +69,6 @@ const formatDuration = (seconds) => {
 
 function BlogContent({ api }) {
     const dispatch = useDispatch();
-    const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const blogs = useSelector(
         (state) =>
@@ -102,11 +101,37 @@ function BlogContent({ api }) {
         total: 0,
     });
     const [loading, setLoading] = useState(false);
-    const [mediaLoading, setMediaLoading] = useState(false);
+    const [drawerLoading, setDrawerLoading] = useState(false);
     const [error, setError] = useState(null);
     const [reportBlogId, setReportBlogId] = useState(null);
     const [contentWidth, setContentWidth] = useState(window.innerWidth);
     const [failedImages, setFailedImages] = useState(new Set());
+    const [isBlogDetailDrawerOpen, setIsBlogDetailDrawerOpen] = useState(false);
+    const [selectedBlogId, setSelectedBlogId] = useState(null);
+
+    const cardStyles = {
+        maxWidth: 450,
+        width: "100%",
+        border: "1px solid #E8E8E8",
+        borderRadius: 8,
+        overflow: "hidden",
+        transition: "transform 0.2s ease, box-shadow 0.2s ease",
+    };
+    const imageContainerStyles = {
+        position: "relative",
+        width: "100%",
+        aspectRatio: "3 / 2",
+        overflow: "hidden",
+        borderTopLeftRadius: 8,
+        borderTopRightRadius: 8,
+    };
+    const imageStyles = {
+        width: "100%",
+        height: "100%",
+        objectFit: "cover",
+        display: "block",
+        loading: "lazy",
+    };
 
     useEffect(() => {
         const handleResize = () => setContentWidth(window.innerWidth);
@@ -127,7 +152,7 @@ function BlogContent({ api }) {
         setError(msg);
         message.error(msg);
         setLoading(false);
-        setMediaLoading(false);
+        setDrawerLoading(false);
     };
 
     const loadBlogs = async () => {
@@ -138,12 +163,6 @@ function BlogContent({ api }) {
                 parseInt(searchParams.get("page")) || blogs.current_page;
             const perPage = parseInt(searchParams.get("perPage")) || 8;
             await fetchBlogs(page, perPage);
-            console.log("Blogs state after fetch:", {
-                data: blogs.data,
-                current_page: blogs.current_page,
-                per_page: blogs.per_page,
-                total: blogs.total,
-            });
         } catch (err) {
             handleError(err, "Failed to load blogs.");
         } finally {
@@ -152,7 +171,7 @@ function BlogContent({ api }) {
     };
 
     const fetchMedia = async () => {
-        setMediaLoading(true);
+        setDrawerLoading(true);
         setError(null);
         try {
             const { data } = await api.get(
@@ -163,7 +182,7 @@ function BlogContent({ api }) {
         } catch (err) {
             handleError(err, "Failed to load media.");
         } finally {
-            setMediaLoading(false);
+            setDrawerLoading(false);
         }
     };
 
@@ -187,15 +206,30 @@ function BlogContent({ api }) {
         setLoading(true);
         setError(null);
         try {
-            await createBlog({ ...values, media_ids: selectedMediaIds });
+            console.log("Submitting blog data:", { ...values, media_ids: selectedMediaIds });
+            const createResponse = await createBlog({ ...values, media_ids: selectedMediaIds });
+            console.log("Create blog response:", createResponse);
             message.success("Blog created successfully");
             closeModal();
-            setSearchParams({});
+            setSearchParams({}); // Clear all query params after creation
             form.resetFields();
             resetForm();
             setSelectedMediaIds([]);
-            await fetchBlogs(blogs.current_page, blogs.per_page);
+            try {
+                console.log("Fetching blogs after creation...");
+                await fetchBlogs(blogs.current_page, blogs.per_page);
+                console.log("Blogs fetched successfully");
+            } catch (fetchErr) {
+                console.error("Error fetching blogs after creation:", fetchErr);
+                handleError(fetchErr, "Blog created, but failed to refresh blog list.");
+            }
         } catch (err) {
+            console.error("Error during blog creation process:", {
+                message: err.message,
+                response: err.response,
+                status: err.response?.status,
+                data: err.response?.data,
+            });
             if (err.response?.status === 422) {
                 const errors = err.response.data.errors;
                 form.setFields(
@@ -217,7 +251,7 @@ function BlogContent({ api }) {
             console.error("Image failed to load:", item, "URL:", srcUrl);
             setFailedImages((prev) => new Set(prev).add(srcUrl));
             e.target.src =
-                "https://via.placeholder.com/150?text=Image+Not+Found";
+                "https://via.placeholder.com/450?text=Image+Not+Found";
         }
     };
 
@@ -244,6 +278,32 @@ function BlogContent({ api }) {
         dots: true,
         arrows: true,
         accessibility: true,
+    };
+
+    const handleCloseMediaDrawer = () => {
+        setIsMediaDrawerOpen(false);
+        setError(null);
+    };
+
+    const handleSelectMedia = (id) => {
+        setSelectedMediaIds((prev) =>
+            prev.includes(id)
+                ? prev.filter((mediaId) => mediaId !== id)
+                : [...prev, id]
+        );
+    };
+
+    const handleSaveMediaSelection = () => {
+        setIsMediaDrawerOpen(false);
+        message.success("Media selection saved");
+    };
+
+    const handleMediaPageChange = (page, pageSize) => {
+        setMediaPagination({
+            ...mediaPagination,
+            currentPage: page,
+            limit: pageSize,
+        });
     };
 
     if (loading)
@@ -299,11 +359,20 @@ function BlogContent({ api }) {
                                     form.resetFields();
                                     resetForm();
                                     setSelectedMediaIds([]);
-                                    setSearchParams({ action: "create" });
+                                    // Preserve existing page and perPage
+                                    setSearchParams((prev) => {
+                                        const params = {};
+                                        if (prev.get("page"))
+                                            params.page = prev.get("page");
+                                        if (prev.get("perPage"))
+                                            params.perPage = prev.get("perPage");
+                                        params.action = "create";
+                                        return params;
+                                    });
                                 }}
                                 aria-label="Create new blog"
                             >
-                                Add Blog
+                                Create Blog
                             </Button>
                         </Tooltip>
                     </Col>
@@ -346,8 +415,11 @@ function BlogContent({ api }) {
                                                 <EditOutlined
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        navigate(
-                                                            `/blog/${blog.id}?page=${blogs.current_page}`
+                                                        setSelectedBlogId(
+                                                            blog.id
+                                                        );
+                                                        setIsBlogDetailDrawerOpen(
+                                                            true
                                                         );
                                                     }}
                                                     aria-label="Edit blog"
@@ -496,14 +568,20 @@ function BlogContent({ api }) {
                                         blogs.current_page === 1 && (
                                             <Button
                                                 type="primary"
-                                                size="{SEPARATOR}small"
+                                                size="small"
                                                 onClick={() => {
                                                     openModal();
                                                     form.resetFields();
                                                     resetForm();
                                                     setSelectedMediaIds([]);
-                                                    setSearchParams({
-                                                        action: "create",
+                                                    setSearchParams((prev) => {
+                                                        const params = {};
+                                                        if (prev.get("page"))
+                                                            params.page = prev.get("page");
+                                                        if (prev.get("perPage"))
+                                                            params.perPage = prev.get("perPage");
+                                                        params.action = "create";
+                                                        return params;
                                                     });
                                                 }}
                                             >
@@ -516,14 +594,16 @@ function BlogContent({ api }) {
                         )}
                     </Row>
                 </div>
-                <div
+                <Row
                     style={{
                         position: "sticky",
                         bottom: 0,
-                        background: "#FFFFFF",
+                        backgroundColor: "#FFFFFF",
                         padding: "12px 0",
                         borderTop: "1px solid #E8E8E8",
-                        textAlign: "center",
+                        textAlign: "end",
+                        zIndex: 10,
+                        display: "block",
                     }}
                 >
                     <Pagination
@@ -534,25 +614,37 @@ function BlogContent({ api }) {
                         showSizeChanger
                         pageSizeOptions={["8", "16", "24"]}
                         disabled={loading}
+                        style={{
+                            borderRadius: 8,
+                            display: "inline-block",
+                        }}
                     />
-                </div>
+                </Row>
                 <Modal
                     title="Add Blog"
                     open={isModalOpen}
                     onCancel={() => {
                         closeModal();
-                        setSearchParams({});
+                        setSearchParams((prev) => {
+                            // Preserve page and perPage when closing modal
+                            const params = {};
+                            if (prev.get("page"))
+                                params.page = prev.get("page");
+                            if (prev.get("perPage"))
+                                params.perPage = prev.get("perPage");
+                            return params;
+                        });
                         form.resetFields();
                         resetForm();
                         setSelectedMediaIds([]);
                     }}
                     footer={null}
+                    style={{ textAlign: "end" }}
                 >
                     <Form
                         form={form}
                         layout="vertical"
                         onFinish={handleSubmit}
-                        style={{ padding: 16, border: "1px solid #E8E8E8" }}
                     >
                         <Form.Item
                             name="title"
@@ -590,13 +682,18 @@ function BlogContent({ api }) {
                                 selected)
                             </Button>
                             {selectedMediaIds.length > 0 && (
-                                <p style={{ marginTop: 8, color: "#666666" }}>
+                                <p
+                                    style={{
+                                        marginTop: 8,
+                                        color: "#666666",
+                                    }}
+                                >
                                     Selected Media IDs:{" "}
                                     {selectedMediaIds.join(", ")}
                                 </p>
                             )}
                         </Form.Item>
-                        <Form.Item>
+                        <Form.Item style={{ textAlign: "end" }}>
                             <Space>
                                 <Button
                                     type="primary"
@@ -608,7 +705,14 @@ function BlogContent({ api }) {
                                 <Button
                                     onClick={() => {
                                         closeModal();
-                                        setSearchParams({});
+                                        setSearchParams((prev) => {
+                                            const params = {};
+                                            if (prev.get("page"))
+                                                params.page = prev.get("page");
+                                            if (prev.get("perPage"))
+                                                params.perPage = prev.get("perPage");
+                                            return params;
+                                        });
                                         form.resetFields();
                                         resetForm();
                                         setSelectedMediaIds([]);
@@ -624,12 +728,16 @@ function BlogContent({ api }) {
                     title="Select Media"
                     placement="right"
                     width={Math.min(1200, window.innerWidth * 0.9)}
-                    onClose={() => setIsMediaDrawerOpen(false)}
+                    onClose={handleCloseMediaDrawer}
                     open={isMediaDrawerOpen}
                     closable
-                    closeIcon={<CloseOutlined style={{ color: "#333333" }} />}
-                    bodyStyle={{ padding: 24 }}
-                    headerStyle={{ borderBottom: "1px solid #E8E8E8" }}
+                    closeIcon={
+                        <CloseOutlined style={{ color: "#333333" }} />
+                    }
+                    styles={{
+                        header: { borderBottom: "1px solid #E8E8E8" },
+                        body: { padding: 24 },
+                    }}
                 >
                     <div
                         style={{
@@ -639,13 +747,13 @@ function BlogContent({ api }) {
                             boxSizing: "border-box",
                         }}
                     >
-                        {mediaLoading ? (
+                        {drawerLoading ? (
                             <Spin
                                 size="large"
                                 tip="Loading media..."
                                 style={{
                                     textAlign: "center",
-                                    margin: "20px 0",
+                                    margin: "100px 0",
                                     flex: 1,
                                 }}
                             />
@@ -657,17 +765,18 @@ function BlogContent({ api }) {
                                 showIcon
                                 closable
                                 onClose={() => setError(null)}
-                                style={{ marginBottom: 24 }}
+                                style={{ marginBottom: 24, padding: 12 }}
                             />
-                        ) : !media.data.length ? (
+                        ) : !media.data || media.data.length === 0 ? (
                             <Alert
                                 message="No Media Available"
-                                description="Please upload some images or videos to select."
+                                description="Please upload some media to select."
                                 type="info"
                                 showIcon
                                 style={{
                                     backgroundColor: "#E6F7FF",
                                     border: "1px solid #91D5FF",
+                                    padding: 12,
                                 }}
                             />
                         ) : (
@@ -680,21 +789,20 @@ function BlogContent({ api }) {
                                         paddingBottom: 64,
                                     }}
                                 >
-                                    <Row
-                                        gutter={[16, 16]}
-                                        style={{ width: "100%" }}
-                                    >
+                                    <Row gutter={[16, 16]} justify="start">
                                         {media.data.map((item) => {
+                                            const isVideoMedia =
+                                                item.type === "video";
                                             const isSelected =
                                                 selectedMediaIds.includes(
                                                     item.id
                                                 );
                                             const srcUrl =
-                                                item.type === "video" &&
+                                                isVideoMedia &&
                                                 item.thumbnail_url
                                                     ? item.thumbnail_url
                                                     : item.url ||
-                                                      "https://via.placeholder.com/150?text=Image+Not+Found";
+                                                      "https://via.placeholder.com/450?text=Image+Not+Found";
                                             return (
                                                 <Col
                                                     span={colSpan}
@@ -703,20 +811,23 @@ function BlogContent({ api }) {
                                                     <Card
                                                         hoverable
                                                         style={{
+                                                            ...cardStyles,
                                                             border: isSelected
                                                                 ? "2px solid #4A90E2"
                                                                 : "1px solid #E8E8E8",
-                                                            maxWidth: "100%",
+                                                            padding:
+                                                                isSelected
+                                                                    ? "0"
+                                                                    : "1px",
+                                                        }}
+                                                        bodyStyle={{
+                                                            padding: 12,
                                                         }}
                                                         cover={
                                                             <div
-                                                                style={{
-                                                                    position:
-                                                                        "relative",
-                                                                    width: "100%",
-                                                                    aspectRatio:
-                                                                        "3 / 2",
-                                                                }}
+                                                                style={
+                                                                    imageContainerStyles
+                                                                }
                                                             >
                                                                 <img
                                                                     alt={
@@ -727,19 +838,12 @@ function BlogContent({ api }) {
                                                                         failedImages.has(
                                                                             srcUrl
                                                                         )
-                                                                            ? "https://via.placeholder.com/150?text=Image+Not+Found"
+                                                                            ? "https://via.placeholder.com/450?text=Image+Not+Found"
                                                                             : srcUrl
                                                                     }
-                                                                    style={{
-                                                                        width: "100%",
-                                                                        height: "100%",
-                                                                        objectFit:
-                                                                            "cover",
-                                                                        display:
-                                                                            "block",
-                                                                        loading:
-                                                                            "lazy",
-                                                                    }}
+                                                                    style={
+                                                                        imageStyles
+                                                                    }
                                                                     onError={(
                                                                         e
                                                                     ) =>
@@ -750,8 +854,7 @@ function BlogContent({ api }) {
                                                                         )
                                                                     }
                                                                 />
-                                                                {item.type ===
-                                                                    "video" &&
+                                                                {isVideoMedia &&
                                                                     item.duration && (
                                                                         <div
                                                                             style={{
@@ -777,22 +880,8 @@ function BlogContent({ api }) {
                                                             </div>
                                                         }
                                                         onClick={() =>
-                                                            setSelectedMediaIds(
-                                                                (prev) =>
-                                                                    prev.includes(
-                                                                        item.id
-                                                                    )
-                                                                        ? prev.filter(
-                                                                              (
-                                                                                  id
-                                                                              ) =>
-                                                                                  id !==
-                                                                                  item.id
-                                                                          )
-                                                                        : [
-                                                                              ...prev,
-                                                                              item.id,
-                                                                          ]
+                                                            handleSelectMedia(
+                                                                item.id
                                                             )
                                                         }
                                                     >
@@ -807,6 +896,11 @@ function BlogContent({ api }) {
                                                                     {item.title ||
                                                                         "Untitled"}
                                                                 </span>
+                                                            }
+                                                            description={
+                                                                isVideoMedia
+                                                                    ? "Video"
+                                                                    : "Image"
                                                             }
                                                         />
                                                         {isSelected && (
@@ -836,28 +930,77 @@ function BlogContent({ api }) {
                                         background: "#FFFFFF",
                                         padding: "12px 0",
                                         borderTop: "1px solid #E8E8E8",
-                                        textAlign: "center",
+                                        textAlign: "end",
                                     }}
                                 >
-                                    <Pagination
-                                        current={mediaPagination.currentPage}
-                                        pageSize={mediaPagination.limit}
-                                        total={mediaPagination.total}
-                                        onChange={(page, pageSize) =>
-                                            setMediaPagination({
-                                                ...mediaPagination,
-                                                currentPage: page,
-                                                limit: pageSize,
-                                            })
-                                        }
-                                        showSizeChanger
-                                        pageSizeOptions={["8", "16", "32"]}
-                                        disabled={mediaLoading}
-                                    />
+                                    <Space>
+                                        <Button
+                                            type="primary"
+                                            onClick={
+                                                handleSaveMediaSelection
+                                            }
+                                            disabled={drawerLoading}
+                                        >
+                                            Save
+                                        </Button>
+                                        <Pagination
+                                            current={
+                                                mediaPagination.currentPage
+                                            }
+                                            pageSize={mediaPagination.limit}
+                                            total={mediaPagination.total}
+                                            onChange={handleMediaPageChange}
+                                            showSizeChanger
+                                            pageSizeOptions={[
+                                                "8",
+                                                "16",
+                                                "32",
+                                            ]}
+                                            disabled={drawerLoading}
+                                            style={{
+                                                borderRadius: 8,
+                                                display: "inline-block",
+                                                zIndex: 10,
+                                            }}
+                                        />
+                                    </Space>
                                 </div>
                             </>
                         )}
                     </div>
+                </Drawer>
+                <Drawer
+                    title={
+                        selectedBlogId
+                            ? `Edit Blog ID: ${selectedBlogId}`
+                            : "Edit Blog"
+                    }
+                    placement="right"
+                    width={Math.min(1200, window.innerWidth * 0.9)}
+                    onClose={() => {
+                        setIsBlogDetailDrawerOpen(false);
+                        setSelectedBlogId(null);
+                    }}
+                    open={isBlogDetailDrawerOpen}
+                    closable
+                    closeIcon={
+                        <CloseOutlined style={{ color: "#333333" }} />
+                    }
+                    styles={{
+                        header: { borderBottom: "1px solid #E8E8E8" },
+                        body: { padding: 0 },
+                    }}
+                >
+                    {selectedBlogId && (
+                        <BlogDetail
+                            api={api}
+                            blogId={selectedBlogId}
+                            onClose={() => {
+                                setIsBlogDetailDrawerOpen(false);
+                                setSelectedBlogId(null);
+                            }}
+                        />
+                    )}
                 </Drawer>
                 <Drawer
                     title={`Report for Blog ID: ${reportBlogId}`}
@@ -866,11 +1009,17 @@ function BlogContent({ api }) {
                     onClose={() => setReportBlogId(null)}
                     open={!!reportBlogId}
                     closable
-                    closeIcon={<CloseOutlined style={{ color: "#333333" }} />}
-                    bodyStyle={{ padding: 24 }}
-                    headerStyle={{ borderBottom: "1px solid #E8E8E8" }}
+                    closeIcon={
+                        <CloseOutlined style={{ color: "#333333" }} />
+                    }
+                    styles={{
+                        header: { borderBottom: "1px solid #E8E8E8" },
+                        body: { padding: 24 },
+                    }}
                 >
-                    {reportBlogId && <ReportDashboard blogId={reportBlogId} />}
+                    {reportBlogId && (
+                        <ReportDashboard blogId={reportBlogId} />
+                    )}
                 </Drawer>
             </section>
         </ConfigProvider>

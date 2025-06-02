@@ -10,14 +10,16 @@ import {
     message,
     Skeleton,
     DatePicker,
+    Modal,
 } from "antd";
 import Highcharts from "highcharts";
 import HighchartsReact from "highcharts-react-official";
 import { useBlogContext } from "../context/BlogContext";
-import { UploadOutlined, DownloadOutlined } from "@ant-design/icons";
+import { UploadOutlined, DownloadOutlined, EditOutlined } from "@ant-design/icons";
 import moment from "moment-timezone";
 
 const { RangePicker } = DatePicker;
+const { Dragger } = Upload;
 
 const ReportDashboard = ({ blogId }) => {
     const { reportBlogContext, getBlogContext } = useBlogContext();
@@ -40,6 +42,7 @@ const ReportDashboard = ({ blogId }) => {
     const [lastFetchedViewsParams, setLastFetchedViewsParams] = useState(null);
     const [likesDateRange, setLikesDateRange] = useState([null, null]);
     const [viewsDateRange, setViewsDateRange] = useState([null, null]);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false); // State for modal visibility
 
     // Fetch statistics data when blogId changes
     useEffect(() => {
@@ -278,6 +281,28 @@ const ReportDashboard = ({ blogId }) => {
         legend: { enabled: false },
     };
 
+    const handleExportTemplate = async () => {
+        try {
+            await exportReports(blogId);
+            message.success("Template exported successfully!");
+        } catch (error) {
+            console.error("Export template failed:", error);
+            message.error("Failed to export template.");
+        }
+    };
+
+    const handleImportReports = async (file) => {
+        try {
+            await importReports(blogId, file);
+            message.success("Reports imported successfully!");
+            setIsEditModalOpen(false); // Close modal on success
+        } catch (error) {
+            console.error("Import reports failed:", error);
+            message.error("Failed to import reports.");
+        }
+        return false; // Prevent default upload behavior
+    };
+
     if (loading) {
         return (
             <div style={{ padding: 24 }}>
@@ -330,25 +355,14 @@ const ReportDashboard = ({ blogId }) => {
         <div style={{ padding: 24 }}>
             <Typography.Title level={2}>Report Dashboard</Typography.Title>
             <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-                <Col>
-                    <Upload
-                        beforeUpload={(file) => {
-                            importReports(blogId, file);
-                            return false;
-                        }}
-                        showUploadList={false}
-                    >
-                        <Button icon={<UploadOutlined />}>
-                            Import Reports
-                        </Button>
-                    </Upload>
-                </Col>
+                <Col flex="auto"></Col>
                 <Col>
                     <Button
-                        icon={<DownloadOutlined />}
-                        onClick={() => exportReports(blogId)}
+                        icon={<EditOutlined />}
+                        onClick={() => setIsEditModalOpen(true)}
+                        style={{color:"red"}}
                     >
-                        Export Reports
+                        Edit Report
                     </Button>
                 </Col>
             </Row>
@@ -490,6 +504,41 @@ const ReportDashboard = ({ blogId }) => {
                     </Card>
                 </Col>
             </Row>
+
+            {/* Edit Report Modal */}
+            <Modal
+                title="Edit Report"
+                open={isEditModalOpen}
+                onCancel={() => setIsEditModalOpen(false)}
+                footer={[
+                    <Button key="cancel" onClick={() => setIsEditModalOpen(false)}>
+                        Cancel
+                    </Button>,
+                ]}
+                width={600}
+            >
+                <div style={{ marginBottom: 16, textAlign: "end" }}>
+                    <Button
+                        icon={<DownloadOutlined />}
+                        onClick={handleExportTemplate}
+                        style={{ marginBottom: 16 , color:"blue"}}
+                    >
+                        Template
+                    </Button>
+                </div>
+                <Dragger
+                    accept=".xlsx"
+                    beforeUpload={handleImportReports}
+                    showUploadList={false}
+                >
+                    <p className="ant-upload-text">
+                        <Typography.Title level={4}>
+                            Import Reports
+                        </Typography.Title>
+                        Click or drag file to this area to upload
+                    </p>
+                </Dragger>
+            </Modal>
         </div>
     );
 };

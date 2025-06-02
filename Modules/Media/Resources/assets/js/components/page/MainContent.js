@@ -86,8 +86,8 @@ const MainContent = ({
                 flex: 1,
                 minWidth: 300,
                 minHeight: "100vh",
-                overflowY: "auto",
-                overflowX: "hidden",
+                // overflowY: "auto",
+                // overflowX: "hidden",
                 display: "flex",
                 flexDirection: "column",
                 position: "relative",
@@ -123,7 +123,7 @@ const MainContent = ({
                             aria-label="Add new media"
                             disabled={loadingContent}
                         >
-                            Add Media
+                            Create Media
                         </Button>
                         <Button
                             icon={<ReloadOutlined />}
@@ -235,6 +235,9 @@ const MainContent = ({
                                                     height: "100%",
                                                     objectFit: "cover",
                                                     display: "block",
+                                                    position: "absolute",
+                                                    top: 0,
+                                                    left: 0,
                                                 }}
                                                 loading={true}
                                                 active={true}
@@ -354,16 +357,17 @@ const MainContent = ({
                     />
                 )}
             </div>
-            <div
+            <Row
                 style={{
-                    position: "sticky",
-                    bottom: 0,
-                    backgroundColor: "#FFFFFF",
-                    padding: "12px 0",
-                    borderTop: "1px solid #E8E8E8",
-                    textAlign: "center",
-                    zIndex: 10,
-                }}
+                        position: "sticky",
+                        bottom: 0,
+                        backgroundColor: "#FFFFFF",
+                        padding: "12px 0",
+                        borderTop: "1px solid #E8E8E8",
+                        textAlign: "end",
+                        zIndex: 10,
+                        display: "block",
+                    }}
             >
                 <Pagination
                     current={media.current_page}
@@ -377,10 +381,11 @@ const MainContent = ({
                     style={{
                         borderRadius: 8,
                         display: "inline-block",
+                        zIndex: 10,
                     }}
                     disabled={loading}
                 />
-            </div>
+            </Row>
         </div>
     );
 };

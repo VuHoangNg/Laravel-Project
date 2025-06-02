@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Typography,
   Spin,
@@ -16,17 +15,16 @@ import {
   Tag,
   ConfigProvider,
   Modal,
+  Splitter,
 } from "antd";
-import { useBlogContext } from "../context/BlogContext";
 import { useSelector, useDispatch } from "react-redux";
+import { useBlogContext } from "../context/BlogContext";
 import { setMedia } from "../../../../../../Media/Resources/assets/js/components/reducer/action";
-import VideoPlayer from "../../../../../../Core/Resources/assets/js/components/page/VideoPlayer";
 import { CloseOutlined } from "@ant-design/icons";
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 const { Meta } = Card;
 
-// Theme configuration from BlogContent
 const theme = {
   token: {
     colorPrimary: "#4A90E2",
@@ -39,31 +37,61 @@ const theme = {
   components: {
     Card: { borderRadius: 8, boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)" },
     Modal: { colorBgElevated: "#FFFFFF", colorText: "#333333" },
-    Button: { primaryColor: "#FFFFFF", primaryBg: "#4A90E2", defaultBorderColor: "#E8E8E8", borderRadius: 6 },
+    Button: {
+      primaryColor: "#FFFFFF",
+      primaryBg: "#4A90E2",
+      defaultBorderColor: "#E8E8E8",
+      borderRadius: 6,
+    },
     Alert: { colorBgAlert: "#FFF1F0", colorText: "#333333" },
     Pagination: { colorPrimary: "#4A90E2", colorText: "#333333" },
     Drawer: { colorBgElevated: "#FFFFFF", colorText: "#333333" },
   },
 };
 
-// Format duration for videos (from BlogContent)
 const formatDuration = (seconds) => {
   const minutes = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 };
 
-function BlogDetail({ api }) {
-  const { id } = useParams();
-  const navigate = useNavigate();
+// Consistent card styles for both Splitter and Drawer
+const cardStyles = {
+  maxWidth: 450,
+  width: "100%",
+  border: "1px solid #E8E8E8",
+  borderRadius: 8,
+  overflow: "hidden",
+  transition: "transform 0.2s ease, box-shadow 0.2s ease",
+};
+
+// Consistent image container styles
+const imageContainerStyles = {
+  position: "relative",
+  width: "100%",
+  aspectRatio: "16 / 9",
+  overflow: "hidden",
+};
+
+// Consistent image styles
+const imageStyles = {
+  width: "100%",
+  height: "100%",
+  objectFit: "cover",
+  display: "block",
+  loading: "lazy",
+};
+
+function BlogDetail({ api, blogId, onClose }) {
   const dispatch = useDispatch();
-  const [searchParams] = useSearchParams();
   const [blog, setBlog] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [drawerLoading, setDrawerLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isMediaDrawerOpen, setIsMediaDrawerOpen] = useState(false);
   const [selectedMediaIds, setSelectedMediaIds] = useState([]);
+  const [newlySelectedMediaIds, setNewlySelectedMediaIds] = useState([]); // New state for drawer selections
   const [mediaPagination, setMediaPagination] = useState({
     currentPage: 1,
     limit: 8,
@@ -72,7 +100,6 @@ function BlogDetail({ api }) {
   const [form] = Form.useForm();
   const [contentWidth, setContentWidth] = useState(window.innerWidth);
   const [failedImages, setFailedImages] = useState(new Set());
-  const loggedErrors = new Set();
 
   const media = useSelector(
     (state) =>
@@ -85,14 +112,12 @@ function BlogDetail({ api }) {
       }
   );
 
-  const { createBlogContext, editingBlogContext, deleteBlogContext } = useBlogContext();
-  const { resetForm } = createBlogContext;
+  const { editingBlogContext, deleteBlogContext } = useBlogContext();
   const { updateBlog } = editingBlogContext;
   const { deleteBlog } = deleteBlogContext;
 
   const isMounted = useRef(false);
 
-  // Handle window resize for responsive column spans
   useEffect(() => {
     const handleResize = () => setContentWidth(window.innerWidth);
     window.addEventListener("resize", handleResize);
@@ -105,7 +130,7 @@ function BlogDetail({ api }) {
     return () => {
       isMounted.current = false;
     };
-  }, [id]);
+  }, [blogId]);
 
   const fetchBlog = async () => {
     if (!isMounted.current) return;
@@ -113,7 +138,7 @@ function BlogDetail({ api }) {
     setError(null);
 
     try {
-      const response = await api.get(`/api/blogs/${id}`, {
+      const response = await api.get(`/api/blogs/${blogId}`, {
         params: { fields: "id,title,content,media" },
       });
 
@@ -123,11 +148,11 @@ function BlogDetail({ api }) {
           title: response.data.title,
           content: response.data.content,
         });
-        setSelectedMediaIds(
-          response.data.media && Array.isArray(response.data.media)
-            ? response.data.media.map((m) => m.id)
-            : []
-        );
+        const blogMediaIds = response.data.media && Array.isArray(response.data.media)
+          ? response.data.media.map((m) => m.id)
+          : [];
+        setSelectedMediaIds(blogMediaIds);
+        setNewlySelectedMediaIds([]); // Initialize empty for new selections
       }
     } catch (err) {
       if (isMounted.current) {
@@ -150,7 +175,7 @@ function BlogDetail({ api }) {
   }, [mediaPagination.currentPage, mediaPagination.limit, isMediaDrawerOpen]);
 
   const fetchMediaForDrawer = async () => {
-    setLoading(true);
+    setDrawerLoading(true);
     setError(null);
 
     try {
@@ -171,7 +196,7 @@ function BlogDetail({ api }) {
       }
     } finally {
       if (isMounted.current) {
-        setLoading(false);
+        setDrawerLoading(false);
       }
     }
   };
@@ -180,7 +205,7 @@ function BlogDetail({ api }) {
     if (!failedImages.has(srcUrl)) {
       console.error("Image failed to load:", item, "URL:", srcUrl);
       setFailedImages((prev) => new Set(prev).add(srcUrl));
-      e.target.src = "/images/placeholder.png";
+      e.target.src = "https://via.placeholder.com/450?text=Image+Not+Found";
     }
   };
 
@@ -192,8 +217,8 @@ function BlogDetail({ api }) {
         ...values,
         media_ids: selectedMediaIds,
       };
-      await updateBlog(id, payload);
-      const response = await api.get(`/api/blogs/${id}`, {
+      await updateBlog(blogId, payload);
+      const response = await api.get(`/api/blogs/${blogId}`, {
         params: { fields: "id,title,content,media" },
       });
       setBlog(response.data);
@@ -201,11 +226,11 @@ function BlogDetail({ api }) {
         title: response.data.title,
         content: response.data.content,
       });
-      setSelectedMediaIds(
-        response.data.media && Array.isArray(response.data.media)
-          ? response.data.media.map((m) => m.id)
-          : []
-      );
+      const blogMediaIds = response.data.media && Array.isArray(response.data.media)
+        ? response.data.media.map((m) => m.id)
+        : [];
+      setSelectedMediaIds(blogMediaIds);
+      setNewlySelectedMediaIds([]); // Reset new selections after save
       setIsMediaDrawerOpen(false);
     } catch (error) {
       if (error.response?.status === 422) {
@@ -224,17 +249,13 @@ function BlogDetail({ api }) {
     }
   };
 
-  const handleOpenDelete = () => {
-    setIsDeleteModalOpen(true);
-  };
-
   const handleConfirmDelete = async () => {
     setLoading(true);
     setError(null);
     try {
-      await deleteBlog(id);
+      await deleteBlog(blogId);
       setIsDeleteModalOpen(false);
-      navigate(`/blog?page=${searchParams.get("page") || "1"}`);
+      onClose();
     } catch (err) {
       setError("Failed to delete blog. Please try again.");
     } finally {
@@ -253,16 +274,30 @@ function BlogDetail({ api }) {
 
   const handleCloseMediaDrawer = () => {
     setIsMediaDrawerOpen(false);
+    setNewlySelectedMediaIds([]); // Reset new selections when closing drawer
+  };
+
+  const handleSaveMediaSelection = () => {
+    setIsMediaDrawerOpen(false);
+    // Selected media IDs are already in selectedMediaIds, no additional action needed
   };
 
   const handleSelectMedia = (mediaId) => {
+    const blogMediaIds = blog?.media?.map((m) => m.id) || [];
     setSelectedMediaIds((prev) =>
       prev.includes(mediaId) ? prev.filter((id) => id !== mediaId) : [...prev, mediaId]
     );
+    setNewlySelectedMediaIds((prev) => {
+      // Only include mediaId in newlySelectedMediaIds if it's not in blog.media
+      if (blogMediaIds.includes(mediaId)) {
+        return prev; // Don't add or remove if it's an existing blog media
+      }
+      return prev.includes(mediaId) ? prev.filter((id) => id !== mediaId) : [...prev, mediaId];
+    });
   };
 
   const handleMediaPageChange = async (page, pageSize) => {
-    setLoading(true);
+    setDrawerLoading(true);
     setError(null);
     try {
       setMediaPagination((prev) => ({
@@ -273,137 +308,164 @@ function BlogDetail({ api }) {
     } catch (err) {
       setError("Failed to load media. Please try again.");
     } finally {
-      setLoading(false);
+      setDrawerLoading(false);
     }
   };
 
-  const handleBack = () => {
-    const page = searchParams.get("page") || "1";
-    navigate(`/blog?page=${page}`);
+  // Column span for Drawer (media selection)
+  const getColSpan = () => {
+    if (contentWidth >= 1400) return 6; // 4 cards per row
+    if (contentWidth >= 992) return 8; // 3 cards per row
+    if (contentWidth >= 768) return 12; // 2 cards per row
+    return 24; // 1 card per row
   };
 
-  // Responsive column span logic from BlogContent
-  const getColSpan = () => (contentWidth >= 1400 ? 6 : contentWidth >= 1200 ? 8 : contentWidth >= 900 ? 12 : 24);
+  // Column span for Selected Media in Splitter (fixed to 2 cards per row)
+  const getSelectedMediaColSpan = () => {
+    return 12; // Always 2 cards per row (24 / 2 = 12)
+  };
 
   const colSpan = getColSpan();
+  const selectedMediaColSpan = getSelectedMediaColSpan();
 
   return (
     <ConfigProvider theme={theme}>
-      <div style={{ padding: "24px", minHeight: "100vh", background: "#FFFFFF" }}>
-        <Row justify={"space-between"}>
-        <Title level={2} style={{ margin: 0, color: "#333333", fontWeight: 600, fontSize: 24 }}>
-          Edit Blog
-        </Title>
-        <Button onClick={handleBack} style={{ marginBottom: 16 }}>
-          Back to Blog List
-        </Button>
-        </Row>
-        {loading && (
-          <div style={{ textAlign: "center", margin: "20px 0" }}>
+      <div style={{ height: "100%", background: "#FFFFFF" }}>
+        {loading ? (
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
             <Spin size="large" tip="Loading..." />
           </div>
-        )}
-        {error && (
-          <Alert
-            message="Error"
-            description={error}
-            type="error"
-            showIcon
-            closable
-            onClose={() => setError(null)}
-            style={{ marginBottom: 16 }}
-          />
-        )}
-        {blog && (
-          <div>
-            <Form
-              form={form}
-              layout="vertical"
-              onFinish={handleSubmitEdit}
-              style={{
-                background: "#fff",
-                padding: "16px",
-                borderRadius: "8px",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-                border: "1px solid #E8E8E8",
-              }}
-            >
-              <Form.Item
-                name="title"
-                label="Title"
-                rules={[{ required: true, message: "Please enter a title" }]}
-              >
-                <Input placeholder="Enter blog title" />
-              </Form.Item>
-              <Form.Item
-                name="content"
-                label="Content"
-                rules={[{ required: true, message: "Please enter content" }]}
-              >
-                <Input.TextArea rows={4} placeholder="Enter blog content" />
-              </Form.Item>
-              <Form.Item label="Media">
-                <Button type="dashed" onClick={handleOpenMediaDrawer}>
-                  Select Media ({selectedMediaIds.length} selected)
-                </Button>
-                {selectedMediaIds.length > 0 && (
-                  <p style={{ marginTop: 8, color: "#666666" }}>
-                    Selected Media IDs: {selectedMediaIds.join(", ")}
-                  </p>
-                )}
-              </Form.Item>
-              <Space style={{ marginBottom: 16 }}>
-                <Button type="primary" htmlType="submit" loading={loading}>
-                  Save
-                </Button>
-                <Button danger onClick={handleOpenDelete}>
-                  Delete
-                </Button>
-              </Space>
-            </Form>
-            {blog.media && Array.isArray(blog.media) && blog.media.length > 0 && (
-              <>
-                <Title level={4} style={{ marginTop: 24, color: "#333333" }}>
-                  Media
-                </Title>
-                <Row gutter={[16, 16]}>
-                  {blog.media.map((item) => {
-                    const srcUrl =
-                      item.type === "video" && item.thumbnail_url
-                        ? item.thumbnail_url
-                        : item.url || "/images/placeholder.png";
-                    return (
-                      <Col span={colSpan} key={item.id}>
-                        {item.type === "video" ? (
-                          <VideoPlayer
-                            src={item.url}
-                            style={{
-                              height: 200,
-                              objectFit: "cover",
-                              width: "100%",
-                            }}
-                          />
-                        ) : (
-                          <img
-                            alt={item.title || "Media item"}
-                            src={failedImages.has(srcUrl) ? "/images/placeholder.png" : srcUrl}
-                            style={{
-                              height: 200,
-                              objectFit: "cover",
-                              width: "100%",
-                              loading: "lazy",
-                            }}
-                            onError={(e) => handleImageError(e, item, srcUrl)}
-                          />
-                        )}
-                        <p style={{ marginTop: 8, fontWeight: 600 }}>{item.title || "Untitled"}</p>
-                      </Col>
-                    );
-                  })}
-                </Row>
-              </>
+        ) : (
+          <>
+            {error && (
+              <Alert
+                message="Error"
+                description={error}
+                type="error"
+                showIcon
+                closable
+                onClose={() => setError(null)}
+                style={{ marginBottom: 16, padding: 12 }}
+              />
             )}
-          </div>
+            {blog && (
+              <Splitter style={{ height: "100%" }}>
+                {/* Left Panel: Selected Media */}
+                <Splitter.Panel defaultSize="60%" min="30%" max="70%" style={{ overflowY: "auto" }}>
+                  <div style={{ padding: 24 }}>
+                    <Title level={4} style={{ color: "#333333", marginBottom: 24 }}>
+                      Selected Media
+                    </Title>
+                    {blog.media && blog.media.length > 0 ? (
+                      <Row gutter={[24, 24]} justify="start">
+                        {blog.media.map((item) => {
+                          const isVideoMedia = item.type === "video";
+                          const srcUrl =
+                            isVideoMedia && item.thumbnail_url
+                              ? item.thumbnail_url
+                              : item.url || "https://via.placeholder.com/450?text=Image+Not+Found";
+                          return (
+                            <Col span={selectedMediaColSpan} key={item.id}>
+                              <Card
+                                hoverable
+                                style={{
+                                  ...cardStyles,
+                                  border: "1px solid #E8E8E8",
+                                }}
+                                bodyStyle={{ padding: 16 }}
+                                cover={
+                                  <div style={imageContainerStyles}>
+                                    <img
+                                      alt={item.title || "Media item"}
+                                      src={failedImages.has(srcUrl) ? "https://via.placeholder.com/450?text=Image+Not+Found" : srcUrl}
+                                      style={imageStyles}
+                                      onError={(e) => handleImageError(e, item, srcUrl)}
+                                    />
+                                    {isVideoMedia && item.duration && (
+                                      <div
+                                        style={{
+                                          position: "absolute",
+                                          bottom: 12,
+                                          right: 12,
+                                          backgroundColor: "rgba(0, 0, 0, 0.7)",
+                                          color: "#FFFFFF",
+                                          padding: "6px 10px",
+                                          borderRadius: 4,
+                                          fontSize: 14,
+                                          fontWeight: 500,
+                                        }}
+                                      >
+                                        {formatDuration(item.duration)}
+                                      </div>
+                                    )}
+                                  </div>
+                                }
+                              >
+                                <Meta
+                                  title={<span style={{ fontWeight: 600, fontSize: 18 }}>{item.title || "Untitled"}</span>}
+                                  description={<span style={{ fontSize: 16 }}>{isVideoMedia ? "Video" : "Image"}</span>}
+                                />
+                              </Card>
+                            </Col>
+                          );
+                        })}
+                      </Row>
+                    ) : (
+                      <Alert
+                        message="No Media Selected"
+                        description="Select media using the button on the right panel."
+                        type="info"
+                        showIcon
+                        style={{ backgroundColor: "#E6F7FF", border: "1px solid #91D5FF", padding: 12 }}
+                      />
+                    )}
+                  </div>
+                </Splitter.Panel>
+                {/* Right Panel: Blog Details and Form */}
+                <Splitter.Panel style={{ overflowY: "auto" }}>
+                  <div style={{ padding: 24 }}>
+                    <Title level={4} style={{ color: "#333333", marginBottom: 24 }}>
+                      Blog Details
+                    </Title>
+                    <Form
+                      form={form}
+                      layout="vertical"
+                      onFinish={handleSubmitEdit}
+                      style={{ maxWidth: 600 , textAlign:"end"}}
+                    >
+                      <Form.Item
+                        name="title"
+                        label="Title"
+                        rules={[{ required: true, message: "Please enter a title" }]}
+                      >
+                        <Input placeholder="Enter blog title" />
+                      </Form.Item>
+                      <Form.Item
+                        name="content"
+                        label="Content"
+                        rules={[{ required: true, message: "Please enter content" }]}
+                      >
+                        <Input.TextArea rows={4} placeholder="Enter blog content" />
+                      </Form.Item>
+                      <Form.Item label="Media">
+                        <Button type="dashed" onClick={handleOpenMediaDrawer}>
+                          Select Media ({newlySelectedMediaIds.length} selected)
+                        </Button>
+                      </Form.Item>
+                      <Space style={{ marginBottom: 16 }}>
+                        <Button type="primary" htmlType="submit" loading={loading}>
+                          Save
+                        </Button>
+                        <Button danger onClick={() => setIsDeleteModalOpen(true)}>
+                          Delete
+                        </Button>
+                      </Space>
+                    </Form>
+                  </div>
+                </Splitter.Panel>
+              </Splitter>
+            )}
+          </>
         )}
         <Modal
           title="Confirm Delete"
@@ -412,12 +474,12 @@ function BlogDetail({ api }) {
           onCancel={handleCancelDelete}
           okText="Delete"
           okType="danger"
+          style={{ padding: 12 }}
         >
           <p>Are you sure you want to delete this blog?</p>
         </Modal>
         <Drawer
           title="Select Media"
-          placementশ
           placement="right"
           width={Math.min(1200, window.innerWidth * 0.9)}
           onClose={handleCloseMediaDrawer}
@@ -428,8 +490,8 @@ function BlogDetail({ api }) {
           headerStyle={{ borderBottom: "1px solid #E8E8E8" }}
         >
           <div style={{ display: "flex", flexDirection: "column", height: "100%", boxSizing: "border-box" }}>
-            {loading ? (
-              <Spin size="large" tip="Loading media..." style={{ textAlign: "center", margin: "20px 0", flex: 1 }} />
+            {drawerLoading ? (
+              <Spin size="large" tip="Loading media..." style={{ textAlign: "center", margin: "100px 0", flex: 1 }} />
             ) : error ? (
               <Alert
                 message="Error"
@@ -438,7 +500,7 @@ function BlogDetail({ api }) {
                 showIcon
                 closable
                 onClose={() => setError(null)}
-                style={{ marginBottom: 24 }}
+                style={{ marginBottom: 24, padding: 12 }}
               />
             ) : !media.data || media.data.length === 0 ? (
               <Alert
@@ -446,56 +508,36 @@ function BlogDetail({ api }) {
                 description="Please upload some media to select."
                 type="info"
                 showIcon
-                style={{ backgroundColor: "#E6F7FF", border: "1px solid #91D5FF" }}
+                style={{ backgroundColor: "#E6F7FF", border: "1px solid #91D5FF", padding: 12 }}
               />
             ) : (
               <>
                 <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", paddingBottom: 64 }}>
-                  <Row gutter={[16, 16]} style={{ width: "100%" }}>
+                  <Row gutter={[16, 16]} justify="start">
                     {media.data.map((item) => {
                       const isVideoMedia = item.type === "video";
                       const isSelected = selectedMediaIds.includes(item.id);
                       const srcUrl =
                         isVideoMedia && item.thumbnail_url
                           ? item.thumbnail_url
-                          : item.url || "/images/placeholder.png";
+                          : item.url || "https://via.placeholder.com/450?text=Image+Not+Found";
                       return (
                         <Col span={colSpan} key={item.id}>
                           <Card
                             hoverable
                             style={{
+                              ...cardStyles,
                               border: isSelected ? "2px solid #4A90E2" : "1px solid #E8E8E8",
-                              maxWidth: "100%",
                             }}
+                            bodyStyle={{ padding: 12 }}
                             cover={
-                              <div style={{ position: "relative", width: "100%", aspectRatio: "3 / 2" }}>
-                                {isVideoMedia ? (
-                                  <img
-                                    alt={item.title || "Media item"}
-                                    src={failedImages.has(srcUrl) ? "/images/placeholder.png" : srcUrl}
-                                    style={{
-                                      width: "100%",
-                                      height: "100%",
-                                      objectFit: "cover",
-                                      display: "block",
-                                      loading: "lazy",
-                                    }}
-                                    onError={(e) => handleImageError(e, item, srcUrl)}
-                                  />
-                                ) : (
-                                  <img
-                                    alt={item.title || "Media item"}
-                                    src={failedImages.has(srcUrl) ? "/images/placeholder.png" : srcUrl}
-                                    style={{
-                                      width: "100%",
-                                      height: "100%",
-                                      objectFit: "cover",
-                                      display: "block",
-                                      loading: "lazy",
-                                    }}
-                                    onError={(e) => handleImageError(e, item, srcUrl)}
-                                  />
-                                )}
+                              <div style={imageContainerStyles}>
+                                <img
+                                  alt={item.title || "Media item"}
+                                  src={failedImages.has(srcUrl) ? "https://via.placeholder.com/450?text=Image+Not+Found" : srcUrl}
+                                  style={imageStyles}
+                                  onError={(e) => handleImageError(e, item, srcUrl)}
+                                />
                                 {isVideoMedia && item.duration && (
                                   <div
                                     style={{
@@ -532,19 +574,29 @@ function BlogDetail({ api }) {
                     })}
                   </Row>
                 </div>
-                <div style={{ position: "sticky", bottom: 0, background: "#FFFFFF", padding: "12px 0", borderTop: "1px solid #E8E8E8", textAlign: "center" }}>
-                  <Pagination
-                    current={mediaPagination.currentPage}
-                    pageSize={mediaPagination.limit}
-                    total={mediaPagination.total}
-                    onChange={handleMediaPageChange}
-                    showSizeChanger
-                    pageSizeOptions={["8", "16", "32"]}
-                    disabled={loading}
-                  />
-                </div>
               </>
             )}
+            <div style={{ position: "sticky", bottom: 0, background: "#FFFFFF", padding: "12px 0", borderTop: "1px solid #E8E8E8", textAlign: "end" }}>
+              <Space>
+                <Button type="primary" onClick={handleSaveMediaSelection} disabled={drawerLoading}>
+                  Save
+                </Button>
+                <Pagination
+                  current={mediaPagination.currentPage}
+                  pageSize={mediaPagination.limit}
+                  total={mediaPagination.total}
+                  onChange={handleMediaPageChange}
+                  showSizeChanger
+                  pageSizeOptions={["8", "16", "32"]}
+                  disabled={drawerLoading}
+                  style={{
+                    borderRadius: 8,
+                    display: "inline-block",
+                    zIndex: 10,
+                  }}
+                />
+              </Space>
+            </div>
           </div>
         </Drawer>
       </div>

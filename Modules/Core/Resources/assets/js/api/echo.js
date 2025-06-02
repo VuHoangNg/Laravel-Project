@@ -9,7 +9,7 @@ if (!token) {
     console.error("No auth token found in localStorage. Please log in again.");
 }
 
-const APP_URL = process.env.APP_URL || "https://12b5-115-73-213-17.ngrok-free.app";
+const APP_URL = process.env.APP_URL || "http://vproject:8000";
 
 window.Echo = new Echo({
     broadcaster: 'pusher',

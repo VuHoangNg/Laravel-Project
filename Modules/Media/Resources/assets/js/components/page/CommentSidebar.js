@@ -1,11 +1,6 @@
 import React, { useRef, useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import {
-  Typography,
-  Divider,
-  Spin,
-  Skeleton,
-} from "antd";
+import { Typography, Divider, Spin, Skeleton, Row } from "antd";
 import InfiniteScroll from "react-infinite-scroll-component";
 import { APPEND_COMMENTS, ADD_COMMENT } from "../reducer/action";
 import CommentInput from "./CommentInput";
@@ -50,399 +45,449 @@ const buildCommentTree = (comments) => {
 };
 
 const CommentSidebar = ({
-  showCommentSplitter,
-  commentSiderWidth,
-  selectedMedia,
-  commentForm,
-  handleCommentSubmit,
-  handleEditComment,
-  handleDeleteComment,
-  handleTimestampClick,
-  videoTime,
-  formatTimestamp, // Add formatTimestamp prop
-  currentUserId,
-  commentLoading,
-  commentContext,
-  commentId,
-  contentHeight,
+    showCommentSplitter,
+    commentSiderWidth,
+    selectedMedia,
+    commentForm,
+    handleCommentSubmit,
+    handleEditComment,
+    handleDeleteComment,
+    handleTimestampClick,
+    videoTime,
+    formatTimestamp,
+    currentUserId,
+    commentLoading,
+    commentContext,
+    commentId,
+    contentHeight,
 }) => {
-  const dispatch = useDispatch();
-  const scrollableDivRef = useRef(null);
-  const isMounted = useRef(false);
-  const comments = useSelector(
-    (state) => state.media.comments[selectedMedia?.id] || []
-  );
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [highlightedCommentId, setHighlightedCommentId] = useState(null);
-  const [replyingTo, setReplyingTo] = useState(null);
-  const [lastMediaId, setLastMediaId] = useState(null);
-  const [loadedPages, setLoadedPages] = useState(new Set());
-  const [singleComment, setSingleComment] = useState(null);
-  const [expandedComments, setExpandedComments] = useState(new Set());
-  const PAGE_SIZE = 10;
-  const scrollPositionRef = useRef(0);
+    const dispatch = useDispatch();
+    const scrollableDivRef = useRef(null);
+    const isMounted = useRef(false);
+    const comments = useSelector(
+        (state) => state.media.comments[selectedMedia?.id] || []
+    );
+    const [page, setPage] = useState(1);
+    const [loading, setLoading] = useState(false);
+    const [hasMore, setHasMore] = useState(true);
+    const [highlightedCommentId, setHighlightedCommentId] = useState(null);
+    const [replyingTo, setReplyingTo] = useState(null);
+    const [lastMediaId, setLastMediaId] = useState(null);
+    const [loadedPages, setLoadedPages] = useState(new Set());
+    const [singleComment, setSingleComment] = useState(null);
+    const [expandedComments, setExpandedComments] = useState(new Set());
+    const PAGE_SIZE = 10;
+    const scrollPositionRef = useRef(0);
 
-  // Calculate heights for comment section
-  const titleHeight = 40;
-  const formHeight = 120; // Keep the same height for consistency
-  const padding = 16;
-  const commentsHeight = contentHeight - titleHeight - formHeight - padding * 2;
+    useEffect(() => {
+        isMounted.current = true;
+        return () => {
+            isMounted.current = false;
+        };
+    }, []);
 
-  useEffect(() => {
-    isMounted.current = true;
-    return () => {
-      isMounted.current = false;
+    useEffect(() => {
+        if (!isMounted.current) return;
+
+        if (
+            !showCommentSplitter ||
+            (selectedMedia?.id !== lastMediaId && lastMediaId !== null)
+        ) {
+            setSingleComment(null);
+            setHighlightedCommentId(null);
+            setExpandedComments(new Set());
+            setPage(1);
+            setHasMore(true);
+            setLoadedPages(new Set());
+        }
+
+        if (selectedMedia?.id && selectedMedia.id !== lastMediaId) {
+            setLastMediaId(selectedMedia.id);
+        }
+    }, [selectedMedia?.id, lastMediaId]);
+
+    const toggleExpandComment = (commentId) => {
+        if (!isMounted.current) return;
+        setExpandedComments((prev) => {
+            const newSet = new Set(prev);
+            if (newSet.has(commentId)) {
+                newSet.delete(commentId);
+            } else {
+                newSet.add(commentId);
+            }
+            return newSet;
+        });
     };
-  }, []);
 
-  useEffect(() => {
-    if (!isMounted.current) return;
-
-    if (!showCommentSplitter || (selectedMedia?.id !== lastMediaId && lastMediaId !== null)) {
-      setSingleComment(null);
-      setHighlightedCommentId(null);
-      setExpandedComments(new Set());
-      setPage(1);
-      setHasMore(true);
-      setLoadedPages(new Set());
-    }
-
-    if (selectedMedia?.id && selectedMedia.id !== lastMediaId) {
-      setLastMediaId(selectedMedia.id);
-    }
-  }, [selectedMedia?.id, lastMediaId]);
-
-  const toggleExpandComment = (commentId) => {
-    if (!isMounted.current) return;
-    setExpandedComments((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(commentId)) {
-        newSet.delete(commentId);
-      } else {
-        newSet.add(commentId);
-      }
-      return newSet;
-    });
-  };
-
-  const fetchSingleComment = async () => {
-    setLoading(true);
-    try {
-      const commentData = await commentContext.fetchCommentById(commentId);
-      if (commentData && isMounted.current) {
-        const commentTree = commentData.parent
-          ? [
-              {
-                ...commentData.parent,
-                children: [{ ...commentData, children: [] }],
-              },
-            ]
-          : [{ ...commentData, children: [] }];
-        setSingleComment(commentTree);
-        setHighlightedCommentId(parseInt(commentId));
-        setExpandedComments(
-          new Set([commentData.parent?.id || commentData.id])
-        );
-        setTimeout(() => {
-          if (isMounted.current) setHighlightedCommentId(null);
-        }, 3000);
-      }
-    } catch (error) {
-      console.error("Error fetching single comment:", error);
-    } finally {
-      if (isMounted.current) setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!isMounted.current || !commentId || !showCommentSplitter) return;
-    fetchSingleComment();
-  }, [commentId, showCommentSplitter, commentContext]);
-
-  const loadMoreComments = async (reset = false) => {
-    if (loading || !selectedMedia?.id || !hasMore || commentId) {
-      return;
-    }
-    const targetPage = reset ? 1 : page;
-    if (loadedPages.has(targetPage)) {
-      setPage((prev) => prev + 1);
-      return;
-    }
-    setLoading(true);
-
-    if (scrollableDivRef.current && !reset) {
-      scrollPositionRef.current = scrollableDivRef.current.scrollTop;
-    }
-
-    try {
-      const response = await commentContext.fetchComments(
-        selectedMedia.id,
-        {
-          page: targetPage,
-          per_page: PAGE_SIZE,
+    const fetchSingleComment = async () => {
+        setLoading(true);
+        try {
+            const commentData = await commentContext.fetchCommentById(
+                commentId
+            );
+            if (commentData && isMounted.current) {
+                const commentTree = commentData.parent
+                    ? [
+                          {
+                              ...commentData.parent,
+                              children: [{ ...commentData, children: [] }],
+                          },
+                      ]
+                    : [{ ...commentData, children: [] }];
+                setSingleComment(commentTree);
+                setHighlightedCommentId(parseInt(commentId));
+                setExpandedComments(
+                    new Set([commentData.parent?.id || commentData.id])
+                );
+                setTimeout(() => {
+                    if (isMounted.current) setHighlightedCommentId(null);
+                }, 3000);
+            }
+        } catch (error) {
+            console.error("Error fetching single comment:", error);
+        } finally {
+            if (isMounted.current) setLoading(false);
         }
-      );
-      if (!response || !response.data) {
-        console.warn(`Invalid response for page ${targetPage}`);
-        if (isMounted.current) setHasMore(false);
-        return;
-      }
-      if (response.data.length === 0) {
-        console.warn(`No comments returned for page ${targetPage}`);
-        if (isMounted.current) setHasMore(false);
-        return;
-      }
+    };
 
-      const newComments = response.data;
-      const currentComments = reset ? [] : comments;
-      const flatCurrent = flattenComments(currentComments);
-      const flatNew = flattenComments(newComments);
-      const combined = [
-        ...flatCurrent.filter(
-          (c) => !flatNew.some((n) => n.id === c.id)
-        ),
-        ...flatNew,
-      ];
-      const newTree = buildCommentTree(combined);
+    useEffect(() => {
+        if (!isMounted.current || !commentId || !showCommentSplitter) return;
+        fetchSingleComment();
+    }, [commentId, showCommentSplitter, commentContext]);
 
-      if (isMounted.current) {
-        dispatch({
-          type: APPEND_COMMENTS,
-          payload: {
-            mediaId: selectedMedia.id,
-            comments: newTree,
-          },
-        });
-
-        setLoadedPages((prev) => new Set(prev).add(targetPage));
-        setHasMore(response.current_page < response.last_page);
-        setPage((prev) => {
-          const nextPage = targetPage + 1;
-          return nextPage;
-        });
-      }
-
-      if (scrollableDivRef.current && !reset) {
-        scrollableDivRef.current.scrollTop = scrollPositionRef.current;
-      }
-    } catch (error) {
-      console.error(
-        "Error loading comments:",
-        error.response || error.message
-      );
-      if (isMounted.current) setHasMore(false);
-    } finally {
-      if (isMounted.current) {
-        setLoading(false);
-      }
-    }
-  };
-
-  const handleReplyClick = (comment) => {
-    if (!isMounted.current) return;
-    setReplyingTo(comment);
-  };
-
-  const handleReplySubmit = async (payload) => {
-    try {
-      const response = await commentContext.createComment(
-        selectedMedia.id,
-        payload.comment,
-        videoTime,
-        payload.parent_id || null
-      );
-      if (response && response.data && isMounted.current) {
-        dispatch({
-          type: ADD_COMMENT,
-          payload: {
-            mediaId: selectedMedia.id,
-            comment: {
-              id: response.data.id,
-              text: payload.comment,
-              parent_id: payload.parent_id || null,
-              user: {
-                id: currentUserId,
-                username: response.data.user?.username || "Current User",
-                avatar_url: response.data.user?.avatar_url || null,
-              },
-              timestamp: videoTime,
-              formatted_timestamp: formatTimestamp(videoTime), // Use formatTimestamp
-              created_at: response.data.created_at || new Date().toISOString(),
-              children: [],
-            },
-          },
-        });
-        if (payload.parent_id) {
-          setExpandedComments((prev) => new Set(prev).add(payload.parent_id));
+    const loadMoreComments = async (reset = false) => {
+        if (loading || !selectedMedia?.id || !hasMore || commentId) {
+            return;
         }
-      } else {
-        console.warn("No comment data in response, cannot dispatch ADD_COMMENT");
-      }
-    } catch (error) {
-      console.error("Error submitting comment:", error.response || error.message);
-    }
-  };
+        const targetPage = reset ? 1 : page;
+        if (loadedPages.has(targetPage)) {
+            setPage((prev) => prev + 1);
+            return;
+        }
+        setLoading(true);
 
-  return (
-    showCommentSplitter && (
-      <div
-        style={{
-          width: `${commentSiderWidth}px`,
-          backgroundColor: "rgba(28, 37, 38, 0.95)",
-          borderLeft: "1px solid rgba(255, 255, 255, 0.1)",
-          padding: `${padding}px`,
-          position: "relative",
-          backdropFilter: "blur(10px)",
-          overflowX: "hidden",
-          overflowY: "hidden",
-          height: contentHeight,
-          flexShrink: 1,
-          boxSizing: "border-box",
-        }}
-      >
-        {selectedMedia ? (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              height: "100%",
-              width: "100%",
-            }}
-          >
-            <Title
-              level={4}
-              style={{
-                color: "#fff",
-                marginBottom: `${padding}px`,
-                height: titleHeight,
-              }}
-            >
-              Comments
-            </Title>
+        if (scrollableDivRef.current && !reset) {
+            scrollPositionRef.current = scrollableDivRef.current.scrollTop;
+        }
+
+        try {
+            const response = await commentContext.fetchComments(
+                selectedMedia.id,
+                {
+                    page: targetPage,
+                    per_page: PAGE_SIZE,
+                }
+            );
+            if (!response || !response.data) {
+                console.warn(`Invalid response for page ${targetPage}`);
+                if (isMounted.current) setHasMore(false);
+                return;
+            }
+            if (response.data.length === 0) {
+                console.warn(`No comments returned for page ${targetPage}`);
+                if (isMounted.current) setHasMore(false);
+                return;
+            }
+
+            const newComments = response.data;
+            const currentComments = reset ? [] : comments;
+            const flatCurrent = flattenComments(currentComments);
+            const flatNew = flattenComments(newComments);
+            const combined = [
+                ...flatCurrent.filter(
+                    (c) => !flatNew.some((n) => n.id === c.id)
+                ),
+                ...flatNew,
+            ];
+            const newTree = buildCommentTree(combined);
+
+            if (isMounted.current) {
+                dispatch({
+                    type: APPEND_COMMENTS,
+                    payload: {
+                        mediaId: selectedMedia.id,
+                        comments: newTree,
+                    },
+                });
+
+                setLoadedPages((prev) => new Set(prev).add(targetPage));
+                setHasMore(response.current_page < response.last_page);
+                setPage((prev) => {
+                    const nextPage = targetPage + 1;
+                    return nextPage;
+                });
+            }
+
+            if (scrollableDivRef.current && !reset) {
+                scrollableDivRef.current.scrollTop = scrollPositionRef.current;
+            }
+        } catch (error) {
+            console.error(
+                "Error loading comments:",
+                error.response || error.message
+            );
+            if (isMounted.current) setHasMore(false);
+        } finally {
+            if (isMounted.current) {
+                setLoading(false);
+            }
+        }
+    };
+
+    const handleReplyClick = (comment) => {
+        if (!isMounted.current) return;
+        setReplyingTo(comment);
+    };
+
+    const handleReplySubmit = async (payload) => {
+        try {
+            const response = await commentContext.createComment(
+                selectedMedia.id,
+                payload.comment,
+                videoTime,
+                payload.parent_id || null
+            );
+            if (response && response.data && isMounted.current) {
+                dispatch({
+                    type: ADD_COMMENT,
+                    payload: {
+                        mediaId: selectedMedia.id,
+                        comment: {
+                            id: response.data.id,
+                            text: payload.comment,
+                            parent_id: payload.parent_id || null,
+                            user: {
+                                id: currentUserId,
+                                username:
+                                    response.data.user?.username ||
+                                    "Current User",
+                                avatar_url:
+                                    response.data.user?.avatar_url || null,
+                            },
+                            timestamp: videoTime,
+                            formatted_timestamp: formatTimestamp(videoTime),
+                            created_at:
+                                response.data.created_at ||
+                                new Date().toISOString(),
+                            children: [],
+                        },
+                    },
+                });
+                if (payload.parent_id) {
+                    setExpandedComments((prev) =>
+                        new Set(prev).add(payload.parent_id)
+                    );
+                }
+            } else {
+                console.warn(
+                    "No comment data in response, cannot dispatch ADD_COMMENT"
+                );
+            }
+        } catch (error) {
+            console.error(
+                "Error submitting comment:",
+                error.response || error.message
+            );
+        }
+    };
+
+    return (
+        showCommentSplitter && (
             <div
-              ref={scrollableDivRef}
-              style={{
-                flex: 1,
-                overflowY: "auto",
-                marginBottom: `${padding}px`,
-                minHeight: commentsHeight,
-                width: "100%",
-                overflowX: "hidden",
-              }}
-              id="scrollableCommentDiv"
-            >
-              {commentLoading || (commentId && loading) ? (
-                <div
-                  style={{
+                style={{
                     display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    height: "100%",
-                    overflowX: "hidden",
-                  }}
-                >
-                  <Spin tip="Loading comments..." />
-                </div>
-              ) : commentId && singleComment ? (
-                singleComment.map((comment) => (
-                  <CommentItem
-                    key={comment.id}
-                    comment={comment}
-                    currentUserId={currentUserId}
-                    onReplyClick={handleReplyClick}
-                    handleEditComment={handleEditComment}
-                    handleDeleteComment={handleDeleteComment}
-                    handleTimestampClick={handleTimestampClick}
-                    handleReplySubmit={handleReplySubmit}
-                    replyingTo={replyingTo}
-                    setReplyingTo={setReplyingTo}
-                    highlightedCommentId={highlightedCommentId}
-                    expandedComments={expandedComments}
-                    toggleExpandComment={toggleExpandComment}
-                    formatTimestamp={formatTimestamp} // Pass formatTimestamp
-                  />
-                ))
-              ) : comments.length > 0 ? (
-                <InfiniteScroll
-                  style={{ overflowX: "hidden" }}
-                  dataLength={comments.length}
-                  next={() => {
-                    loadMoreComments();
-                  }}
-                  hasMore={hasMore}
-                  loader={
-                    <Skeleton
-                      avatar
-                      paragraph={{ rows: 1 }}
-                      active
-                    />
-                  }
-                  endMessage={
-                    <Divider
-                      plain
-                      style={{ color: "white" }}
+                    flexDirection: "column",
+                    height: `${contentHeight}px`, // Use contentHeight
+                    width: commentSiderWidth,
+                    backgroundColor: "#FFFFFF",
+                    borderLeft: "1px solid #E0E0E0",
+                    padding: 16,
+                    boxSizing: "border-box",
+                    overflow: "hidden",
+                }}
+            >
+                {selectedMedia ? (
+                    <div
+                        style={{
+                            flex: 1,
+                            display: "flex",
+                            flexDirection: "column",
+                            height: "100%",
+                            overflow: "hidden",
+                        }}
                     >
-                      No more comments 🤐
-                    </Divider>
-                  }
-                  scrollableTarget="scrollableCommentDiv"
-                >
-                  {comments.map((comment) => (
-                    <CommentItem
-                      key={comment.id}
-                      comment={comment}
-                      currentUserId={currentUserId}
-                      onReplyClick={handleReplyClick}
-                      handleEditComment={handleEditComment}
-                      handleDeleteComment={handleDeleteComment}
-                      handleTimestampClick={handleTimestampClick}
-                      handleReplySubmit={handleReplySubmit}
-                      replyingTo={replyingTo}
-                      setReplyingTo={setReplyingTo}
-                      highlightedCommentId={highlightedCommentId}
-                      expandedComments={expandedComments}
-                      toggleExpandComment={toggleExpandComment}
-                      formatTimestamp={formatTimestamp} // Pass formatTimestamp
-                    />
-                  ))}
-                </InfiniteScroll>
-              ) : (
-                <Typography
-                  style={{
-                    color: "#fff",
-                    fontSize: "16px",
-                  }}
-                >
-                  No comments yet.
-                </Typography>
-              )}
+                        <Row style={{ marginBottom: 16, width: "100%" }}>
+                            <div
+                                style={{
+                                    width: "100%",
+                                    borderBottom: "1px solid #E0E0E0",
+                                    padding: "8px 0",
+                                }}
+                            >
+                                <Title
+                                    level={4}
+                                    style={{
+                                        color: "#000000",
+                                        margin: 0,
+                                        fontWeight: 600,
+                                    }}
+                                >
+                                    Comments
+                                </Title>
+                            </div>
+                        </Row>
+                        <div
+                            ref={scrollableDivRef}
+                            style={{
+                                flex: 1,
+                                overflowY: "auto",
+                                marginBottom: 16,
+                                background: "#F9F9F9",
+                                borderRadius: 8,
+                                border: "1px solid #E0E0E0",
+                                minHeight: 0, // Allow shrinking
+                            }}
+                            id="scrollableCommentDiv"
+                        >
+                            {commentLoading || (commentId && loading) ? (
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        justifyContent: "center",
+                                        alignItems: "center",
+                                        height: "100%",
+                                    }}
+                                >
+                                    <Spin tip="Loading comments..." />
+                                </div>
+                            ) : commentId && singleComment ? (
+                                singleComment.map((comment) => (
+                                    <CommentItem
+                                        key={comment.id}
+                                        comment={comment}
+                                        currentUserId={currentUserId}
+                                        onReplyClick={handleReplyClick}
+                                        handleEditComment={handleEditComment}
+                                        handleDeleteComment={
+                                            handleDeleteComment
+                                        }
+                                        handleTimestampClick={
+                                            handleTimestampClick
+                                        }
+                                        handleReplySubmit={handleReplySubmit}
+                                        replyingTo={replyingTo}
+                                        setReplyingTo={setReplyingTo}
+                                        highlightedCommentId={
+                                            highlightedCommentId
+                                        }
+                                        expandedComments={expandedComments}
+                                        toggleExpandComment={
+                                            toggleExpandComment
+                                        }
+                                        formatTimestamp={formatTimestamp}
+                                    />
+                                ))
+                            ) : comments.length > 0 ? (
+                                <InfiniteScroll
+                                    style={{
+                                        overflowX: "hidden",
+                                        height: "100%",
+                                    }} // Ensure full height
+                                    dataLength={comments.length}
+                                    next={() => {
+                                        loadMoreComments();
+                                    }}
+                                    hasMore={hasMore}
+                                    loader={
+                                        <Skeleton
+                                            avatar
+                                            paragraph={{ rows: 1 }}
+                                            active
+                                        />
+                                    }
+                                    endMessage={
+                                        <Divider
+                                            plain
+                                            style={{ color: "#000000" }}
+                                        >
+                                            No more comments 🤐
+                                        </Divider>
+                                    }
+                                    scrollableTarget="scrollableCommentDiv"
+                                >
+                                    {comments.map((comment) => (
+                                        <CommentItem
+                                            key={comment.id}
+                                            comment={comment}
+                                            currentUserId={currentUserId}
+                                            onReplyClick={handleReplyClick}
+                                            handleEditComment={
+                                                handleEditComment
+                                            }
+                                            handleDeleteComment={
+                                                handleDeleteComment
+                                            }
+                                            handleTimestampClick={
+                                                handleTimestampClick
+                                            }
+                                            handleReplySubmit={
+                                                handleReplySubmit
+                                            }
+                                            replyingTo={replyingTo}
+                                            setReplyingTo={setReplyingTo}
+                                            highlightedCommentId={
+                                                highlightedCommentId
+                                            }
+                                            expandedComments={expandedComments}
+                                            toggleExpandComment={
+                                                toggleExpandComment
+                                            }
+                                            formatTimestamp={formatTimestamp}
+                                        />
+                                    ))}
+                                </InfiniteScroll>
+                            ) : (
+                                <Typography
+                                    style={{
+                                        color: "#000000",
+                                        fontSize: 16,
+                                        textAlign: "center",
+                                        padding: "20px",
+                                        height: "100%",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                    }}
+                                >
+                                    No comments yet.
+                                </Typography>
+                            )}
+                        </div>
+                        <div style={{ flexShrink: 0 }}>
+                            <CommentInput
+                                onSubmit={handleReplySubmit}
+                                videoTime={videoTime}
+                            />
+                        </div>
+                    </div>
+                ) : (
+                    <div
+                        style={{
+                            flex: 1,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            height: "100%",
+                        }}
+                    >
+                        <Typography style={{ color: "#000000", fontSize: 16 }}>
+                            No media selected
+                        </Typography>
+                    </div>
+                )}
             </div>
-            <CommentInput
-              onSubmit={handleReplySubmit}
-              videoTime={videoTime}
-              formatTimestamp={formatTimestamp} // Pass formatTimestamp
-              formHeight={formHeight}
-            />
-          </div>
-        ) : (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              height: "100%",
-            }}
-          >
-            <Typography style={{ color: "#fff", fontSize: "16px" }}>
-              No media selected
-            </Typography>
-          </div>
-        )}
-      </div>
-    )
-  );
+        )
+    );
 };
 
 export default CommentSidebar;

@@ -70,9 +70,19 @@ export const ScriptProvider = ({ api, children }) => {
                 throw new Error("Invalid response structure: script data missing");
             }
             dispatch({ type: ADD_SCRIPT, payload: responseScriptData });
-            message.success("Script created successfully!");
+            return responseScriptData; // Return data for success handling
         } catch (error) {
-            message.error("Failed to create script.");
+            if (error.response?.status === 422) {
+                const errors = error.response.data.errors || {};
+                // Map backend field names to form field names
+                const fieldErrors = Object.keys(errors).reduce((acc, key) => {
+                    const field = key === "estimated_time" ? "est_time" : key;
+                    acc[field] = errors[key].join(", ");
+                    return acc;
+                }, {});
+                throw { message: error.response.data.message || "Validation failed", fieldErrors };
+            }
+            throw { message: error.response?.data?.message || "Failed to create script" };
         }
     };
 
@@ -87,12 +97,22 @@ export const ScriptProvider = ({ api, children }) => {
                     throw new Error("Invalid response structure: script data missing");
                 }
                 dispatch({ type: UPDATE_SCRIPT, payload: responseScriptData });
-                message.success("Script updated successfully!");
+                return responseScriptData; // Return data for success handling
             } else {
                 throw new Error(`Unexpected status code: ${response.status}`);
             }
         } catch (error) {
-            message.error("Failed to update script.");
+            if (error.response?.status === 422) {
+                const errors = error.response.data.errors || {};
+                // Map backend field names to form field names
+                const fieldErrors = Object.keys(errors).reduce((acc, key) => {
+                    const field = key === "estimated_time" ? "est_time" : key;
+                    acc[field] = errors[key].join(", ");
+                    return acc;
+                }, {});
+                throw { message: error.response.data.message || "Validation failed", fieldErrors };
+            }
+            throw { message: error.response?.data?.message || "Failed to update script" };
         }
     };
 
@@ -161,8 +181,8 @@ export const ScriptProvider = ({ api, children }) => {
                     }
                     return `Row ${err.row}: ${Object.entries(err.errors).map(([field, messages]) => {
                         // Map est_time to estimated time for display
-                        const displayField = field === 'est_time' ? 'estimated time' : field;
-                        return `${displayField}: ${messages.join(', ')}`;
+                        const fieldName = field === 'est_time' ? 'estimated time' : field;
+                        return `${fieldName}: ${messages.join(', ')}`;
                     }).join('; ')}`;
                 }).join('\n');
                 message.error({

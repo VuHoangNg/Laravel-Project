@@ -418,6 +418,7 @@ function Core() {
                             display: "flex",
                             justifyContent: "flex-end",
                             alignItems: "center",
+                            margin: "10px 10px 0 10px",
                         }}
                     >
                         <div
